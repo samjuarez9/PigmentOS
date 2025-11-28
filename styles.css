@@ -510,42 +510,45 @@ h1 {
 /* System Status Beacons (Dot + Signal Icon) */
 .status-container {
     display: inline-flex;
-    gap: 6px;
-    margin-left: 10px;
+    gap: 4px;
+    margin-left: 8px;
     align-items: center;
-    font-size: 14px;
 }
 
 /* Default State (DOWN / INITIALIZING) - Neon Red */
 .status-container .status-dot {
     color: var(--alert-red);
     opacity: 0.8;
-    font-size: 16px;
-    /* Larger */
+    font-size: 10px;
+    /* Much smaller */
 }
 
 .status-container .status-text {
     font-family: var(--font-pixel);
-    font-size: 14px;
+    font-size: 10px;
+    /* Much smaller */
     font-weight: 700;
     letter-spacing: 1px;
-    margin-left: 6px;
+    margin-left: 4px;
     color: var(--alert-red);
     opacity: 1;
     text-transform: uppercase;
     transition: color 0.3s ease;
 }
 
-/* Live State - Vibrant Cyan */
+/* Live State - Neon Green */
 .status-container.status-live .status-dot {
-    color: var(--primary-color);
+    color: #00FF00;
+    /* Pure Green */
     animation: blink 1s steps(1) infinite;
-    /* Blocky blink */
+    font-size: 8px;
+    /* Tiny dot */
 }
 
 .status-container.status-live .status-text {
-    color: var(--primary-color);
-    text-shadow: 0 0 5px var(--primary-color);
+    color: #00FF00;
+    /* Pure Green */
+    text-shadow: 0 0 4px rgba(0, 255, 0, 0.6);
 }
 
 @keyframes blink {
