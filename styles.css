@@ -2180,8 +2180,8 @@ td {
 .news-headline {
     font-size: 14px;
     /* Reduced from default */
-    color: #EEEEEE;
-    /* White/Grey, less blue */
+    color: #FFFFFF;
+    /* Pure White */
     line-height: 1.4;
     margin-bottom: 4px;
     font-weight: 400;
@@ -2196,7 +2196,8 @@ td {
     /* Smaller meta */
     margin-bottom: 4px;
     font-family: var(--font-mono);
-    color: #BBBBBB;
+    color: #CCCCCC;
+    /* Lighter Grey/White */
 }
 
 .news-time {
