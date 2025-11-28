@@ -2058,31 +2058,40 @@ td {
 }
 
 .polymarket-odds-yes {
-    color: var(--electric-cyan);
+    color: #00FF00;
+    /* Neon Green */
 }
 
 .polymarket-odds-no {
-    color: var(--anaglyph-red);
+    color: #FF3333;
+    /* Red */
 }
 
 .polymarket-laser-gauge {
     position: relative;
-    height: 2px;
-    background: rgba(0, 0, 0, 0.8);
+    height: 4px;
+    /* Increased from 2px for visibility */
+    background: rgba(255, 255, 255, 0.1);
+    /* Slight background to show empty space */
     overflow: hidden;
     display: flex;
+    margin-top: 4px;
+    /* Add spacing */
+    border-radius: 2px;
 }
 
 .polymarket-yes-segment {
     height: 100%;
-    background: var(--electric-cyan);
-    box-shadow: 0 0 4px var(--electric-cyan);
+    background: #00FF00;
+    /* Neon Green */
+    box-shadow: 0 0 4px rgba(0, 255, 0, 0.6);
     transition: width 0.4s ease;
 }
 
 .polymarket-no-segment {
     height: 100%;
-    background: var(--anaglyph-red);
+    background: #FF3333;
+    /* Red */
     opacity: 0.8;
     transition: width 0.4s ease;
 }
