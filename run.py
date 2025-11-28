@@ -12,6 +12,7 @@ from datetime import datetime, date
 import pytz
 from flask import Flask, jsonify, Response, request, send_from_directory, stream_with_context
 from flask_cors import CORS
+import feedparser
 
 # Fix for SSL Certificate Verify Failed
 try:
@@ -375,35 +376,38 @@ def api_movers():
 
 @app.route('/api/news')
 def api_news():
-    # Simplified News Logic
-    import feedparser
-    import calendar
-    
-    RSS_URLS = [
-        "https://www.investing.com/rss/news.rss",
-        "https://finance.yahoo.com/news/rssindex"
-    ]
-    
-    all_news = []
-    for url in RSS_URLS:
-        try:
-            feed = feedparser.parse(url)
-            for entry in feed.entries[:5]:
-                pub_ts = int(time.time())
-                if hasattr(entry, 'published_parsed') and entry.published_parsed:
-                    pub_ts = int(calendar.timegm(entry.published_parsed))
-                
-                all_news.append({
-                    "title": entry.get('title', ''),
-                    "publisher": "Market Wire",
-                    "link": entry.get('link', ''),
-                    "time": pub_ts,
-                    "ticker": "NEWS"
-                })
-        except: continue
+    try:
+        # Simplified News Logic
+        import calendar
         
-    all_news.sort(key=lambda x: x['time'], reverse=True)
-    return jsonify(all_news)
+        RSS_URLS = [
+            "https://www.investing.com/rss/news.rss",
+            "https://finance.yahoo.com/news/rssindex"
+        ]
+        
+        all_news = []
+        for url in RSS_URLS:
+            try:
+                feed = feedparser.parse(url)
+                for entry in feed.entries[:5]:
+                    pub_ts = int(time.time())
+                    if hasattr(entry, 'published_parsed') and entry.published_parsed:
+                        pub_ts = int(calendar.timegm(entry.published_parsed))
+                    
+                    all_news.append({
+                        "title": entry.get('title', ''),
+                        "publisher": "Market Wire",
+                        "link": entry.get('link', ''),
+                        "time": pub_ts,
+                        "ticker": "NEWS"
+                    })
+            except: continue
+            
+        all_news.sort(key=lambda x: x['time'], reverse=True)
+        return jsonify(all_news)
+    except Exception as e:
+        print(f"News Error: {e}")
+        return jsonify([])
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8001))

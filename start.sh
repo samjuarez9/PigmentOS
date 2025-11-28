@@ -28,7 +28,12 @@ else
     echo -e "${YELLOW}[2/3]${NC} Starting backend server..."
     
     # Start server in background and redirect output to log file
-    nohup python3 run.py > server.log 2>&1 &
+    # Start server in background and redirect output to log file
+    PYTHON_CMD="python3"
+    if [ -f ".venv/bin/python" ]; then
+        PYTHON_CMD=".venv/bin/python"
+    fi
+    nohup $PYTHON_CMD run.py > server.log 2>&1 &
     SERVER_PID=$!
     
     # Wait for server to start (max 5 seconds)
