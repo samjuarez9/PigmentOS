@@ -1,19 +1,23 @@
 /* styles.css */
 
 :root {
-    --bg-color: #080808;
-    --text-color: #EAEAEA;
-    --anaglyph-red: #FF0055;
-    --electric-cyan: #0066FF;
-    --accent-dim-red: rgba(255, 0, 85, 0.2);
-    --accent-dim-cyan: rgba(0, 102, 255, 0.2);
-    --border-color: #1A1A1A;
-    --widget-bg: rgba(12, 12, 12, 0.95);
-    --font-mono: 'JetBrains Mono', monospace;
-    --font-pixel: 'JetBrains Mono', monospace;
-    /* Anaglyph 3D Theme */
-    --bearish-color: #FF0055;
-    --bullish-color: #0066FF;
+    --bg-color: #000000;
+    --text-color: #0051CA;
+    /* Pepsi Blue */
+    /* Neon Cyan */
+    --primary-color: #0051CA;
+    --alert-red: #FF3333;
+    --dim-cyan: rgba(0, 81, 202, 0.2);
+    --border-color: #0051CA;
+    --widget-bg: rgba(0, 10, 25, 0.9);
+    /* Slight blue tint */
+    --font-mono: 'VT323', monospace;
+    /* Pixel Font everywhere */
+    --font-pixel: 'VT323', monospace;
+
+    /* Feed Colors (Preserved) */
+    --bullish-color: #00FF00;
+    --bearish-color: #FF0099;
 }
 
 * {
@@ -30,6 +34,23 @@ body {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    text-shadow: 0 0 2px var(--dim-cyan);
+    /* Slight bloom */
+}
+
+/* CRT Scanline Overlay */
+body::after {
+    content: " ";
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    z-index: 9999;
+    background-size: 100% 2px, 3px 100%;
+    pointer-events: none;
 }
 
 .terminal-container {
@@ -45,13 +66,13 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 15px 20px;
-    background: rgba(10, 10, 10, 0.95);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    background: #000000;
+    border-bottom: 2px solid var(--border-color);
+    /* Thick border */
     position: sticky;
     top: 0;
     z-index: 100;
+    box-shadow: 0 0 10px var(--dim-cyan);
 }
 
 .header-right {
@@ -69,8 +90,8 @@ body {
 
 .brand-icon {
     font-size: 24px;
-    color: #fff;
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    color: var(--primary-color);
+    text-shadow: 0 0 5px var(--primary-color);
 }
 
 .brand-text {
@@ -80,24 +101,21 @@ body {
 }
 
 .pigment-word {
-    font-family: 'Roboto', 'Arial Black', sans-serif;
-    font-weight: 900;
-    font-size: 24px;
-    letter-spacing: 1px;
-    background: linear-gradient(90deg, #00f260, #0575e6, #8e2de2, #ff00cc, #00f260);
-    background-size: 300%;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: flowGradient 6s linear infinite;
-    filter: drop-shadow(0 0 5px rgba(142, 45, 226, 0.4));
+    font-family: var(--font-pixel);
+    font-weight: 700;
+    font-size: 28px;
+    letter-spacing: 2px;
+    color: var(--primary-color);
+    text-shadow: 0 0 5px var(--primary-color);
 }
 
 .os-word {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-pixel);
     font-weight: 400;
-    font-size: 24px;
-    color: #fff;
-    opacity: 0.8;
+    font-size: 28px;
+    color: var(--primary-color);
+    opacity: 1;
+    text-shadow: 0 0 5px var(--primary-color);
 }
 
 @keyframes flowGradient {
@@ -113,11 +131,11 @@ body {
 h1 {
     font-family: var(--font-pixel);
     font-size: 28px;
-    color: var(--text-color);
+    color: var(--primary-color);
     letter-spacing: 2px;
     text-transform: uppercase;
     position: relative;
-    text-shadow: 2px 0 0 var(--anaglyph-red), -2px 0 0 var(--electric-cyan);
+    text-shadow: 0 0 5px var(--primary-color);
 }
 
 /* Custom Dropdown */
@@ -409,14 +427,15 @@ h1 {
 
 .widget {
     background: var(--widget-bg);
-    border: 1px solid var(--border-color);
+    border: 2px solid var(--border-color);
+    /* Thick border */
     display: flex;
     flex-direction: column;
     flex: 1;
     overflow: hidden;
     position: relative;
     padding: 0;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.1);
 }
 
 /* Right column widgets - no gap */
@@ -430,9 +449,10 @@ h1 {
     top: 0;
     left: 0;
     width: 100%;
-    height: 2px;
-    background: linear-gradient(90deg, var(--accent-cyan), transparent);
-    opacity: 0.5;
+    height: 4px;
+    /* Thicker decoration line */
+    background: linear-gradient(90deg, var(--primary-color), transparent);
+    opacity: 0.8;
 }
 
 .widget-header {
@@ -461,7 +481,7 @@ h1 {
 /* System Status Beacons (Dot + Signal Icon) */
 .status-container {
     display: inline-flex;
-    gap: 4px;
+    gap: 6px;
     margin-left: 10px;
     align-items: center;
     font-size: 14px;
@@ -469,36 +489,46 @@ h1 {
 
 /* Default State (DOWN / INITIALIZING) - Neon Red */
 .status-container .status-dot {
-    color: #FF3333;
-    /* Neon Red */
-    opacity: 0.6;
-    /* Dim */
+    color: var(--alert-red);
+    opacity: 0.8;
+    font-size: 16px;
+    /* Larger */
 }
 
 .status-container .status-text {
-    font-family: 'Courier New', monospace;
-    font-size: 9px;
+    font-family: var(--font-pixel);
+    font-size: 14px;
     font-weight: 700;
     letter-spacing: 1px;
     margin-left: 6px;
-    color: #FF3333;
-    /* Default Error Color */
-    opacity: 0.8;
+    color: var(--alert-red);
+    opacity: 1;
     text-transform: uppercase;
     transition: color 0.3s ease;
 }
 
-/* Live State - Vibrant Energy Green */
+/* Live State - Vibrant Cyan */
 .status-container.status-live .status-dot {
-    color: #00FF7F;
-    /* Vibrant Energy Green */
-    animation: heartbeat 2s infinite ease-in-out;
+    color: var(--primary-color);
+    animation: blink 1s steps(1) infinite;
+    /* Blocky blink */
 }
 
 .status-container.status-live .status-text {
-    color: #00FF7F;
-    /* Vibrant Energy Green */
-    text-shadow: 0 0 5px rgba(0, 255, 127, 0.5);
+    color: var(--primary-color);
+    text-shadow: 0 0 5px var(--primary-color);
+}
+
+@keyframes blink {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0;
+    }
 }
 
 /* Heartbeat Animation */
@@ -624,7 +654,7 @@ td {
     color: #666;
 }
 
-/* Ticker Widget (Retro Classified Military) */
+/* Ticker Widget (Blue WarGames) */
 .ticker-widget {
     position: fixed;
     bottom: 10px;
@@ -634,21 +664,14 @@ td {
     z-index: 1000;
     margin: 0;
     flex: none;
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.8);
-    /* Darker shadow */
-    border: none;
-    border-top: 1px solid #ff5555;
-    /* Bright Red Top Border */
-    background: #4a1212;
-    /* Deep Burgundy */
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+    border: 2px solid var(--primary-color);
+    background: #000000;
     border-radius: 0;
-    /* Sharp corners for military look */
-    font-family: 'Courier New', Courier, monospace;
-    /* Monospace */
+    font-family: var(--font-pixel);
     text-transform: uppercase;
     letter-spacing: 2px;
-    color: #ffcccc;
-    /* Pale Red/Pink */
+    color: var(--primary-color);
     font-weight: bold;
 }
 
