@@ -2677,3 +2677,81 @@ td {
         box-shadow: 0 0 6px rgba(0, 255, 157, 0.4);
     }
 }
+
+/* === MOBILE RESPONSIVENESS === */
+@media (max-width: 768px) {
+    body {
+        overflow-y: auto;
+        /* Enable scrolling on mobile */
+        height: auto;
+    }
+
+    .terminal-container {
+        height: auto;
+        padding-bottom: 60px;
+        /* Space for bottom ticker */
+    }
+
+    .main-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        overflow: visible;
+    }
+
+    .column {
+        height: auto;
+        overflow: visible;
+    }
+
+    /* Adjust Widget Heights for Mobile */
+    .widget {
+        min-height: 300px;
+        max-height: none;
+        flex: none;
+    }
+
+    /* Header Adjustments */
+    .main-header {
+        padding: 10px;
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+    }
+
+    .header-right {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .pigment-word {
+        font-size: 20px;
+    }
+
+    .os-word {
+        font-size: 20px;
+    }
+
+    /* Chart Container on Mobile */
+    .chart-container {
+        min-height: 300px;
+    }
+
+    /* Ticker Widget */
+    .ticker-widget {
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 9999;
+    }
+
+    /* Ensure dropdown doesn't get cut off */
+    .custom-dropdown {
+        margin-right: 0;
+    }
+
+    .header-left-group {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
