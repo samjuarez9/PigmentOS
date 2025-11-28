@@ -105,8 +105,8 @@ body::after {
     font-weight: 700;
     font-size: 28px;
     letter-spacing: 2px;
-    /* Blue Plasma Gradient: Deep Blue -> Pepsi Blue -> Cyan -> White -> Pepsi Blue -> Deep Blue */
-    background: linear-gradient(90deg, #001f4d, #0051CA, #00FFFF, #FFFFFF, #0051CA, #001f4d);
+    /* System Core Gradient: Pepsi Blue -> Purple -> Pink -> White -> Green -> Cyan -> Pepsi Blue */
+    background: linear-gradient(90deg, #0051CA, #9D00FF, #FF0099, #FFFFFF, #00FF00, #00FFFF, #0051CA);
     background-size: 300%;
     -webkit-background-clip: text;
     background-clip: text;
