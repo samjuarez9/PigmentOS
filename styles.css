@@ -1985,12 +1985,7 @@ td {
     }
 }
 
-.widget-header h2 {
-    font-size: 14px;
-    color: var(--color-text-dim);
-    letter-spacing: 1px;
-    margin: 0;
-}
+
 
 .polymarket-top-row {
     display: flex;
