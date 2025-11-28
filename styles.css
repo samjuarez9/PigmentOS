@@ -2743,6 +2743,9 @@ td {
         left: 0;
         right: 0;
         z-index: 9999;
+        min-height: auto;
+        /* Override generic widget min-height */
+        height: auto;
     }
 
     /* Ensure dropdown doesn't get cut off */
