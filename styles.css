@@ -496,7 +496,8 @@ h1 {
 .widget-header h2 {
     font-family: var(--font-pixel);
     font-size: 18px;
-    color: var(--accent-cyan);
+    color: #FFFFFF;
+    /* Pure White */
     letter-spacing: 1px;
 }
 
@@ -2000,7 +2001,8 @@ td {
 
 .polymarket-event {
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 14px;
+    /* Increased from 11px */
     color: #CCCCCC;
     letter-spacing: 0.5px;
     text-decoration: none;
@@ -2038,21 +2040,24 @@ td {
 
 .delta-up {
     color: #00FF7F;
-    font-size: 9px;
+    font-size: 11px;
+    /* Increased */
     margin-left: 3px;
     vertical-align: middle;
 }
 
 .delta-down {
     color: #FF3333;
-    font-size: 9px;
+    font-size: 11px;
+    /* Increased */
     margin-left: 3px;
     vertical-align: middle;
 }
 
 .polymarket-odds-text {
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 14px;
+    /* Increased from 11px */
     font-weight: bold;
     letter-spacing: 0.5px;
 }
@@ -2176,33 +2181,78 @@ td {
     background: rgba(255, 255, 255, 0.05);
 }
 
+/* Market Wire Typography Refinement */
+.news-headline {
+    font-size: 14px;
+    /* Reduced from default */
+    color: #EEEEEE;
+    /* White/Grey, less blue */
+    line-height: 1.4;
+    margin-bottom: 4px;
+    font-weight: 400;
+    text-shadow: none;
+    /* Remove blue glow */
+}
+
 .news-meta {
     display: flex;
     justify-content: space-between;
     font-size: 11px;
+    /* Smaller meta */
     margin-bottom: 4px;
     font-family: var(--font-mono);
+    color: #BBBBBB;
 }
 
 .news-time {
     color: #888;
 }
 
-.news-ticker {
-    color: #0066FF;
-    /* Polymarket Blue */
-    font-weight: bold;
+/* General Widget Typography Bump */
+.widget-content {
+    font-size: 14px;
+    /* Base size increase */
 }
 
-.news-title {
-    display: block;
-    color: #fff;
+.polymarket-event {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    /* Increased from 11px */
+    color: #CCCCCC;
+    letter-spacing: 0.5px;
     text-decoration: none;
-    font-size: 13px;
-    line-height: 1.4;
-    margin-bottom: 4px;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 10px;
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
 }
+
+.polymarket-odds-text {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    /* Increased from 11px */
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}
+
+.whale-row {
+    display: grid;
+    grid-template-columns: 0.8fr 1fr 1.2fr 0.8fr;
+    align-items: center;
+    padding: 0 10px;
+    height: 40px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 14px;
+    /* Increased from 13px */
+    transition: background-color 0.2s;
+    border-left: 3px solid transparent;
+}
+
+
 
 .news-title:hover {
     text-decoration: underline;
