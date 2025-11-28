@@ -1,70 +1,34 @@
-# PigmentOS
+# ❖ PIGMENT OS
+**Real-time Financial Intelligence Terminal**
 
-Real-time stock intelligence HUD with market sentiment analysis.
+PigmentOS is a high-performance, dark-mode market dashboard designed for traders who need speed and clarity. It aggregates live data from multiple sources into a single "glass-morphic" HUD.
 
-## Quick Start
+## 🚀 Features
+-   **Unusual Whales Tracker**: Real-time options flow monitoring for big money bets.
+-   **Polymarket Odds**: Live probability feeds for global events (Fed rates, Elections).
+-   **Trader Fear Index (TFI)**: Custom sentiment gauge based on VIX and market momentum.
+-   **Live Price Action**: Sub-second updates for major tickers (NVDA, SPY, BTC).
+-   **Market Wire**: AI-filtered news feed prioritizing "Breaking" and "Macro" events.
 
-```bash
-./start.sh
-```
+## 🛠️ Tech Stack
+-   **Frontend**: Vanilla JS + CSS3 (No frameworks, pure speed).
+-   **Backend**: Python (Flask) + Gunicorn.
+-   **Data**: Yahoo Finance, Polymarket API, RSS Feeds.
 
-This will start the backend server and open the dashboard in your browser.
+## 📦 Installation
+1.  Clone the repo:
+    ```bash
+    git clone https://github.com/YOUR_USERNAME/pigment-os.git
+    ```
+2.  Install dependencies:
+    ```bash
+    pip install -r requirements.txt
+    ```
+3.  Run the server:
+    ```bash
+    ./start.sh
+    ```
 
-## Architecture
-
-PigmentOS consists of two components:
-
-1. **Frontend** (`index.html` + `app.js`)
-   - Real-time dashboard
-   - TradingView charts
-   - Live data feeds
-
-2. **Backend** (`run.py`)
-   - Python server on port 8001
-   - Fetches data from multiple APIs:
-     - CNN Fear & Greed Index
-     - Polymarket odds
-     - News feeds (TechCrunch, CNBC, The Verge)
-     - Unusual options activity (yfinance)
-
-## Features
-
-- 🐳 **Unusual Whales** - High-value options flow tracker
-- 📊 **P/C Ratio** - Put/Call sentiment analysis  
-- 📈 **Live Price Action** - TradingView charts
-- 🔮 **Polymarket Odds** - Market probabilities
-- 😱 **Trader Fear Index** - Real CNN Fear & Greed data
-- 📰 **Market Wire** - Curated news feed
-
-## Requirements
-
-```bash
-pip install -r requirements.txt
-```
-
-Dependencies:
-- Python 3.11+
-- yfinance
-- requests
-- feedparser
-- pandas
-
-## Health Check
-
-Verify the server is running:
-
-```bash
-./check_server.sh
-```
-
-## Troubleshooting
-
-See `.agent/workflows/start.md` for detailed troubleshooting steps.
-
-## Server Logs
-
-Server output is logged to `server.log`:
-
-```bash
-tail -f server.log
-```
+## ☁️ Deployment
+Ready for production on **Render** or **Railway**.
+See `deployment_workflow.md` for details.

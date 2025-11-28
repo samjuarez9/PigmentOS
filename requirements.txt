@@ -3,3 +3,6 @@ yfinance
 pandas
 pytz
 urllib3
+flask
+flask-cors
+gunicorn
