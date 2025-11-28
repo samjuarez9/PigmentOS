@@ -89,40 +89,40 @@ body::after {
 }
 
 .brand-icon {
-    font-size: 24px;
-    color: var(--primary-color);
-    text-shadow: 0 0 5px var(--primary-color);
+    display: none;
+    /* Remove icon */
 }
 
 .brand-text {
     display: flex;
     align-items: baseline;
-    gap: 5px;
+    gap: 10px;
+    /* Increased gap */
 }
 
 .pigment-word {
     font-family: var(--font-pixel);
     font-weight: 700;
-    font-size: 28px;
+    font-size: 42px;
+    /* Increased size */
     letter-spacing: 2px;
-    /* Retro Arcade Chrome: Deep Blue Base with Cyan/White Glint */
+    /* Holographic Chrome: Cyan -> White -> Neon Pink */
     background: linear-gradient(110deg,
-            #001f4d 0%,
-            #001f4d 40%,
-            #00FFFF 48%,
-            /* Cyan Horizon */
-            #FFFFFF 50%,
+            #00FFFF 0%,
+            #00FFFF 40%,
+            #FFFFFF 48%,
             /* White Glint */
-            #00FFFF 52%,
-            /* Cyan Horizon */
-            #001f4d 60%,
-            #001f4d 100%);
+            #FFFFFF 52%,
+            /* White Glint */
+            #FF00FF 60%,
+            /* Neon Pink */
+            #FF00FF 100%);
     background-size: 250% 100%;
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
     animation: chromeShine 4s linear infinite;
-    filter: drop-shadow(0 0 5px rgba(0, 81, 202, 0.8));
+    filter: drop-shadow(0 0 5px rgba(0, 255, 255, 0.5));
 }
 
 @keyframes chromeShine {
@@ -138,10 +138,13 @@ body::after {
 .os-word {
     font-family: var(--font-pixel);
     font-weight: 400;
-    font-size: 28px;
-    color: var(--primary-color);
+    font-size: 42px;
+    /* Increased size */
+    color: #FFFFFF;
+    /* Pure White */
     opacity: 1;
-    text-shadow: 0 0 5px var(--primary-color);
+    text-shadow: none;
+    /* Clean, no glow */
 }
 
 @keyframes flowGradient {
