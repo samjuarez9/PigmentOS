@@ -40,7 +40,7 @@ WATCHLIST = [
 MEGA_WHALE_THRESHOLD = 9_000_000  # $9M
 
 # Cache structure
-CACHE_DURATION = 60
+CACHE_DURATION = 300
 MACRO_CACHE_DURATION = 1800
 POLY_STATE = {}
 
@@ -155,6 +155,7 @@ def refresh_whales_logic():
         try:
             whales = fetch_ticker_options(ticker)
             all_whales.extend(whales)
+            time.sleep(2)
         except: continue
     
     all_whales.sort(key=lambda x: x.get('tradeTime', 0), reverse=True)
