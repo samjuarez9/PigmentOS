@@ -105,8 +105,14 @@ body::after {
     font-weight: 700;
     font-size: 28px;
     letter-spacing: 2px;
-    color: var(--primary-color);
-    text-shadow: 0 0 5px var(--primary-color);
+    /* Blue Plasma Gradient: Deep Blue -> Pepsi Blue -> Cyan -> White -> Pepsi Blue -> Deep Blue */
+    background: linear-gradient(90deg, #001f4d, #0051CA, #00FFFF, #FFFFFF, #0051CA, #001f4d);
+    background-size: 300%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: flowGradient 3s linear infinite;
+    filter: drop-shadow(0 0 8px rgba(0, 81, 202, 0.8));
 }
 
 .os-word {
