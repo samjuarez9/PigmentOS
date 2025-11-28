@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIGMENT OS</title>
+    <link rel="stylesheet" href="styles.css?v=3.3">
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+
+<body>
+    <div class="terminal-container">
+        <!-- Header -->
+        <header class="main-header">
+            <div class="brand-container">
+                <span class="brand-icon">❖</span>
+                <div class="brand-text">
+                    <span class="pigment-word">PIGMENT</span>
+                    <span class="os-word">OS</span>
+                </div>
+            </div>
+
+            <!-- Ticker moved to footer -->
+
+            <!-- LIVE Indicator placeholder (will be on right) -->
+            <div class="header-right">
+                <!-- Status indicators go here -->
+            </div>
+
+        </header>
+
+        <!-- NEWS FEED -->
+
+
+        <!-- Main Grid -->
+        <main class="main-grid">
+            <!-- Left Column -->
+            <div class="column left-col">
+                <div class="widget" id="unusual-whales">
+                    <div class="widget-header">
+                        <h2>UNUSUAL WHALES 🐳</h2>
+                        <div class="status-container" id="status-whales">
+                            <span class="status-dot">●</span>
+                            <span class="status-text">OFFLINE</span>
+                        </div>
+                        <div class="decoration-line"></div>
+                    </div>
+                    <div class="widget-content list-container" id="flow-feed-container">
+                        <!-- Populated by JS -->
+                        <div class="placeholder-item">Scanning for High Value Flow...</div>
+                    </div>
+                </div>
+
+                <div class="widget" id="put-call-ratio">
+                    <div class="widget-header">
+                        <h2>PUT/CALL RATIO</h2>
+                        <div class="status-container" id="status-pcr">
+                            <span class="status-dot">●</span>
+                            <span class="status-text">LIVE</span>
+                        </div>
+                        <div class="decoration-line"></div>
+                    </div>
+                    <div class="widget-content chart-container" id="pcr-chart-container">
+                        <!-- TradingView Widget -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center Column -->
+            <div class="column center-col">
+                <div class="widget large-widget" id="live-price-action">
+                    <div class="widget-header">
+                        <div class="header-left-group">
+                            <h2>PRICE ACTION</h2>
+                            <!-- Custom Ticker Dropdown (Next to title) -->
+                            <div class="custom-dropdown" id="ticker-dropdown">
+                                <div class="dropdown-selected" id="dropdown-selected">
+                                    <span id="selected-ticker-text">NVDA</span>
+                                    <span class="dropdown-arrow">▼</span>
+                                </div>
+                                <div class="dropdown-options" id="dropdown-options">
+                                    <!-- Options populated by JS -->
+                                </div>
+                            </div>
+                        </div>
+                        <div class="status-container" id="status-chart">
+                            <span class="status-dot">●</span>
+                            <span class="status-text">OFFLINE</span>
+                        </div>
+                        <div class="decoration-line"></div>
+                    </div>
+                    <div class="widget-content chart-container" id="chart-container">
+                        <!-- Chart rendered here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="column right-col">
+                <div class="widget" id="polymarket-odds">
+                    <div class="widget-header">
+                        <h2>🔮 POLYMARKET ODDS</h2>
+                        <div class="status-container" id="status-polymarket">
+                            <span class="status-dot">●</span>
+                            <span class="status-text">OFFLINE</span>
+                        </div>
+                        <div class="decoration-line"></div>
+                    </div>
+                    <div class="widget-content list-container" id="polymarket-container">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <div class="widget" id="trader-fear-index">
+                    <div class="widget-header">
+                        <h2>TRADER FEAR INDEX</h2>
+                        <div class="status-container" id="status-tfi">
+                            <span class="status-dot">●</span>
+                            <span class="status-text">LIVE</span>
+                        </div>
+                        <div class="decoration-line"></div>
+                    </div>
+                    <div class="widget-content">
+                        <div class="tfi-container">
+                            <div class="tfi-display">
+                                <div class="tfi-score" id="tfi-score">50</div>
+                                <div class="tfi-rating" id="tfi-rating">NEUTRAL</div>
+                            </div>
+                            <div class="tfi-bar-chart" id="tfi-segments">
+                                <!-- 10 Segments -->
+                                <div class="tfi-seg"></div>
+                                <div class="tfi-seg"></div>
+                                <div class="tfi-seg"></div>
+                                <div class="tfi-seg"></div>
+                                <div class="tfi-seg"></div>
+                                <div class="tfi-seg"></div>
+                                <div class="tfi-seg"></div>
+                                <div class="tfi-seg"></div>
+                                <div class="tfi-seg"></div>
+                                <div class="tfi-seg"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="news-feed-container" id="news-feed-container" style="flex: 1; overflow: hidden;">
+                    <div class="news-header">
+                        <span style="color: #9ba1a6; font-weight: 600;">MARKET WIRE</span>
+                        <div class="status-container" id="status-news">
+                            <span class="status-dot">●</span>
+                            <span class="status-text">LIVE</span>
+                        </div>
+                    </div>
+                    <div id="news-items-list">
+                        <!-- News items injected here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Bottom Ticker Widget -->
+        <div class="widget ticker-widget">
+            <div class="widget-content" id="price-ticker">
+                <div class="ticker-content">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="mockData.js"></script>
+    <script src="app.js?v=3.6"></script>
+</body>
+
+</html>
