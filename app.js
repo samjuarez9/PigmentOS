@@ -1333,7 +1333,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial Fetch & Interval
     safeExecute('News Feed', fetchNews);
-    setInterval(() => safeExecute('News Feed Update', fetchNews), 300000); // Every 5 minutes
+    setInterval(() => safeExecute('News Feed Update', fetchNews), 60000); // Every 1 minute
 
     safeExecute('PCR Chart', initPCRChart);
 
