@@ -63,16 +63,20 @@ body::after {
 /* Header */
 .main-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
+    /* Push right content to end */
     align-items: center;
     padding: 15px 20px;
     background: #000000;
     border-bottom: 2px solid var(--border-color);
     /* Thick border */
-    position: sticky;
+    position: relative;
+    /* For absolute centering */
     top: 0;
     z-index: 100;
     box-shadow: 0 0 10px var(--dim-cyan);
+    min-height: 140px;
+    /* Increased to prevent overlap */
 }
 
 .header-right {
@@ -84,8 +88,14 @@ body::after {
 /* === PIGMENT OS BRANDING === */
 .brand-container {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 10px;
+    align-items: center;
+    gap: 5px;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
 }
 
 .brand-icon {
@@ -100,11 +110,52 @@ body::after {
     /* Increased gap */
 }
 
+.brand-subtitle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: -5px;
+    /* Pull closer to title */
+}
+
+.subtitle-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    /* Increased from 10px */
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-right: 6px;
+}
+
+.polymarket-badge {
+    display: flex;
+    align-items: center;
+    /* Background removed, handled by Image */
+    padding: 0;
+}
+
+.poly-logo-img {
+    height: 28px;
+    /* Increased from 20px for visibility */
+    width: auto;
+    display: block;
+    opacity: 1;
+    /* Full opacity for visibility */
+    transition: opacity 0.3s ease;
+}
+
+.poly-logo-img:hover {
+    opacity: 1;
+}
+
+/* Removed .poly-text as it is part of the logo image usually, or we just use the icon */
+
 .pigment-word {
     font-family: var(--font-pixel);
     font-weight: 700;
-    font-size: 42px;
-    /* Increased size */
+    font-size: 64px;
+    /* Increased size from 42px */
     letter-spacing: 2px;
     /* Holographic Chrome: Cyan -> White -> Neon Pink */
     background: linear-gradient(110deg,
@@ -138,8 +189,8 @@ body::after {
 .os-word {
     font-family: var(--font-pixel);
     font-weight: 400;
-    font-size: 42px;
-    /* Increased size */
+    font-size: 64px;
+    /* Increased size from 42px */
     color: #FFFFFF;
     /* Pure White */
     opacity: 1;
@@ -440,37 +491,59 @@ h1 {
 
 #news-items-list {
     display: flex;
-    flex-direction: row;
-    gap: 12px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    padding: 15px;
     flex: 1;
-
-    /* Hide scrollbar */
+    overflow-x: auto;
+    /* Enable scrolling */
+    overflow-y: hidden;
+    padding: 8px 0;
+    /* Reduced vertical padding */
+    position: relative;
+    mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
     scrollbar-width: none;
+    /* Firefox */
     -ms-overflow-style: none;
+    /* IE 10+ */
+    cursor: grab;
 }
 
+#news-items-list:active {
+    cursor: grabbing;
+}
+
+#news-track {
+    display: flex;
+    gap: 8px;
+    /* Reduced gap */
+    width: max-content;
+    padding-left: 15px;
+    /* Initial offset */
+}
+
+/* Hide scrollbar */
 #news-items-list::-webkit-scrollbar {
     display: none;
 }
 
 .news-item {
     min-width: 280px;
+    /* Increased width for larger text */
     max-width: 280px;
-    background: rgba(0, 20, 40, 0.8);
+    background: rgba(0, 20, 40, 0.9);
+    /* More opaque background */
     border: 1px solid var(--border-color);
     border-radius: 4px;
     padding: 12px;
+    /* Slightly more padding */
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
+    /* Increased gap */
     flex-shrink: 0;
 }
 
 .news-item:hover {
-    background: rgba(0, 40, 80, 0.9);
+    background: rgba(0, 40, 80, 0.95);
     border-color: var(--electric-cyan);
 }
 
@@ -479,14 +552,18 @@ h1 {
     justify-content: space-between;
     align-items: center;
     font-size: 12px;
+    /* Reduced from 13px */
     opacity: 0.9;
 }
 
 .news-headline {
     font-size: 16px;
-    line-height: 1.4;
+    /* Reduced from 18px */
+    line-height: 1.2;
+    /* Tighter line height */
     color: #FFFFFF;
-    font-weight: 500;
+    font-weight: 600;
+    /* Bolder text */
     /* Prevent overflow */
     display: -webkit-box;
     -webkit-line-clamp: 3;
@@ -496,7 +573,7 @@ h1 {
 
 .news-highlight-mag7 {
     border-left: 3px solid #FF0055 !important;
-    background: linear-gradient(90deg, rgba(255, 0, 85, 0.1) 0%, transparent 100%) !important;
+    background: linear-gradient(90deg, rgba(255, 0, 85, 0.15) 0%, transparent 100%) !important;
     animation: pulse-red-border 2s infinite;
 }
 
@@ -506,7 +583,8 @@ h1 {
 }
 
 .news-time {
-    color: #888;
+    color: #AAA;
+    /* Lighter grey */
 }
 
 /* Ensure Chart takes remaining space */
@@ -1478,6 +1556,11 @@ td {
     overflow-y: auto;
     padding-right: 5px;
     /* Space for scrollbar */
+}
+
+/* Allow overflow when showing radar animation */
+#flow-feed-container:has(.whale-pre-market-container) {
+    overflow: visible !important;
 }
 
 /* Custom Scrollbar for Flow Feed */
@@ -2531,393 +2614,443 @@ td {
 /* --- MINIMALIST RAW DATA STREAM --- */
 :root {
     --stream-bg: #0b0e11;
+}
 
+.news-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #1e2124;
+    padding-bottom: 8px;
+    flex-shrink: 0;
+}
 
-    .news-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 10px;
-        border-bottom: 1px solid #1e2124;
-        padding-bottom: 8px;
-        flex-shrink: 0;
+/* Stream List - REMOVED DUPLICATE #news-items-list RULE */
+
+/* Stream Row Item */
+.stream-row {
+    display: flex;
+    align-items: flex-start;
+    /* Align to top for wrapped text */
+    padding: 6px 4px;
+    /* Slightly more padding for the border */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    font-size: 0.85rem;
+    line-height: 1.4;
+    text-decoration: none;
+    color: var(--stream-text);
+    transition: background 0.1s;
+    border-radius: 2px;
+    font-family: 'Courier New', Courier, monospace;
+    /* Retro Terminal Font */
+}
+
+/* Watchlist alert styling handled below at line 2220 */
+
+.stream-row:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* Columns */
+.stream-time {
+    color: var(--stream-dim);
+    font-size: 0.7rem;
+    /* Smaller time */
+    width: 40px;
+    flex-shrink: 0;
+    margin-right: 8px;
+    padding-top: 2px;
+    /* Align with text */
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.stream-source {
+    color: #666;
+    /* Dimmer source */
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    margin-right: 8px;
+    background: #15181c;
+    padding: 2px 5px;
+    border-radius: 3px;
+    white-space: nowrap;
+    padding-top: 2px;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.stream-ticker {
+    font-weight: 700;
+    margin-right: 8px;
+    font-size: 0.8rem;
+    padding-top: 1px;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.stream-ticker.bullish {
+    color: var(--stream-accent);
+    text-shadow: 0 0 5px rgba(0, 255, 157, 0.2);
+}
+
+.stream-ticker.bearish {
+    color: var(--stream-alert);
+    text-shadow: 0 0 5px rgba(255, 80, 80, 0.2);
+}
+
+.stream-headline {
+    color: var(--stream-text);
+    flex-grow: 1;
+    white-space: normal;
+    word-break: break-word;
+    font-size: 11px;
+    /* Match Polymarket text size */
+    font-family: 'Courier New', Courier, monospace;
+    text-transform: uppercase;
+    /* TERMINAL STYLE */
+    letter-spacing: 0.5px;
+    /* Improve readability */
+}
+
+.stream-row:hover .stream-headline {
+    color: #fff;
+}
+
+/* Scrollbar */
+#news-items-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+#news-items-list::-webkit-scrollbar-track {
+    background: var(--stream-bg);
+}
+
+#news-items-list::-webkit-scrollbar-thumb {
+    background: #333;
+}
+
+/* Watchlist Alert - Glowing Pulse Animation */
+.watchlist-alert {
+    border: 1px solid #FF4444 !important;
+    border-radius: 8px !important;
+    background: rgba(255, 68, 68, 0.05);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7);
     }
 
-    /* Stream List - REMOVED DUPLICATE #news-items-list RULE */
-
-    /* Stream Row Item */
-    .stream-row {
-        display: flex;
-        align-items: flex-start;
-        /* Align to top for wrapped text */
-        padding: 6px 4px;
-        /* Slightly more padding for the border */
-        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-        font-size: 0.85rem;
-        line-height: 1.4;
-        text-decoration: none;
-        color: var(--stream-text);
-        transition: background 0.1s;
-        border-radius: 2px;
-        font-family: 'Courier New', Courier, monospace;
-        /* Retro Terminal Font */
+    50% {
+        box-shadow: 0 0 0 8px rgba(255, 68, 68, 0);
     }
 
-    /* Watchlist alert styling handled below at line 2220 */
-
-    .stream-row:hover {
-        background: rgba(255, 255, 255, 0.02);
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 68, 68, 0);
     }
-
-    /* Columns */
-    .stream-time {
-        color: var(--stream-dim);
-        font-size: 0.7rem;
-        /* Smaller time */
-        width: 40px;
-        flex-shrink: 0;
-        margin-right: 8px;
-        padding-top: 2px;
-        /* Align with text */
-        font-family: 'Courier New', Courier, monospace;
-    }
-
-    .stream-source {
-        color: #666;
-        /* Dimmer source */
-        font-size: 0.65rem;
-        text-transform: uppercase;
-        margin-right: 8px;
-        background: #15181c;
-        padding: 2px 5px;
-        border-radius: 3px;
-        white-space: nowrap;
-        padding-top: 2px;
-        font-family: 'Courier New', Courier, monospace;
-    }
-
-    .stream-ticker {
-        font-weight: 700;
-        margin-right: 8px;
-        font-size: 0.8rem;
-        padding-top: 1px;
-        font-family: 'Courier New', Courier, monospace;
-    }
-
-    .stream-ticker.bullish {
-        color: var(--stream-accent);
-        text-shadow: 0 0 5px rgba(0, 255, 157, 0.2);
-    }
-
-    .stream-ticker.bearish {
-        color: var(--stream-alert);
-        text-shadow: 0 0 5px rgba(255, 80, 80, 0.2);
-    }
-
-    .stream-headline {
-        color: var(--stream-text);
-        flex-grow: 1;
-        white-space: normal;
-        word-break: break-word;
-        font-size: 11px;
-        /* Match Polymarket text size */
-        font-family: 'Courier New', Courier, monospace;
-        text-transform: uppercase;
-        /* TERMINAL STYLE */
-        letter-spacing: 0.5px;
-        /* Improve readability */
-    }
-
-    .stream-row:hover .stream-headline {
-        color: #fff;
-    }
-
-    /* Scrollbar */
-    #news-items-list::-webkit-scrollbar {
-        width: 4px;
-    }
-
-    #news-items-list::-webkit-scrollbar-track {
-        background: var(--stream-bg);
-    }
-
-    #news-items-list::-webkit-scrollbar-thumb {
-        background: #333;
-    }
-
-    /* Watchlist Alert - Glowing Pulse Animation */
-    .watchlist-alert {
-        border: 1px solid #FF4444 !important;
-        border-radius: 8px !important;
-        background: rgba(255, 68, 68, 0.05);
-        animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-        0% {
-            box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7);
-        }
-
-        50% {
-            box-shadow: 0 0 0 8px rgba(255, 68, 68, 0);
-        }
-
-        100% {
-            box-shadow: 0 0 0 0 rgba(255, 68, 68, 0);
-        }
-    }
+}
 
 
 
-    /* === NEWS FEED ENHANCEMENTS === */
+/* === NEWS FEED ENHANCEMENTS === */
 
 
-    .news-highlight-mag7 {
-        border-left: 3px solid #FF0055 !important;
-        background: linear-gradient(90deg, rgba(255, 0, 85, 0.1) 0%, transparent 100%);
-    }
+.news-highlight-mag7 {
+    border-left: 3px solid #FF0055 !important;
+    background: linear-gradient(90deg, rgba(255, 0, 85, 0.1) 0%, transparent 100%);
+}
 
-    .news-source-tag {
-        font-weight: bold;
-        color: var(--electric-cyan);
-        margin-right: 6px;
-        font-size: 0.9em;
-    }
+.news-source-tag {
+    font-weight: bold;
+    color: var(--electric-cyan);
+    margin-right: 6px;
+    font-size: 0.9em;
+}
 
-    /* === PRE-MARKET PULSING RADAR RINGS === */
-    .whale-pre-market-container {
-        position: relative;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        height: 100%;
-        min-height: 200px;
-        overflow: hidden;
-    }
+/* === PRE-MARKET PULSING RADAR RINGS === */
+.whale-pre-market-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    min-height: 200px;
+    overflow: visible !important;
+}
 
-    .radar-container {
-        position: absolute;
-        top: 50%;
-        left: 50%;
+.radar-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 300px;
+    height: 300px;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.radar-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border: 2px solid #00ff00;
+    border-radius: 50%;
+    opacity: 0;
+    width: 20px;
+    height: 20px;
+    will-change: transform, opacity, width, height;
+}
+
+.radar-ring-1 {
+    animation: radar-pulse 2.5s ease-out infinite;
+}
+
+.radar-ring-2 {
+    animation: radar-pulse 2.5s ease-out infinite 0.8s;
+}
+
+.radar-ring-3 {
+    animation: radar-pulse 2.5s ease-out infinite 1.6s;
+}
+
+@keyframes radar-pulse {
+    0% {
+        width: 20px;
+        height: 20px;
+        opacity: 0;
+        border-width: 4px;
         transform: translate(-50%, -50%);
+    }
+
+    10% {
+        opacity: 0.9;
+        border-width: 3px;
+        transform: translate(-50%, -50%);
+    }
+
+    100% {
         width: 300px;
         height: 300px;
-        z-index: 0;
-        pointer-events: none;
-    }
-
-    .radar-ring {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        border: 2px solid #00ff00;
-        border-radius: 50%;
         opacity: 0;
-    }
-
-    .radar-ring-1 {
-        animation: radar-pulse 4s ease-out infinite;
-    }
-
-    .radar-ring-2 {
-        animation: radar-pulse 4s ease-out infinite 1.3s;
-    }
-
-    .radar-ring-3 {
-        animation: radar-pulse 4s ease-out infinite 2.6s;
-    }
-
-    @keyframes radar-pulse {
-        0% {
-            width: 20px;
-            height: 20px;
-            opacity: 0;
-        }
-
-        10% {
-            opacity: 0.6;
-        }
-
-        100% {
-            width: 300px;
-            height: 300px;
-            opacity: 0;
-        }
-    }
-
-    .radar-center {
-        position: absolute;
-        top: 50%;
-        left: 50%;
+        border-width: 1px;
         transform: translate(-50%, -50%);
-        width: 8px;
-        height: 8px;
-        background: #00ff00;
-        border-radius: 50%;
-        box-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
-        animation: center-pulse 2s ease-in-out infinite;
+    }
+}
+
+.radar-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    background: #00ff00;
+    border-radius: 50%;
+    box-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
+    animation: center-pulse 2s ease-in-out infinite;
+    will-change: transform, opacity;
+}
+
+@keyframes center-pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
     }
 
-    @keyframes center-pulse {
+    50% {
+        opacity: 0.5;
+        transform: translate(-50%, -50%) scale(1.3);
+    }
+}
 
-        0%,
-        100% {
-            opacity: 1;
-            transform: translate(-50%, -50%) scale(1);
-        }
+.status-message {
+    position: absolute;
+    bottom: 20px;
+    left: 0;
+    right: 0;
+    z-index: 1;
+    text-align: center;
+    padding: 0 20px;
+}
 
-        50% {
-            opacity: 0.5;
-            transform: translate(-50%, -50%) scale(1.3);
-        }
+/* === DEMO DATA INDICATOR === */
+.demo-indicator {
+    font-size: 9px;
+    color: #ff9800;
+    background: rgba(255, 152, 0, 0.15);
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 10px;
+    font-family: var(--font-mono);
+    letter-spacing: 0.5px;
+    border: 1px solid rgba(255, 152, 0, 0.3);
+    animation: demo-pulse 2s ease-in-out infinite;
+}
+
+@keyframes demo-pulse {
+
+    0%,
+    100% {
+        opacity: 0.7;
     }
 
-    .status-message {
-        position: absolute;
-        bottom: 20px;
+    50% {
+        opacity: 1;
+    }
+}
+
+/* === WHALE NEW BADGE === */
+.whale-new-badge {
+    font-size: 8px;
+    color: #00ff9d;
+    background: rgba(0, 255, 157, 0.15);
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    letter-spacing: 0.5px;
+    border: 1px solid rgba(0, 255, 157, 0.4);
+    animation: new-badge-pulse 2s ease-in-out infinite;
+    text-shadow: 0 0 4px rgba(0, 255, 157, 0.3);
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 4px;
+}
+
+@keyframes new-badge-pulse {
+
+    0%,
+    100% {
+        opacity: 0.8;
+        box-shadow: 0 0 3px rgba(0, 255, 157, 0.2);
+    }
+
+    50% {
+        opacity: 1;
+        box-shadow: 0 0 6px rgba(0, 255, 157, 0.4);
+    }
+}
+
+/* === MOBILE OPTIMIZATIONS === */
+@media screen and (max-width: 768px) {
+
+    /* Fix Chart Distortion */
+    #price-chart-container,
+    #pcr-chart-container {
+        height: 300px !important;
+        /* Force taller height on mobile */
+        min-height: 300px !important;
+    }
+
+    /* Adjust widget content padding */
+    .widget-content {
+        padding: 5px;
+    }
+
+    /* Ensure columns stack properly if not already */
+    .column {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+}
+
+/* === MOBILE RESPONSIVENESS === */
+@media (max-width: 768px) {
+    body {
+        overflow-y: auto;
+        /* Enable scrolling on mobile */
+        height: auto;
+    }
+
+    .terminal-container {
+        height: auto;
+        padding-bottom: 60px;
+        /* Space for bottom ticker */
+    }
+
+    .main-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        overflow: visible;
+    }
+
+    .column {
+        height: auto;
+        overflow: visible;
+    }
+
+    /* Adjust Widget Heights for Mobile */
+    .widget {
+        min-height: 300px;
+        max-height: none;
+        flex: none;
+    }
+
+    /* Header Adjustments */
+    .main-header {
+        padding: 10px;
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+    }
+
+    .header-right {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .pigment-word {
+        font-size: 20px;
+    }
+
+    .os-word {
+        font-size: 20px;
+    }
+
+    /* Chart Container on Mobile */
+    .chart-container {
+        min-height: 300px;
+    }
+
+    /* Ticker Widget */
+    .ticker-widget {
+        bottom: 0;
         left: 0;
         right: 0;
-        z-index: 1;
-        text-align: center;
-        padding: 0 20px;
+        z-index: 9999;
+        min-height: auto;
+        /* Override generic widget min-height */
+        height: auto;
     }
 
-    /* === DEMO DATA INDICATOR === */
-    .demo-indicator {
-        font-size: 9px;
-        color: #ff9800;
-        background: rgba(255, 152, 0, 0.15);
-        padding: 2px 6px;
-        border-radius: 3px;
-        margin-left: 10px;
-        font-family: var(--font-mono);
-        letter-spacing: 0.5px;
-        border: 1px solid rgba(255, 152, 0, 0.3);
-        animation: demo-pulse 2s ease-in-out infinite;
+    /* Ensure dropdown doesn't get cut off */
+    .custom-dropdown {
+        margin-right: 0;
     }
 
-    @keyframes demo-pulse {
+    .header-left-group {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
 
-        0%,
-        100% {
-            opacity: 0.7;
-        }
+/* === NEWS FEED SLIDE-IN ANIMATION === */
+.news-slide-in {
+    animation: news-slide-in 0.5s ease-out forwards;
+}
 
-        50% {
-            opacity: 1;
-        }
+@keyframes news-slide-in {
+    0% {
+        opacity: 0;
+        transform: translateX(-50px);
     }
 
-    /* === WHALE NEW BADGE === */
-    .whale-new-badge {
-        font-size: 8px;
-        color: #00ff9d;
-        background: rgba(0, 255, 157, 0.15);
-        padding: 2px 5px;
-        border-radius: 3px;
-        font-family: var(--font-mono);
-        letter-spacing: 0.5px;
-        border: 1px solid rgba(0, 255, 157, 0.4);
-        animation: new-badge-pulse 2s ease-in-out infinite;
-        text-shadow: 0 0 4px rgba(0, 255, 157, 0.3);
-        display: inline-block;
-        vertical-align: middle;
-        margin-right: 4px;
+    100% {
+        opacity: 1;
+        transform: translateX(0);
     }
-
-    @keyframes new-badge-pulse {
-
-        0%,
-        100% {
-            opacity: 0.8;
-            box-shadow: 0 0 3px rgba(0, 255, 157, 0.2);
-        }
-
-        50% {
-            opacity: 1;
-            box-shadow: 0 0 6px rgba(0, 255, 157, 0.4);
-        }
-    }
-
-    /* === MOBILE RESPONSIVENESS === */
-    @media (max-width: 768px) {
-        body {
-            overflow-y: auto;
-            /* Enable scrolling on mobile */
-            height: auto;
-        }
-
-        .terminal-container {
-            height: auto;
-            padding-bottom: 60px;
-            /* Space for bottom ticker */
-        }
-
-        .main-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            overflow: visible;
-        }
-
-        .column {
-            height: auto;
-            overflow: visible;
-        }
-
-        /* Adjust Widget Heights for Mobile */
-        .widget {
-            min-height: 300px;
-            max-height: none;
-            flex: none;
-        }
-
-        /* Header Adjustments */
-        .main-header {
-            padding: 10px;
-            flex-direction: column;
-            gap: 10px;
-            align-items: flex-start;
-        }
-
-        .header-right {
-            width: 100%;
-            justify-content: space-between;
-        }
-
-        .pigment-word {
-            font-size: 20px;
-        }
-
-        .os-word {
-            font-size: 20px;
-        }
-
-        /* Chart Container on Mobile */
-        .chart-container {
-            min-height: 300px;
-        }
-
-        /* Ticker Widget */
-        .ticker-widget {
-            bottom: 0;
-            left: 0;
-            right: 0;
-            z-index: 9999;
-            min-height: auto;
-            /* Override generic widget min-height */
-            height: auto;
-        }
-
-        /* Ensure dropdown doesn't get cut off */
-        .custom-dropdown {
-            margin-right: 0;
-        }
-
-        .header-left-group {
-            width: 100%;
-            justify-content: space-between;
-        }
-    }
+}

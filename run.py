@@ -349,8 +349,35 @@ def api_movers():
     
     if current_time - CACHE["movers"]["timestamp"] < 60 and CACHE["movers"]["data"]:
         return jsonify(CACHE["movers"]["data"])
+    
+    MOVERS_TICKERS = [
+        # Mag 7 & Tech Giants
+        "NVDA", "TSLA", "AAPL", "MSFT", "AMZN", "META", "GOOGL",
         
-    MOVERS_TICKERS = ["NVDA", "TSLA", "AAPL", "MSFT", "AMZN", "META", "GOOGL", "AMD", "INTC", "PLTR", "COIN", "SPY", "QQQ"]
+        # Semiconductors & AI
+        "AMD", "INTC", "AVGO", "MU", "QCOM", "ARM", "SMCI",
+        
+        # FinTwit Meme Stocks & High Volume
+        "PLTR", "COIN", "MSTR", "GME", "AMC", "SOFI", "HOOD", "BBBY",
+        
+        # Growth Tech & SaaS
+        "SNOW", "DDOG", "NET", "CRWD", "ZS", "SHOP", "ROKU", "UPST",
+        
+        # FinTech & Payments
+        "SQ", "PYPL", "AFRM",
+        
+        # Consumer & Entertainment
+        "NFLX", "DIS", "UBER", "DASH", "ABNB", "PTON", "NKE", "SBUX",
+        
+        # EV & Space (High Vol)
+        "RIVN", "LCID", "NIO", "RKLB",
+        
+        # Big Movers / Volatility
+        "BA", "SNAP", "PINS", "SPOT",
+        
+        # Major Indices
+        "SPY", "QQQ", "IWM", "DIA"
+    ]
     
     try:
         movers = []

@@ -45,9 +45,23 @@ document.addEventListener('DOMContentLoaded', () => {
             "enable_publishing": false,
             "backgroundColor": "#0C0C18", // Deep Cosmos Background
             "gridColor": "rgba(30, 144, 255, 0.1)", // Subtle Deep Sky Blue grid
-            "hide_top_toolbar": false,
+            "hide_top_toolbar": true,
+            "studies": [
+                "MASimple@tv-basicstudies"
+            ],
             "container_id": "chart-container"
         });
+
+        // MOBILE FIX: Force resize after load to prevent squished graph
+        if (window.innerWidth <= 768) {
+            setTimeout(() => {
+                const iframe = container.querySelector('iframe');
+                if (iframe) {
+                    iframe.style.height = '300px';
+                    iframe.style.minHeight = '300px';
+                }
+            }, 1000);
+        }
 
         // Mark chart as live
         updateStatus('status-chart', true);
@@ -416,11 +430,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!priceTicker) return;
 
         // Filter data
-        const gainers = moversData.filter(m => m.type === 'gain');
-        const losers = moversData.filter(m => m.type === 'loss');
+        const gainers = moversData.filter(m => m.type === 'gain').sort((a, b) => b.change - a.change); // Sort highest to lowest
+        const losers = moversData.filter(m => m.type === 'loss').sort((a, b) => a.change - b.change); // Sort lowest to highest (most negative first)
 
-        // Select set to display
-        const currentSet = showGainers ? gainers : losers;
+        // Select set to display - LIMIT TO 5 ITEMS MAX
+        const currentSet = (showGainers ? gainers : losers).slice(0, 5);
         const label = showGainers ? 'TOP GAINERS' : 'TOP LOSERS';
         const labelClass = showGainers ? 'mover-gain' : 'mover-loss';
 
@@ -720,22 +734,50 @@ document.addEventListener('DOMContentLoaded', () => {
     let marketOpenTimeout = null;
 
     function getMarketState() {
-        // Get current time in ET
+        // Get current time in ET using robust Intl API
         const now = new Date();
-        const etTimeStr = now.toLocaleString("en-US", { timeZone: "America/New_York" });
-        const etTime = new Date(etTimeStr);
 
-        const hours = etTime.getHours();
-        const minutes = etTime.getMinutes();
-        const seconds = etTime.getSeconds();
+        const options = {
+            timeZone: "America/New_York",
+            hour12: false,
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: 'numeric',
+            second: 'numeric'
+        };
+
+        const formatter = new Intl.DateTimeFormat("en-US", options);
+        const parts = formatter.formatToParts(now);
+
+        const getPart = (type) => {
+            const part = parts.find(p => p.type === type);
+            return part ? parseInt(part.value) : 0;
+        };
+
+        const year = getPart('year');
+        const month = getPart('month') - 1; // 0-indexed for Date
+        const dayOfMonth = getPart('day');
+        const hours = getPart('hour');
+        const minutes = getPart('minute');
+        const seconds = getPart('second');
+
+        // Create Date object representing ET time
+        const etTime = new Date(year, month, dayOfMonth, hours, minutes, seconds);
+        const day = etTime.getDay(); // 0=Sun, 6=Sat
+
         const currentMinutes = hours * 60 + minutes;
 
         const marketOpenMinutes = 9 * 60 + 30; // 9:30 AM
         const marketCloseMinutes = 16 * 60; // 4:00 PM
 
+        const isWeekend = day === 0 || day === 6;
+
         return {
+            isWeekend,
             isPreMarket: currentMinutes < marketOpenMinutes,
-            isMarketHours: currentMinutes >= marketOpenMinutes && currentMinutes < marketCloseMinutes,
+            isMarketHours: !isWeekend && currentMinutes >= marketOpenMinutes && currentMinutes < marketCloseMinutes,
             isAfterHours: currentMinutes >= marketCloseMinutes,
             currentET: etTime,
             hours,
@@ -793,6 +835,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const isSystemHealthy = !stale;
         const hasData = data && data.length > 0;
 
+        console.log('🔍 handleWhaleData called:', { hasData, isSystemHealthy, dataLength: data?.length, stale });
+
         // Update Status: Only show OFFLINE if system is actually down (stale)
         updateStatus('status-whales', isSystemHealthy);
 
@@ -812,14 +856,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Handle empty data
         if (!hasData) {
+            console.log('🔍 No whale data, checking market state...');
             // Clear existing items
             flowFeedContainer.innerHTML = '';
 
             if (isSystemHealthy) {
                 const marketState = getMarketState();
+                console.log('🔍 Market State:', marketState);
 
-                if (marketState.isPreMarket) {
-                    // PRE-MARKET: Show pulsing radar rings
+                if (marketState.isPreMarket || marketState.isWeekend) {
+                    console.log('✅ Injecting radar animation for', marketState.isWeekend ? 'WEEKEND' : 'PRE-MARKET');
+                    // PRE-MARKET or WEEKEND: Show pulsing radar rings
+                    const statusText = marketState.isWeekend ? "WEEKEND" : "PRE-MARKET";
                     flowFeedContainer.innerHTML = `
                         <div class="whale-pre-market-container">
                             <div class="radar-container">
@@ -829,7 +877,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <div class="radar-center"></div>
                             </div>
                             <div class="status-message">
-                                <span style="color: #888; font-size: 11px; font-family: var(--font-mono);">STATUS: PRE-MARKET. Monitoring for block orders...</span>
+                                <span style="color: #888; font-size: 11px; font-family: var(--font-mono);">STATUS: ${statusText}. Monitoring for block orders...</span>
                             </div>
                         </div>
                     `;
@@ -1091,7 +1139,7 @@ document.addEventListener('DOMContentLoaded', () => {
             "locale": "en",
             "toolbar_bg": "#f1f3f6",
             "enable_publishing": false,
-            "hide_top_toolbar": false,
+            "hide_top_toolbar": true,
             "hide_legend": true,
             "save_image": false,
             "container_id": "pcr-chart-container",
@@ -1110,13 +1158,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 "mainSeriesProperties.baselineStyle.topLineWidth": 2,
                 "mainSeriesProperties.baselineStyle.bottomLineWidth": 2,
                 "mainSeriesProperties.baselineStyle.baselineColor": "rgba(200, 200, 200, 0.4)",
-                "mainSeriesProperties.baselineStyle.baselineWidth": 1,
-                "paneProperties.background": "#000000",
-                "paneProperties.vertGridProperties.color": "#1a1a1a",
-                "paneProperties.horzGridProperties.color": "#1a1a1a",
-                "scalesProperties.textColor": "#666666"
             }
         });
+
+        // MOBILE FIX: Force resize after load to prevent squished graph
+        if (window.innerWidth <= 768) {
+            setTimeout(() => {
+                const iframe = container.querySelector('iframe');
+                if (iframe) {
+                    iframe.style.height = '300px';
+                    iframe.style.minHeight = '300px';
+                }
+            }, 1000);
+        }
 
         updateStatus('status-pcr', true);
     }
@@ -1124,40 +1178,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // === News Feed Logic ===
     let seenNews = new Set();
+    let newsTickerInterval = null;
+    let isNewsHovered = false;
+    let lastTopNewsSignature = ''; // Track the newest item
 
     function renderNews(newsItems) {
-        const container = document.getElementById('news-items-list');
-        if (!container) return;
+        const track = document.getElementById('news-track');
+        if (!track) return;
 
         // Filter for Last 24 Hours (86400 seconds)
         const now = new Date().getTime() / 1000;
         const last24Hours = now - 86400;
 
-        const todaysNews = newsItems.filter(item => item.time >= last24Hours);
+        const validNews = newsItems.filter(item => item.time >= last24Hours);
 
-        // Filter out seen items
-        const newItems = todaysNews.filter(item => {
-            const id = item.link || item.title;
-            if (seenNews.has(id)) return false;
-            seenNews.add(id);
-            return true;
-        });
+        if (validNews.length === 0) return;
 
-        if (newItems.length === 0) {
-            // No new items
-            return;
+        // Sort Newest First
+        validNews.sort((a, b) => b.time - a.time);
+
+        // Check if the top news item has changed
+        const topItem = validNews[0];
+        const topItemSignature = topItem ? `${topItem.ticker || ''}_${topItem.time}_${topItem.title}` : '';
+
+        let shouldSnap = false;
+        if (topItemSignature && topItemSignature !== lastTopNewsSignature) {
+            console.log('📰 New Top News Detected! Snapping to start.');
+            shouldSnap = true;
+            lastTopNewsSignature = topItemSignature;
         }
 
-        newItems.forEach(item => {
-            // Create Card Element
+        // Clear Track
+        track.innerHTML = '';
+
+        // Helper to create card
+        const createCard = (item) => {
             const div = document.createElement('div');
-            div.className = 'news-item'; // Card Style
-            div.dataset.time = item.time; // Store timestamp for sorting
+            div.className = 'news-item';
 
-            // Highlight Logic (Regex for precision)
-            // Includes: Mag 7, Macro, FinTwit Favorites, AI/Tech
+            // Highlight Logic
             const highlightRegex = /\b(MAG 7|TRUMP|AI|OPENAI|ARTIFICIAL INTELLIGENCE|FED|RATE|INFLATION|JOB|LABOR|UNEMPLOYMENT|CPI|PPI|FOMC|POWELL|QQQ|SPY|VIX|NVIDIA|NVDA|TESLA|TSLA|APPLE|AAPL|MICROSOFT|MSFT|META|GOOGLE|GOOG|GOOGL|AMAZON|AMZN|AMD|PLTR|COIN|MSTR|GME|AMC|HOOD|SOFI|UPST)\b/i;
-
             const upperTitle = item.title.toUpperCase();
             const upperTicker = (item.ticker || '').toUpperCase();
 
@@ -1178,8 +1238,8 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (pub.includes('reuters')) sourceColor = '#FF8800';
             else if (pub.includes('bloomberg')) sourceColor = '#0077FF';
             else if (pub.includes('breaking')) sourceColor = '#FF3333';
-            else if (pub.includes('investing')) sourceColor = '#FFA500'; // Orange
-            else if (pub.includes('yahoo')) sourceColor = '#720e9e'; // Yahoo Purple
+            else if (pub.includes('investing')) sourceColor = '#FFA500';
+            else if (pub.includes('yahoo')) sourceColor = '#720e9e';
 
             div.innerHTML = `
                 <div class="news-meta">
@@ -1188,31 +1248,77 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="news-headline"><a href="${item.link}" target="_blank" style="color: inherit; text-decoration: none;">${item.title}</a></div>
             `;
+            return div;
+        };
 
-            // Smart Insertion: Find correct position based on time (Newest First)
-            // We want to insert BEFORE the first item that is OLDER than the new item.
-            let inserted = false;
-            for (let i = 0; i < container.children.length; i++) {
-                const child = container.children[i];
-                const childTime = parseInt(child.dataset.time || 0);
-
-                if (item.time > childTime) {
-                    container.insertBefore(div, child);
-                    inserted = true;
-                    break;
-                }
-            }
-
-            // If not inserted (meaning it's older than everything, or list is empty), append to end
-            if (!inserted) {
-                container.appendChild(div);
-            }
+        // Render Original Set
+        validNews.forEach(item => {
+            track.appendChild(createCard(item));
         });
 
-        // Prune list to 50 items
-        while (container.children.length > 50) {
-            container.removeChild(container.lastChild);
+        // Render Duplicate Set (for seamless loop)
+        validNews.forEach(item => {
+            const clone = createCard(item);
+            clone.setAttribute('aria-hidden', 'true'); // Accessibility
+            track.appendChild(clone);
+        });
+
+        // Start the JS Ticker
+        startNewsTicker(shouldSnap);
+    }
+
+    function startNewsTicker(forceSnap = false) {
+        const container = document.getElementById('news-items-list');
+        const track = document.getElementById('news-track');
+        if (!container || !track) return;
+
+        // Reset state
+        if (window.newsAnimationFrame) cancelAnimationFrame(window.newsAnimationFrame);
+
+        // Event Listeners for Pause
+        container.onmouseenter = () => { isNewsHovered = true; };
+        container.onmouseleave = () => { isNewsHovered = false; };
+        container.ontouchstart = () => { isNewsHovered = true; };
+        container.ontouchend = () => { isNewsHovered = false; };
+
+        let scrollPos = container.scrollLeft;
+
+        // Force Snap Logic
+        if (forceSnap) {
+            scrollPos = 0;
+            container.scrollLeft = 0;
         }
+
+        const speed = 0.5; // Pixels per frame (Adjust for speed)
+
+        function animate() {
+            if (!isNewsHovered) {
+                scrollPos += speed;
+
+                // Seamless Loop Logic
+                // Since we duplicated content, the track width is 2x the content width.
+                // When we scroll past half the track width, we reset to 0.
+                // However, 'scrollWidth' includes the hidden overflow.
+                // We need to know the width of the *original* content set.
+                // Approximation: Total width / 2
+
+                const maxScroll = track.scrollWidth / 2;
+
+                // Robust Loop: If we reach OR EXCEED the midpoint, snap back to 0
+                if (scrollPos >= maxScroll) {
+                    scrollPos = 0;
+                }
+
+                container.scrollLeft = scrollPos;
+            } else {
+                // If hovered, update scrollPos to current manual scroll position so it doesn't jump when resuming
+                scrollPos = container.scrollLeft;
+            }
+
+            window.newsAnimationFrame = requestAnimationFrame(animate);
+        }
+
+        window.newsAnimationFrame = requestAnimationFrame(animate);
     }
 
     // === UTILITY: Safe Execution Wrapper ===
