@@ -26,7 +26,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function createTradingViewWidget(ticker) {
         // Clear container first
         const container = document.getElementById('chart-container');
-        if (container) container.innerHTML = '';
+        if (!container) return;
+        container.innerHTML = '';
+
+        // Ensure container has dimensions
+        if (container.clientHeight === 0) {
+            container.style.height = '400px'; // Force height if missing
+        }
 
         new TradingView.widget({
             "autosize": true,
@@ -34,18 +40,22 @@ document.addEventListener('DOMContentLoaded', () => {
             "interval": "5",
             "timezone": "Etc/UTC",
             "theme": "dark",
-            "style": "1",
+            "style": "1", // Candle style
             "locale": "en",
             "enable_publishing": false,
             "backgroundColor": "#0C0C18", // Deep Cosmos Background
             "gridColor": "rgba(30, 144, 255, 0.1)", // Subtle Deep Sky Blue grid
             "hide_top_toolbar": false,
-            "container_id": "chart-container" // Ensure this matches your HTML ID
+            "container_id": "chart-container"
         });
 
         // Mark chart as live
         updateStatus('status-chart', true);
     }
+
+    // ... (Watchlist code remains same) ...
+
+    // News Feed Logic moved to consolidated function below
 
     // Watchlist Tickers for Dropdown (Expanded w/ FinTwit Favorites)
     const WATCHLIST_TICKERS = [
@@ -303,6 +313,9 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchPolymarketData(); // Initial render
     setInterval(fetchPolymarketData, 30000); // Refresh every 30 seconds
 
+    // Initialize Chart
+    createTradingViewWidget(currentTicker);
+
     // Render Odds (Legacy - kept for compatibility)
     function renderOdds(odds) {
         // Now handled by fetchPolymarketData
@@ -459,65 +472,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // FRED API & TFI Logic
-    const FRED_API_KEY = "YOUR_FRED_API_KEY"; // Placeholder
+    const FRED_API_KEY = "YOUR_FRED_API_KEY"; // Placeholder";
 
-    // News Feed Logic
-    const newsFeedContainer = document.getElementById('news-items-list');
-    const MAX_NEWS_ITEMS = 50;
-
-    function createNewsItem(item) {
-        const div = document.createElement('div');
-        div.className = 'news-item news-item-slide-in';
-
-        // Highlight Logic
-        const upperTitle = item.title.toUpperCase();
-        const upperTicker = (item.ticker || '').toUpperCase();
-
-        if (upperTitle.includes('MAG 7') ||
-            upperTitle.includes('TRUMP') ||
-            upperTicker === 'TRUMP' ||
-            upperTitle.includes('NVDA') || upperTitle.includes('NVIDIA') ||
-            upperTitle.includes('TSLA') || upperTitle.includes('TESLA') ||
-            upperTitle.includes('AAPL') || upperTitle.includes('APPLE') ||
-            upperTitle.includes('MSFT') || upperTitle.includes('MICROSOFT') ||
-            upperTitle.includes('META') || upperTitle.includes('FACEBOOK') ||
-            upperTitle.includes('GOOGL') || upperTitle.includes('GOOGLE') ||
-            upperTitle.includes('AMZN') || upperTitle.includes('AMAZON') ||
-            upperTitle.includes('JOB') ||
-            upperTitle.includes('LABOR') ||
-            upperTitle.includes('JOBLESS') ||
-            upperTitle.includes('EMPLOYMENT') ||
-            upperTitle.includes('UNEMPLOYMENT') ||
-            upperTitle.includes(' AI ') ||
-            upperTitle.includes('ARTIFICIAL INTELLIGENCE')) {
-            div.classList.add('news-highlight-mag7');
-        }
-
-        // Format Time
-        const date = new Date(item.time * 1000);
-        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-        // Source Color Logic
-        let sourceColor = '#EAEAEA';
-        const pub = item.publisher.toLowerCase();
-        if (pub.includes('techcrunch')) sourceColor = '#00FF00';
-        else if (pub.includes('verge')) sourceColor = '#EAEAEA';
-        else if (pub.includes('cnbc')) sourceColor = '#00AACC';
-        else if (pub.includes('reuters')) sourceColor = '#FF8800';
-        else if (pub.includes('bloomberg')) sourceColor = '#0077FF';
-        else if (pub.includes('breaking')) sourceColor = '#FF3333';
-
-        div.innerHTML = `
-            <div class="news-meta">
-                <span class="news-source-tag" style="color: ${sourceColor}">${item.publisher}</span>
-                <span class="news-time">${timeStr}</span>
-            </div>
-            <div class="news-headline"><a href="${item.link}" target="_blank" style="color: inherit; text-decoration: none;">${item.title}</a></div>
-        `;
-
-        return div;
-    }
-
+    // Consolidated News Fetcher
     async function fetchNews() {
         try {
             const response = await fetch(`${API_BASE_URL}/api/news`);
@@ -525,33 +482,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const newsItems = await response.json();
 
-            // Empty news doesn't mean offline - API still responded successfully
             if (!newsItems || newsItems.length === 0) {
                 updateStatus('status-news', true); // Still LIVE, just no items
                 return;
             }
 
-            // Clear current list if it's a full refresh (or handle merging)
-            // For simplicity, let's clear and re-render if it's the first load, 
-            // or intelligently prepend new items.
-            // Since the API returns the full sorted list, we can just re-render 
-            // or check for new IDs.
-
-            // Let's use a Set to track seen links to avoid duplicates
-            // We need to define seenNewsLinks outside this function scope if we want it to persist
-            // But for now, let's just render the top 50.
-
-            newsFeedContainer.innerHTML = '';
-
-            newsItems.forEach((item, index) => {
-                const newsEl = createNewsItem(item);
-                // Only animate the first few on initial load, or all if they are new?
-                // If we clear innerHTML, everything animates. 
-                // To avoid massive animation storm, maybe only animate top 5.
-                if (index > 5) newsEl.classList.remove('news-item-slide-in');
-
-                newsFeedContainer.appendChild(newsEl);
-            });
+            // Use the renderNews function which handles filtering and rendering
+            renderNews(newsItems);
 
             // Set status to LIVE after successful render
             updateStatus('status-news', true);
@@ -562,31 +499,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Initial Fetch and Interval
-    fetchNews();
-    setInterval(fetchNews, 60000); // Refresh every 60 seconds
-
-    async function fetchVIX() {
-        try {
-            // Fetch from our backend proxy (protects API key)
-            const response = await fetch(`${API_BASE_URL}/api/vix`);
-
-            if (!response.ok) throw new Error("VIX API Error");
-
-            const data = await response.json();
-            // FRED returns data.observations[0].value
-            const vixValue = parseFloat(data.observations[0].value);
-
-            const value = data.value || 50;
-            const rating = data.rating || 'Neutral';
-
-            updateTFI(value, rating);
-            updateStatus('status-tfi', true);
-        } catch (err) {
-            console.warn('CNN Fear & Greed API Failed:', err);
-            updateStatus('status-tfi', false);
-        }
-    }
+    // fetchVIX removed (replaced by CNN Fear & Greed)
 
     function updateTFI(value, rating) {
         console.log('updateTFI START - value:', value, 'rating:', rating);
@@ -1216,8 +1129,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('news-items-list');
         if (!container) return;
 
-        // container.innerHTML = ''; // Don't clear, we append now
-
         // Filter for Last 24 Hours (86400 seconds)
         const now = new Date().getTime() / 1000;
         const last24Hours = now - 86400;
@@ -1237,63 +1148,65 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Sort new items by time (Oldest -> Newest) so when we prepend them one by one,
-        // the newest ends up at the very top.
-        newItems.sort((a, b) => a.time - b.time);
-
         newItems.forEach(item => {
-            // Determine Sentiment Class for Ticker
-            let tickerClass = 'stream-ticker';
-            if (item.sentiment === 'BULLISH') tickerClass += ' bullish';
-            if (item.sentiment === 'BEARISH') tickerClass += ' bearish';
+            // Create Card Element
+            const div = document.createElement('div');
+            div.className = 'news-item'; // Card Style
+            div.dataset.time = item.time; // Store timestamp for sorting
 
-            // Create Link Element (Row is the link)
-            const row = document.createElement('a');
-            let rowClass = 'stream-row news-slide-in'; // Add animation class
+            // Highlight Logic (Regex for precision)
+            // Includes: Mag 7, Macro, FinTwit Favorites, AI/Tech
+            const highlightRegex = /\b(MAG 7|TRUMP|AI|OPENAI|ARTIFICIAL INTELLIGENCE|FED|RATE|INFLATION|JOB|LABOR|UNEMPLOYMENT|CPI|PPI|FOMC|POWELL|QQQ|SPY|VIX|NVIDIA|NVDA|TESLA|TSLA|APPLE|AAPL|MICROSOFT|MSFT|META|GOOGLE|GOOG|GOOGL|AMAZON|AMZN|AMD|PLTR|COIN|MSTR|GME|AMC|HOOD|SOFI|UPST)\b/i;
 
-            // Apply pulsing border if it's a related ticker (and not just generic 'MKT' or 'ALERT')
-            // Logic: Check for Mag 7 or Trump (Tickers OR Full Names)
-            const mag7Tickers = ["NVDA", "TSLA", "AAPL", "MSFT", "META", "GOOGL", "AMZN"];
-            const mag7Names = ["nvidia", "tesla", "apple", "microsoft", "meta", "google", "amazon", "alphabet"];
+            const upperTitle = item.title.toUpperCase();
+            const upperTicker = (item.ticker || '').toUpperCase();
 
-            const titleLower = item.title ? item.title.toLowerCase() : "";
-
-            const isMag7Ticker = mag7Tickers.includes(item.ticker);
-            const isMag7Name = mag7Names.some(name => titleLower.includes(name));
-            const isMag7 = isMag7Ticker || isMag7Name;
-
-            const isTrump = item.ticker === "TRUMP" || titleLower.includes("trump");
-
-            if (isMag7 || isTrump) {
-                rowClass += ' watchlist-alert';
+            if (highlightRegex.test(upperTitle) || upperTicker === 'TRUMP') {
+                div.classList.add('news-highlight-mag7');
             }
-
-            row.className = rowClass;
-            row.href = item.link;
-            row.target = "_blank";
 
             // Format Time
             const date = new Date(item.time * 1000);
             const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-            // Ticker Display (Use Ticker if avail, else 'MKT')
-            const tickerText = item.ticker ? item.ticker : 'MKT';
+            // Source Color Logic
+            let sourceColor = '#EAEAEA';
+            const pub = (item.publisher || '').toLowerCase();
+            if (pub.includes('techcrunch')) sourceColor = '#00FF00';
+            else if (pub.includes('verge')) sourceColor = '#EAEAEA';
+            else if (pub.includes('cnbc')) sourceColor = '#00AACC';
+            else if (pub.includes('reuters')) sourceColor = '#FF8800';
+            else if (pub.includes('bloomberg')) sourceColor = '#0077FF';
+            else if (pub.includes('breaking')) sourceColor = '#FF3333';
+            else if (pub.includes('investing')) sourceColor = '#FFA500'; // Orange
+            else if (pub.includes('yahoo')) sourceColor = '#720e9e'; // Yahoo Purple
 
-            // Source Display (Shorten if needed)
-            let source = item.publisher || 'WIRE';
-            if (source.includes('Investing.com')) source = 'INV';
-            if (source.includes('CNBC')) source = 'CNBC';
-            if (source.includes('Breaking News')) source = 'BRK';
-
-            row.innerHTML = `
-                <span class="stream-time">${timeStr}</span>
-                <span class="stream-source">${source}</span>
-                <span class="${tickerClass}">${tickerText}</span>
-                <span class="stream-headline">${item.title}</span>
+            div.innerHTML = `
+                <div class="news-meta">
+                    <span class="news-source-tag" style="color: ${sourceColor}">${item.publisher || 'WIRE'}</span>
+                    <span class="news-time">${timeStr}</span>
+                </div>
+                <div class="news-headline"><a href="${item.link}" target="_blank" style="color: inherit; text-decoration: none;">${item.title}</a></div>
             `;
 
-            // Prepend to container
-            container.insertBefore(row, container.firstChild);
+            // Smart Insertion: Find correct position based on time (Newest First)
+            // We want to insert BEFORE the first item that is OLDER than the new item.
+            let inserted = false;
+            for (let i = 0; i < container.children.length; i++) {
+                const child = container.children[i];
+                const childTime = parseInt(child.dataset.time || 0);
+
+                if (item.time > childTime) {
+                    container.insertBefore(div, child);
+                    inserted = true;
+                    break;
+                }
+            }
+
+            // If not inserted (meaning it's older than everything, or list is empty), append to end
+            if (!inserted) {
+                container.appendChild(div);
+            }
         });
 
         // Prune list to 50 items

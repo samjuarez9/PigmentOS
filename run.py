@@ -49,7 +49,8 @@ CACHE = {
     "vix": {"data": {"value": 0, "rating": "Neutral"}, "timestamp": 0},
     "cnn_fear_greed": {"data": {"value": 50, "rating": "Neutral"}, "timestamp": 0},
     "polymarket": {"data": [], "timestamp": 0, "is_mock": False},
-    "movers": {"data": [], "timestamp": 0}
+    "movers": {"data": [], "timestamp": 0},
+    "news": {"data": [], "timestamp": 0}
 }
 
 # --- HELPER FUNCTIONS ---
@@ -377,38 +378,73 @@ def api_movers():
 
 @app.route('/api/news')
 def api_news():
+    global CACHE
+    current_time = time.time()
+    
+    # 1. Check Cache (3 minutes = 180s)
+    if current_time - CACHE["news"]["timestamp"] < 180 and CACHE["news"]["data"]:
+        return jsonify(CACHE["news"]["data"])
+
     try:
         # Simplified News Logic
         import calendar
         
         RSS_URLS = [
-            "https://www.investing.com/rss/news.rss",
-            "https://finance.yahoo.com/news/rssindex"
+            "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114", # CNBC Top News
+            "https://techcrunch.com/feed/", # TechCrunch
+            "https://www.investing.com/rss/news.rss" # Investing.com
         ]
         
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+
         all_news = []
+        print("📰 Fetching fresh news...", flush=True)
+        
         for url in RSS_URLS:
             try:
-                feed = feedparser.parse(url)
+                # Polite Delay
+                time.sleep(1)
+                
+                # Use requests to handle headers and SSL
+                response = requests.get(url, headers=headers, verify=False, timeout=5)
+                if response.status_code != 200: continue
+                
+                feed = feedparser.parse(response.content)
+                
                 for entry in feed.entries[:5]:
                     pub_ts = int(time.time())
                     if hasattr(entry, 'published_parsed') and entry.published_parsed:
                         pub_ts = int(calendar.timegm(entry.published_parsed))
                     
+                    # Determine publisher from URL or Feed Title
+                    publisher = "Market Wire"
+                    if "cnbc" in url: publisher = "CNBC"
+                    elif "techcrunch" in url: publisher = "TechCrunch"
+                    elif "investing.com" in url: publisher = "Investing.com"
+                    
                     all_news.append({
                         "title": entry.get('title', ''),
-                        "publisher": "Market Wire",
+                        "publisher": publisher,
                         "link": entry.get('link', ''),
                         "time": pub_ts,
                         "ticker": "NEWS"
                     })
-            except: continue
+            except Exception as e:
+                print(f"Feed Error {url}: {e}")
+                continue
             
         all_news.sort(key=lambda x: x['time'], reverse=True)
+        
+        # Update Cache
+        CACHE["news"]["data"] = all_news
+        CACHE["news"]["timestamp"] = current_time
+        
         return jsonify(all_news)
     except Exception as e:
         print(f"News Error: {e}")
-        return jsonify([])
+        return jsonify(CACHE["news"]["data"] if CACHE["news"]["data"] else [])
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8001))
