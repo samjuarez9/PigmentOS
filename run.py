@@ -2,8 +2,7 @@ import json
 import time
 import random
 import threading
-import yfinance as yf
-import pandas as pd
+import requests
 import yfinance as yf
 import pandas as pd
 import statistics
