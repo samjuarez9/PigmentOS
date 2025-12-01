@@ -1207,7 +1207,16 @@ document.addEventListener('DOMContentLoaded', () => {
             iv: item.iv
         }));
 
-        renderWhaleFeed(trades);
+        // Hover Pause Logic
+        if (isFeedHovered) {
+            // Queue them up
+            pendingWhales = [...trades, ...pendingWhales];
+            // Limit buffer
+            if (pendingWhales.length > 50) pendingWhales = pendingWhales.slice(0, 50);
+        } else {
+            // Render immediately
+            renderWhaleFeed(trades);
+        }
     }
 
     // === Hover Pause Logic ===
@@ -1223,10 +1232,10 @@ document.addEventListener('DOMContentLoaded', () => {
         feedContainer.addEventListener('mouseleave', () => {
             isFeedHovered = false;
             // Process pending
-            pendingWhales = [...trades, ...pendingWhales]; // Newest first
-            // Limit buffer
-            if (pendingWhales.length > 50) pendingWhales = pendingWhales.slice(0, 50);
-            return;
+            if (pendingWhales.length > 0) {
+                renderWhaleFeed(pendingWhales);
+                pendingWhales = [];
+            }
         });
     }
 
