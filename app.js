@@ -304,49 +304,49 @@ document.addEventListener('DOMContentLoaded', () => {
             const item = document.createElement('div');
             item.className = 'polymarket-item';
 
-            // Delta Logic
+            // Delta Badge (Percent Change)
             let deltaBadge = '';
-            if (market.delta && Math.abs(market.delta) >= 0.01) {
-                const deltaPercent = Math.round(market.delta * 100);
-                const isPositive = deltaPercent > 0;
-                const deltaClass = isPositive ? 'delta-up' : 'delta-down';
-                const sign = isPositive ? '+' : '';
-                deltaBadge = `<span class="${deltaClass}">${sign}${deltaPercent}%</span>`;
-                console.log('Delta badge created:', deltaBadge, 'for', market.event);
+            if (market.delta !== 0) {
+                const deltaPercent = Math.abs(market.delta * 100).toFixed(0); // e.g. 15
+                const arrow = market.delta > 0 ? '↗' : '↘';
+                const colorClass = market.delta > 0 ? 'delta-up' : 'delta-down';
+                deltaBadge = `<span class="${colorClass}">${arrow} ${deltaPercent}%</span>`;
             }
 
-            // Calculate width for laser gauge
+            // Calculate width for confidence gauge
             const prob1 = market.outcome_1_prob || 0;
-            const prob2 = market.outcome_2_prob || 0;
-            const total = prob1 + prob2 || 100; // Avoid divide by zero
-            const width1 = (prob1 / total) * 100;
-            const width2 = (prob2 / total) * 100;
+            const width1 = prob1; // Direct percentage
 
-            // Determine labels - Dynamic from Backend
+            // Determine label - Dynamic from Backend
             let label1 = market.outcome_1_label || 'YES';
-            let label2 = market.outcome_2_label || 'NO';
 
             // Truncate long labels
-            if (label1.length > 8) label1 = label1.substring(0, 8) + '..';
-            if (label2.length > 8) label2 = label2.substring(0, 8) + '..';
+            if (label1.length > 12) label1 = label1.substring(0, 12) + '..';
+
+            // Calculate width for split bar
+            const width2 = 100 - width1;
 
             item.innerHTML = `
-    <div class="polymarket-top-row">
+                <div class="polymarket-header">
                     <a href="https://polymarket.com/event/${market.slug}" target="_blank" class="polymarket-event">${market.event}</a>
+                </div>
+                <div class="polymarket-odds-row">
                     <div class="polymarket-odds">
                         <span class="polymarket-odds-text polymarket-odds-yes">${prob1}% ${label1}${deltaBadge}</span>
-                        <span class="polymarket-odds-text polymarket-odds-no">${prob2}% ${label2}</span>
+                    </div>
+                    <div class="poly-stats-mini">
+                        <span>VOL: ${market.volume}</span>
+                        <span class="separator">•</span>
+                        <span>LIQ: ${market.liquidity}</span>
                     </div>
                 </div>
-                <div class="polymarket-stats-row">
-                    <span class="poly-stat">VOL: <span class="stat-val">${market.volume}</span></span>
-                    <span class="poly-stat">LIQ: <span class="stat-val">${market.liquidity}</span></span>
+                <div class="polymarket-bar-row">
+                    <div class="polymarket-laser-gauge single-gauge">
+                        <div class="polymarket-yes-segment" style="width: ${width1}%"></div>
+                        <div class="polymarket-no-segment" style="width: ${width2}%"></div>
+                    </div>
                 </div>
-    <div class="polymarket-laser-gauge">
-        <div class="polymarket-yes-segment" style="width: ${width1}%"></div>
-        <div class="polymarket-no-segment" style="width: ${width2}%"></div>
-    </div>
-`;
+            `;
             container.appendChild(item);
         });
         console.log('Rendered', data.length, 'Polymarket items');
@@ -611,6 +611,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             renderMarketMap(data);
             updateStatus('status-sectors', true);
+
+            // Update Header with Market State Badge - REVERTED
+            const headerTitle = document.querySelector('#market-map .widget-title');
+            if (headerTitle) {
+                const existingBadge = headerTitle.querySelector('.market-state-badge');
+                if (existingBadge) existingBadge.remove();
+            }
         } catch (error) {
             console.error('Heatmap Fetch Error:', error);
             updateStatus('status-sectors', false);
@@ -1270,18 +1277,20 @@ document.addEventListener('DOMContentLoaded', () => {
         tickerSpan.textContent = flow.ticker;
         colTicker.appendChild(tickerSpan);
 
+        // Common Variables for Type
+        const isCall = flow.type === 'CALL';
+        const typeClass = isCall ? 'type-c' : 'type-p';
+        const typeLabel = isCall ? 'C' : 'P';
+
         // 2. Premium Column
         const colPremium = document.createElement('div');
         colPremium.className = 'col-premium';
+        colPremium.classList.add(typeClass);
         colPremium.textContent = flow.premium;
 
         // 3. Strike/Type Column
         const colStrike = document.createElement('div');
         colStrike.className = 'col-strike';
-        // flow.type is 'CALL' or 'PUT'
-        const isCall = flow.type === 'CALL';
-        const typeClass = isCall ? 'type-c' : 'type-p';
-        const typeLabel = isCall ? 'C' : 'P';
         colStrike.innerHTML = `<span class="${typeClass}">${flow.strike}${typeLabel}</span>`;
 
         // 4. Tag Column (MEGA / FRESH / BULL / BEAR / HEDGE / ITM / OTM)

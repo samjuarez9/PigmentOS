@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PigmentOS Animation Preview</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=VT323&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0a0a0a;
+            --card-bg: #111;
+            --text-color: #e0e0e0;
+            --accent-color: #00ff88;
+            --danger-color: #ff3333;
+            --neon-blue: #00f3ff;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'JetBrains Mono', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        h1 {
+            font-family: 'VT323', monospace;
+            color: var(--neon-blue);
+            text-shadow: 0 0 10px var(--neon-blue);
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 10px 20px;
+            font-family: 'JetBrains Mono', monospace;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: var(--neon-blue);
+            color: #000;
+            box-shadow: 0 0 15px var(--neon-blue);
+            border-color: var(--neon-blue);
+        }
+
+        /* WIDGET CONTAINER */
+        .widget-container {
+            width: 350px;
+            background: #000;
+            border: 1px solid #333;
+            padding: 10px;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* === ANIMATION STYLES === */
+
+        /* 1. Container Glitch */
+        .glitch-active {
+            animation: container-glitch 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+        }
+
+        @keyframes container-glitch {
+            0% {
+                transform: translate(0);
+            }
+
+            20% {
+                transform: translate(-2px, 2px);
+                filter: hue-rotate(90deg);
+            }
+
+            40% {
+                transform: translate(-2px, -2px);
+                filter: hue-rotate(0deg);
+            }
+
+            60% {
+                transform: translate(2px, 2px);
+                filter: hue-rotate(180deg);
+            }
+
+            80% {
+                transform: translate(2px, -2px);
+                filter: hue-rotate(0deg);
+            }
+
+            100% {
+                transform: translate(0);
+            }
+        }
+
+        /* 2. Item Cascade */
+        .polymarket-item {
+            background: #1a1a1a;
+            margin-bottom: 8px;
+            padding: 8px;
+            border-left: 2px solid #333;
+            opacity: 0;
+            /* Start hidden */
+            transform: translateX(-20px);
+            /* Start off-screen */
+        }
+
+        /* The Cascade Animation Class */
+        .cascade-in {
+            animation: slide-glitch-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes slide-glitch-in {
+            0% {
+                opacity: 0;
+                transform: translateX(-50px) skewX(20deg);
+                filter: brightness(2);
+            }
+
+            50% {
+                opacity: 1;
+                transform: translateX(5px) skewX(-10deg);
+            }
+
+            70% {
+                transform: translateX(-2px) skewX(5deg);
+            }
+
+            100% {
+                opacity: 1;
+                transform: translateX(0) skewX(0);
+                filter: brightness(1);
+            }
+        }
+
+        /* MOCK CONTENT STYLES */
+        .item-title {
+            font-size: 14px;
+            color: #fff;
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+        }
+
+        .green {
+            color: var(--accent-color);
+        }
+
+        .red {
+            color: var(--danger-color);
+        }
+
+        .bar {
+            height: 4px;
+            background: #333;
+            margin-top: 4px;
+            display: flex;
+        }
+
+        .bar-g {
+            background: var(--accent-color);
+            height: 100%;
+        }
+
+        .bar-r {
+            background: var(--danger-color);
+            height: 100%;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>CYBER CASCADE PREVIEW</h1>
+
+    <div class="controls">
+        <button onclick="triggerSort()">RE-SORT FEED</button>
+    </div>
+
+    <div class="widget-container" id="feed">
+        <!-- Items will be injected here -->
+    </div>
+
+    <script>
+        const mockData = [
+            { title: "Fed Rate Cut Dec?", odds: "89%", delta: "+15%", vol: "$4.2M" },
+            { title: "Bitcoin > $100k?", odds: "72%", delta: "-5%", vol: "$12M" },
+            { title: "China Taiwan 2025?", odds: "12%", delta: "+2%", vol: "$1.1M" },
+            { title: "US Recession 2025?", odds: "35%", delta: "0%", vol: "$800k" },
+            { title: "OpenAI IPO Q1?", odds: "45%", delta: "+8%", vol: "$2.5M" }
+        ];
+
+        function renderFeed() {
+            const container = document.getElementById('feed');
+
+            // 1. Trigger Container Glitch
+            container.classList.remove('glitch-active');
+            void container.offsetWidth; // Force reflow
+            container.classList.add('glitch-active');
+
+            // 2. Clear Content
+            container.innerHTML = '';
+
+            // 3. Re-render with Staggered Animation
+            // Shuffle data to simulate sorting change
+            const shuffled = [...mockData].sort(() => Math.random() - 0.5);
+
+            shuffled.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'polymarket-item cascade-in';
+
+                // STAGGER DELAY: 50ms per item
+                div.style.animationDelay = `${index * 0.05}s`;
+
+                const isUp = item.delta.includes('+');
+                const deltaClass = isUp ? 'green' : (item.delta === '0%' ? '' : 'red');
+                const width = parseInt(item.odds);
+
+                div.innerHTML = `
+                    <span class="item-title">${item.title}</span>
+                    <div class="item-row">
+                        <span class="green">${item.odds} <span class="${deltaClass}">${item.delta}</span></span>
+                        <span>VOL: ${item.vol}</span>
+                    </div>
+                    <div class="bar">
+                        <div class="bar-g" style="width: ${width}%"></div>
+                        <div class="bar-r" style="width: ${100 - width}%"></div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // Initial Render
+        renderFeed();
+
+        function triggerSort() {
+            renderFeed();
+        }
+    </script>
+</body>
+
+</html>

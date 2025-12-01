@@ -30,6 +30,10 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
+@app.route('/preview')
+def preview_page():
+    return send_from_directory('.', 'preview.html')
+
 # Watchlist for "Whale" Scan
 WATCHLIST = [
     "NVDA", "TSLA", "AAPL", "MSFT", "AMZN", "META", "GOOGL",
@@ -56,116 +60,95 @@ CACHE = {
 
 # --- HELPER FUNCTIONS ---
 
-def filter_for_whales(chain_df, current_stock_price, min_premium=2000000):
-    if chain_df.empty: return chain_df
-    
-    ny_tz = pytz.timezone('America/New_York')
-    today_ny = datetime.now(ny_tz).date()
-    
-    def is_today(ts):
-        try:
-            if hasattr(ts, 'to_pydatetime'): dt = ts.to_pydatetime()
-            else: dt = ts
-            if dt.tzinfo is None: dt = pytz.utc.localize(dt)
-            return dt.astimezone(ny_tz).date() == today_ny
-        except: return False
-
-    chain_df = chain_df[chain_df['lastTradeDate'].apply(is_today)].copy()
-    if chain_df.empty: return chain_df
-
-    chain_df['notional_value'] = chain_df['volume'] * chain_df['lastPrice'] * 100
-    chain_df['vol_oi_ratio'] = chain_df['volume'] / (chain_df['openInterest'].replace(0, 1))
-    
-    whales = chain_df[
-        (chain_df['volume'] > chain_df['openInterest']) &
-        (chain_df['notional_value'] >= min_premium) &
-        (chain_df['volume'] > 50)
-    ].copy()
-    
-    if whales.empty: return whales
-        
-    whales['moneyness'] = 'ITM'
-    whales.loc[(whales['contractSymbol'].str.contains('C')) & (whales['strike'] > current_stock_price), 'moneyness'] = 'OTM'
-    whales.loc[(whales['contractSymbol'].str.contains('P')) & (whales['strike'] < current_stock_price), 'moneyness'] = 'OTM'
-    
-    return whales.sort_values(by='lastTradeDate', ascending=False)
-
-def fetch_ticker_options(ticker):
-    try:
-        stock = yf.Ticker(ticker)
-        exps = stock.options
-        if not exps: return []
-        
-        expiry = exps[0]
-        chain = stock.option_chain(expiry)
-        
-        try: current_price = stock.fast_info['last_price']
-        except: current_price = stock.history(period="1d")['Close'].iloc[-1]
-
-        calls = chain.calls.copy()
-        calls['putCall'] = 'C'
-        if 'delta' not in calls.columns: calls['delta'] = 0.0
-        if 'impliedVolatility' not in calls.columns: calls['impliedVolatility'] = 0.0
-        
-        puts = chain.puts.copy()
-        puts['putCall'] = 'P'
-        if 'delta' not in puts.columns: puts['delta'] = 0.0
-        if 'impliedVolatility' not in puts.columns: puts['impliedVolatility'] = 0.0
-        
-        full_chain = pd.concat([calls, puts])
-        whales = filter_for_whales(full_chain, current_price)
-        
-        if whales.empty: return []
-
-        trades = []
-        for i, (index, row) in enumerate(whales.iterrows()):
-            premium = row['notional_value']
-            is_mega = premium >= MEGA_WHALE_THRESHOLD
-            
-            # Formatting for console logs (optional)
-            if premium >= 1_000_000: prem_str = f"${premium/1_000_000:.1f}M"
-            else: prem_str = f"${premium/1_000:.0f}k"
-
-            trades.append({
-                "baseSymbol": ticker,
-                "symbol": row['contractSymbol'],
-                "strikePrice": float(row['strike']),
-                "expirationDate": expiry,
-                "putCall": row['putCall'],
-                "volume": int(row['volume']),
-                "openInterest": int(row['openInterest']),
-                "lastPrice": float(row['lastPrice']),
-                "tradeTime": int(row['lastTradeDate'].timestamp()),
-                "vol_oi": round(row['vol_oi_ratio'], 1),
-                "premium": prem_str,
-                "notional_value": row['notional_value'],
-                "moneyness": row['moneyness'],
-                "is_mega_whale": is_mega,
-                "delta": round(float(row.get('delta', 0)), 3),
-                "iv": round(float(row.get('impliedVolatility', 0)) * 100, 1)
-            })
-        return trades
-    except Exception as e:
-        print(f"Error fetching {ticker}: {e}")
-        return []
-
 def refresh_whales_logic():
     global CACHE
-    all_whales = []
-    print("🐳 Scanning for whales...", flush=True)
-    for ticker in WATCHLIST:
-        try:
-            whales = fetch_ticker_options(ticker)
-            all_whales.extend(whales)
-            time.sleep(2)
-        except: continue
+    print("🐳 Fetching data from Barchart...", flush=True)
     
-    all_whales.sort(key=lambda x: x.get('tradeTime', 0), reverse=True)
-    all_whales = all_whales[:50]
-    
-    CACHE["barchart"]["data"] = all_whales
-    CACHE["barchart"]["timestamp"] = time.time()
-    print(f"🐳 Refreshed {len(all_whales)} whale trades.", flush=True)
+    try:
+        # 1. Setup Headers
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Accept": "application/json",
+            "Referer": "https://www.barchart.com/options/unusual-activity/stocks"
+        }
+
+        # 2. Get Cookies (XSRF)
+        session = requests.Session()
+        # First request to get cookies
+        session.get("https://www.barchart.com/options/unusual-activity/stocks", headers=headers, verify=False, timeout=10)
+        
+        xsrf = session.cookies.get_dict().get("XSRF-TOKEN")
+        if xsrf:
+            headers["X-XSRF-TOKEN"] = requests.utils.unquote(xsrf)
+
+        # 3. Request API
+        api_url = "https://www.barchart.com/proxies/core-api/v1/quotes/get"
+        params = {
+            "list": "options.unusual_activity.stocks",
+            "fields": "symbol,baseSymbol,strikePrice,expirationDate,putCall,volume,openInterest,tradeTime,lastPrice,priceChange,percentChange",
+            "orderBy": "volume",
+            "orderDir": "desc",
+            "limit": "50",
+            "meta": "field.shortName,field.type,field.description"
+        }
+
+        api_resp = session.get(api_url, headers=headers, params=params, verify=False, timeout=10)
+        
+        if api_resp.status_code == 200:
+            data = api_resp.json()
+            results = data.get('data', [])
+            
+            clean_whales = []
+            for item in results:
+                try:
+                    # Map Barchart fields to our frontend format
+                    # Barchart: symbol, baseSymbol, strikePrice, expirationDate, putCall, volume, openInterest, tradeTime
+                    
+                    # Calculate Vol/OI
+                    vol = float(item.get('volume', 0).replace(',', ''))
+                    oi = float(item.get('openInterest', 0).replace(',', ''))
+                    vol_oi = round(vol / oi, 1) if oi > 0 else 0
+                    
+                    # Premium estimation (Barchart doesn't give premium directly in this endpoint, so we estimate or leave blank)
+                    # We can use lastPrice * volume * 100 as a rough proxy for notional
+                    last_price = float(item.get('lastPrice', 0).replace(',', ''))
+                    notional = vol * last_price * 100
+                    
+                    def format_money(val):
+                        if val >= 1_000_000: return f"${val/1_000_000:.1f}M"
+                        if val >= 1_000: return f"${val/1_000:.0f}k"
+                        return f"${val:.0f}"
+
+                    clean_whales.append({
+                        "baseSymbol": item.get('baseSymbol'),
+                        "symbol": item.get('symbol'),
+                        "strikePrice": float(item.get('strikePrice', 0)),
+                        "expirationDate": item.get('expirationDate'),
+                        "putCall": 'C' if item.get('putCall') == 'Call' else 'P',
+                        "volume": int(vol),
+                        "openInterest": int(oi),
+                        "lastPrice": last_price,
+                        "tradeTime": item.get('tradeTime'), # Keep string for now or parse if needed
+                        "vol_oi": vol_oi,
+                        "premium": format_money(notional),
+                        "notional_value": notional,
+                        "moneyness": "N/A", # Barchart doesn't give this easily
+                        "is_mega_whale": notional > 5_000_000,
+                        "delta": 0, # Not provided
+                        "iv": 0 # Not provided
+                    })
+                except Exception as e:
+                    continue
+            
+            CACHE["barchart"]["data"] = clean_whales
+            CACHE["barchart"]["timestamp"] = time.time()
+            print(f"🐳 Refreshed {len(clean_whales)} whale trades from Barchart.", flush=True)
+            
+        else:
+            print(f"Barchart API Error: {api_resp.status_code}")
+            
+    except Exception as e:
+        print(f"Barchart Refresh Failed: {e}")
 
 # --- FLASK ROUTES ---
 
@@ -231,7 +214,11 @@ def api_polymarket():
         return jsonify({"data": CACHE["polymarket"]["data"], "is_mock": CACHE["polymarket"]["is_mock"]})
 
     try:
-        url = "https://gamma-api.polymarket.com/events?closed=false&limit=100&order=volume24hr&ascending=false"
+        # FETCH OPTIMIZATION:
+        # 1. limit=200: Fetch more to allow for filtering
+        # 2. order=volume24hr: Prioritize what's actually trading
+        # 3. active=true & closed=false: Strict liveness check
+        url = "https://gamma-api.polymarket.com/events?limit=200&active=true&closed=false&order=volume24hr&ascending=false"
         
         headers = {'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json'}
         
@@ -245,17 +232,43 @@ def api_polymarket():
         
         if resp.status_code == 200:
             events = resp.json()
-            # Expanded Keywords for "Deep Intel"
+            
+            # --- NEW LOGIC START ---
+            import math # Import locally to avoid changing top of file
+            
             KEYWORDS = {
-                "GEOPOL": ['war', 'invasion', 'strike', 'china', 'russia', 'israel', 'iran', 'taiwan', 'election', 'ukraine', 'gaza', 'border', 'military'],
-                "MACRO": ['fed', 'rate', 'inflation', 'cpi', 'jobs', 'recession', 'gdp', 'fomc'],
-                "CRYPTO": ['bitcoin', 'crypto', 'btc', 'eth', 'solana', 'nft'],
-                "TECH": ['apple', 'nvidia', 'microsoft', 'google', 'meta', 'tesla', 'amazon', 'ai', 'tech']
+                "GEOPOL": ['war', 'invasion', 'strike', 'china', 'russia', 'israel', 'iran', 'taiwan', 'ukraine', 'gaza', 'border', 'military', 'ceasefire', 'capture', 'regime', 'clash', 'peace', 'khamenei', 'hezbollah', 'venezuela'],
+                "MACRO": ['fed', 'rate', 'inflation', 'cpi', 'jobs', 'recession', 'gdp', 'fomc', 'powell', 'gold', 'reserve', 'ipo'],
+                "CRYPTO": ['bitcoin', 'crypto', 'btc', 'eth', 'nft'],
+                "TECH": ['apple', 'nvidia', 'microsoft', 'google', 'meta', 'tesla', 'amazon', 'ai', 'tech', 'openai', 'gemini'],
+                "CULTURE": ['tweet', 'youtube', 'subscriber', 'mrbeast', 'logan paul', 'ksi', 'spotify', 'taylor swift', 'beyonce', 'film', 'movie', 'box office'],
+                "SCIENCE": ['space', 'nasa', 'spacex', 'mars', 'moon', 'cancer', 'climate', 'temperature', 'fda', 'medicine']
             }
 
-            BLACKLIST = ['nfl', 'nba', 'super bowl', 'box office', 'pop', 'music', 'song', 'artist', 'movie', 'film', 'grammy', 'oscar', 'sport', 'football', 'basketball', 'soccer', 'tennis', 'golf']
+            BLACKLIST = ['nfl', 'nba', 'super bowl', 'sport', 'football', 'basketball', 'soccer', 'tennis', 'golf', 'searched', 'election', 'solana', 'microstrategy', 'mstr']
             
-            clean_markets = []
+            candidates = []
+            seen_stems = {}
+
+            def get_title_stem(t):
+                # Lowercase first
+                s = t.lower()
+                # Remove currency amounts (e.g. $100k, $95,000)
+                s = re.sub(r'\$[\d,]+(\.\d+)?[kKmM]?', '', s)
+                # Remove years (2024-2029)
+                s = re.sub(r'\b202[4-9]\b', '', s)
+                # Remove specific date patterns: "on December 5", "by Jan 1", "in March"
+                # Matches: on/by/in + optional space + Month + optional space + optional Day
+                months = r"(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)"
+                s = re.sub(r'\b(on|by|in)?\s*' + months + r'\s*(\d{1,2})?(st|nd|rd|th)?\b', '', s)
+                # Remove "above" or "below" if followed by space (common in price targets)
+                s = re.sub(r'\b(above|below|hit|reach)\b', '', s)
+                # Remove placeholders
+                s = s.replace("___", "")
+                # Collapse whitespace and non-alphanumeric (keep only letters for strict topic matching)
+                s = re.sub(r'[^a-z\s]', '', s)
+                return ' '.join(s.split())
+
             for event in events:
                 title = event.get('title', '')
                 title_lower = title.lower()
@@ -263,28 +276,64 @@ def api_polymarket():
                 # 1. Blacklist Check
                 if any(bad in title_lower for bad in BLACKLIST): continue
                 
-                # 2. Determine Category (Strict Regex)
+                # 2. Determine Category
                 category = "OTHER"
                 for cat, keys in KEYWORDS.items():
-                    # Match whole words only (e.g. "AI" matches "AI", but not "Saints")
                     if any(re.search(r'\b' + re.escape(k) + r'\b', title_lower) for k in keys):
                         category = cat
                         break
                 
-                # Filter: Only show relevant categories
                 if category == "OTHER": continue
-                
+
+                # 3. Market Data Extraction
                 markets = event.get('markets', [])
                 if not markets: continue
                 
-                # Take first market
-                m = markets[0]
+                # Find best market (highest volume or main)
+                # For the actual widget, we need more data than the audit script (outcomes, prices)
+                # We'll pick the first market for now, but we could search for the "Yes" market
+                m = markets[0] 
+                
+                # Calculate Metrics
                 try:
+                    vol = float(m.get('volume', 0))
+                    liq = float(m.get('liquidity', 0))
+                    delta = float(m.get('oneDayPriceChange', 0))
+                except: continue
+
+                # Thresholds
+                if vol < 1000 or liq < 500: continue
+                
+                # 4. Deduplication Logic
+                stem = get_title_stem(title)
+                
+                # If we've seen this stem, only keep the one with higher volume
+                if stem in seen_stems:
+                    existing_idx = seen_stems[stem]
+                    if vol > candidates[existing_idx]['volume']:
+                        # Replace existing with this one (mark existing as skipped)
+                        candidates[existing_idx]['skip'] = True
+                        seen_stems[stem] = len(candidates) # Update pointer
+                    else:
+                        continue # Skip this one, existing is better
+                else:
+                    seen_stems[stem] = len(candidates)
+
+                # 5. Weighted Score
+                score = math.log(vol + 1) * (abs(delta) * 100)
+                
+                # 6. Process Outcomes (for Display)
+                # This part is from the original code, adapted for the new loop
+                try:
+                    # Fix Template Titles
+                    if "___" in title:
+                        val = m.get('groupItemTitle', '')
+                        if val: title = title.replace("___", val)
+
                     outcomes = json.loads(m['outcomes']) if isinstance(m['outcomes'], str) else m['outcomes']
                     prices = json.loads(m['outcomePrices']) if isinstance(m['outcomePrices'], str) else m['outcomePrices']
                     
                     if len(outcomes) >= 2 and len(prices) >= 2:
-                        # Pair outcomes with prices
                         outcome_data = []
                         for i in range(len(outcomes)):
                             try:
@@ -293,52 +342,63 @@ def api_polymarket():
                                 outcome_data.append({"label": label, "price": price})
                             except: continue
                         
-                        # Sort by price (probability) descending
                         outcome_data.sort(key=lambda x: x['price'], reverse=True)
-                        
-                        # Take Top 2
                         if len(outcome_data) < 2: continue
                         
                         top1 = outcome_data[0]
                         top2 = outcome_data[1]
                         
-                        prob1 = top1['price']
-                        prob2 = top2['price']
-                        
-                        # Delta
-                        mid = m.get('id', '')
-                        last_prob = POLY_STATE.get(mid, prob1)
-                        delta = prob1 - last_prob
-                        POLY_STATE[mid] = prob1
-                        # Volatility Threshold (5% move)
-                        is_volatile = abs(delta) >= 0.05
-                        
-                        # Volume & Liquidity
-                        vol = float(m.get('volume', 0))
-                        liq = float(m.get('liquidity', 0))
+                        # OVERRIDE LABEL
+                        group_title = m.get('groupItemTitle')
+                        if group_title and top1['label'].lower() == "yes":
+                            top1['label'] = group_title
                         
                         def format_money(val):
                             if val >= 1_000_000: return f"${val/1_000_000:.1f}M"
                             if val >= 1_000: return f"${val/1_000:.0f}k"
                             return f"${val:.0f}"
-                        
-                        category = event.get('category', 'General') # Assuming category is available in event
-                        clean_markets.append({
+
+                        candidates.append({
                             "event": title,
                             "category": category,
-                            "is_volatile": is_volatile,
-                            "volume": format_money(vol),
+                            "is_volatile": abs(delta) >= 0.05,
+                            "volume": vol, # Keep raw for sorting
+                            "volume_fmt": format_money(vol),
                             "liquidity": format_money(liq),
                             "outcome_1_label": top1['label'],
-                            "outcome_1_prob": int(prob1 * 100),
+                            "outcome_1_prob": int(top1['price'] * 100),
                             "outcome_2_label": top2['label'],
-                            "outcome_2_prob": int(prob2 * 100),
+                            "outcome_2_prob": int(top2['price'] * 100),
                             "slug": event.get('slug', ''),
-                            "delta": delta
+                            "delta": delta,
+                            "score": score,
+                            "skip": False
                         })
-                except: continue
+                except Exception as e:
+                    continue
+
+            # Filter and Sort
+            final_list = [c for c in candidates if not c['skip']]
+            final_list.sort(key=lambda x: x['score'], reverse=True)
             
-            CACHE["polymarket"]["data"] = clean_markets[:15]
+            # Format for Frontend (remove raw fields)
+            clean_markets = []
+            for c in final_list[:15]:
+                clean_markets.append({
+                    "event": c['event'],
+                    "category": c['category'],
+                    "is_volatile": c['is_volatile'],
+                    "volume": c['volume_fmt'],
+                    "liquidity": c['liquidity'],
+                    "outcome_1_label": c['outcome_1_label'],
+                    "outcome_1_prob": c['outcome_1_prob'],
+                    "outcome_2_label": c['outcome_2_label'],
+                    "outcome_2_prob": c['outcome_2_prob'],
+                    "slug": c['slug'],
+                    "delta": c['delta']
+                })
+            
+            CACHE["polymarket"]["data"] = clean_markets
             CACHE["polymarket"]["timestamp"] = current_time
             CACHE["polymarket"]["is_mock"] = False
         else:
@@ -545,8 +605,8 @@ def api_heatmap():
     global CACHE
     current_time = time.time()
     
-    # Cache for 5 minutes (300s)
-    if "heatmap" in CACHE and current_time - CACHE["heatmap"]["timestamp"] < 300:
+    # Cache for 1 minute (60s)
+    if "heatmap" in CACHE and current_time - CACHE["heatmap"]["timestamp"] < 60:
         return jsonify(CACHE["heatmap"]["data"])
         
     # Tickers mapped to their "Size" category and "Sector" for filtering
@@ -584,15 +644,38 @@ def api_heatmap():
         for symbol, meta in HEATMAP_TICKERS.items():
             try:
                 t = tickers_obj.tickers[symbol]
-                last = t.fast_info.last_price
-                prev = t.fast_info.previous_close
                 
-                if last and prev:
-                    change = ((last - prev) / prev) * 100
+                # Try to get extended hours data from .info (slower but richer)
+                # If .info fails or is missing keys, fall back to fast_info
+                try:
+                    info = t.info
+                    state = info.get('marketState', 'REGULAR')
+                    
+                    price = info.get('regularMarketPrice')
+                    prev_close = info.get('regularMarketPreviousClose')
+                    
+                    # Handle Pre/Post Market
+                    if state in ['PRE', 'PREPRE'] and info.get('preMarketPrice'):
+                        price = info['preMarketPrice']
+                    elif state in ['POST', 'POSTPOST'] and info.get('postMarketPrice'):
+                        price = info['postMarketPrice']
+                        
+                    # Fallback to fast_info if info is incomplete
+                    if not price or not prev_close:
+                        price = t.fast_info.last_price
+                        prev_close = t.fast_info.previous_close
+                        
+                except:
+                    # Fallback if .info fails completely
+                    price = t.fast_info.last_price
+                    prev_close = t.fast_info.previous_close
+
+                if price and prev_close:
+                    change = ((price - prev_close) / prev_close) * 100
                     heatmap_data.append({
                         "symbol": symbol,
                         "change": round(change, 2),
-                        "price": round(last, 2),
+                        "price": round(price, 2),
                         "size": meta["size"],
                         "sector": meta["sector"]
                     })
