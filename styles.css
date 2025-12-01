@@ -3148,7 +3148,7 @@ td {
 @media screen and (max-width: 768px) {
 
     /* Fix Chart Distortion */
-    #price-chart-container,
+    #chart-container,
     #pcr-chart-container {
         height: 300px !important;
         /* Force taller height on mobile */
@@ -3195,7 +3195,10 @@ td {
 
     /* Adjust Widget Heights for Mobile */
     .widget {
-        min-height: 300px;
+        min-height: 0;
+        /* Allow shrinking */
+        height: auto;
+        /* Shrink-wrap content */
         max-height: none;
         flex: none;
     }
