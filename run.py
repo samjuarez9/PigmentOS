@@ -231,7 +231,15 @@ def api_polymarket():
 
     try:
         url = "https://gamma-api.polymarket.com/events?closed=false&limit=100&order=volume24hr&ascending=false"
+        
         headers = {'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json'}
+        
+        # Optional: Use API Key if provided (helps with rate limits)
+        api_key = os.environ.get("POLYMARKET_API_KEY")
+        if api_key:
+            headers['Authorization'] = f"Bearer {api_key}"
+            print("🔑 Using Polymarket API Key", flush=True)
+            
         resp = requests.get(url, headers=headers, verify=False, timeout=5)
         
         if resp.status_code == 200:
