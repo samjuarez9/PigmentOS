@@ -16,8 +16,16 @@ def verify_whales():
     print(f"📊 Cache contains {len(data)} trades")
     
     if data:
+        print(f"✅ Top Trade Time: {data[0].get('tradeTime')}")
+        print(f"✅ Top Trade Moneyness: {data[0].get('moneyness')}")
         print("✅ Sample Trade:")
         print(data[0])
+        
+        # Check sorting
+        times = [d.get('timestamp', 0) for d in data[:5]]
+        print(f"Top 5 Timestamps: {times}")
+        is_sorted = all(times[i] >= times[i+1] for i in range(len(times)-1))
+        print(f"Is Sorted by Time? {is_sorted}")
     else:
         print("❌ No trades found in cache!")
 

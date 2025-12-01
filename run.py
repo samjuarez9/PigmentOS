@@ -78,6 +78,16 @@ def refresh_whales_logic():
                 # print(f"  Checking {symbol}...", flush=True)
                 ticker = yf.Ticker(symbol)
                 
+                # Get underlying price for Moneyness
+                # Try fast_info first for speed
+                try:
+                    current_price = ticker.fast_info.last_price
+                except:
+                    current_price = ticker.info.get('regularMarketPrice', 0)
+                
+                if not current_price:
+                    continue
+
                 # Get expiration dates
                 expirations = ticker.options
                 if not expirations:
@@ -112,27 +122,48 @@ def refresh_whales_logic():
                     # Calculate Notional Value (Premium)
                     notional = row['volume'] * row['lastPrice'] * 100
                     
+                    # Calculate Moneyness (ITM/OTM)
+                    strike = float(row['strike'])
+                    is_call = row['type'] == 'CALL'
+                    moneyness = "OTM"
+                    
+                    if is_call:
+                        if current_price > strike: moneyness = "ITM"
+                    else: # PUT
+                        if current_price < strike: moneyness = "ITM"
+                    
                     # Format Premium
                     def format_money(val):
                         if val >= 1_000_000: return f"${val/1_000_000:.1f}M"
                         if val >= 1_000: return f"${val/1_000:.0f}k"
                         return f"${val:.0f}"
+                    
+                    # Handle Timestamp
+                    # yfinance returns a Timestamp object, convert to string for JSON
+                    trade_time_obj = row['lastTradeDate']
+                    if hasattr(trade_time_obj, 'strftime'):
+                        trade_time_str = trade_time_obj.strftime("%H:%M:%S")
+                        timestamp_val = trade_time_obj.timestamp()
+                    else:
+                        trade_time_str = str(trade_time_obj)
+                        timestamp_val = time.time() # Fallback
 
                     found_whales.append({
                         "baseSymbol": symbol,
                         "symbol": row['contractSymbol'],
-                        "strikePrice": float(row['strike']),
+                        "strikePrice": strike,
                         "expirationDate": expiry,
-                        "putCall": 'C' if row['type'] == 'CALL' else 'P',
+                        "putCall": 'C' if is_call else 'P',
                         "volume": int(row['volume']),
                         "openInterest": int(row['openInterest']),
                         "lastPrice": float(row['lastPrice']),
-                        "tradeTime": datetime.now().strftime("%H:%M:%S"), # Approx time
+                        "tradeTime": trade_time_str,
+                        "timestamp": timestamp_val, # For sorting
                         "vol_oi": round(row['volume'] / (row['openInterest'] if row['openInterest'] > 0 else 1), 1),
                         "premium": format_money(notional),
                         "notional_value": notional,
-                        "moneyness": "N/A", 
-                        "is_mega_whale": notional > 1_000_000, # Lower threshold for individual contracts
+                        "moneyness": moneyness, 
+                        "is_mega_whale": notional > 1_000_000,
                         "delta": 0,
                         "iv": row['impliedVolatility']
                     })
@@ -141,8 +172,8 @@ def refresh_whales_logic():
                 # print(f"  Skipping {symbol}: {e}")
                 continue
         
-        # Sort by Notional Value (Premium) Descending
-        found_whales.sort(key=lambda x: x['notional_value'], reverse=True)
+        # Sort by Time (Most Recent First)
+        found_whales.sort(key=lambda x: x['timestamp'], reverse=True)
         
         # Update Cache
         if found_whales:
