@@ -136,8 +136,15 @@ def refresh_whales_logic():
                             notional = row['volume'] * row['lastPrice'] * 100
                             
                             # === FILTER: MINIMUM WHALE SIZE ===
-                            # Filter out "guppies" (small bets < $1.5M)
-                            if notional < 1_500_000:
+                            # Tiered Thresholds:
+                            # - ETFs (SPY, QQQ, IWM): $1.5M (Filter noise)
+                            # - Individual Stocks: $500k (Catch specific bets)
+                            
+                            min_whale_val = 500_000
+                            if symbol in ['SPY', 'QQQ', 'IWM']:
+                                min_whale_val = 1_500_000
+                                
+                            if notional < min_whale_val:
                                 continue
 
                             # === FILTER: STRICT DATE CHECK ===
