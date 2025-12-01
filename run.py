@@ -69,7 +69,7 @@ CACHE = {
 # === CONFIGURATION ===
 WHALE_WATCHLIST = [
     'NVDA', 'TSLA', 'SPY', 'QQQ', 'IWM', 'AAPL', 'AMD', 'MSFT', 'AMZN', 
-    'GOOGL', 'META', 'NFLX', 'COIN', 'MSTR', 'GME', 'PLTR', 'HOOD', 'ROKU'
+    'GOOGL', 'META', 'NFLX', 'COIN', 'GME', 'PLTR', 'HOOD', 'ROKU'
 ]
 
 # Track last reported volume to simulate "stream" feel
