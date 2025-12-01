@@ -1,7 +1,63 @@
+
 // app.js
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('✅ JavaScript is loading and DOMContentLoaded fired!');
+
+    // === Cyber Watchdog Connection Monitor ===
+    function measureLatency() {
+        const start = Date.now();
+        fetch('/api/ping')
+            .then(response => {
+                if (response.ok) {
+                    const latency = Date.now() - start;
+                    const latencyEl = document.getElementById('latency-value');
+                    const uplinkEl = document.getElementById('uplink-status');
+                    const dotEl = document.querySelector('.status-dot');
+
+                    if (latencyEl) {
+                        latencyEl.textContent = `${latency} ms`;
+                        if (latency < 100) latencyEl.style.color = 'var(--primary-color)';
+                        else if (latency < 300) latencyEl.style.color = 'var(--warning-color)';
+                        else latencyEl.style.color = '#ff3333';
+                    }
+
+                    if (uplinkEl) {
+                        uplinkEl.textContent = 'ESTABLISHED';
+                        uplinkEl.style.color = 'var(--primary-color)';
+                    }
+
+                    if (dotEl) {
+                        dotEl.classList.remove('pulse-red');
+                        dotEl.classList.add('pulse-green');
+                    }
+                } else {
+                    throw new Error('Network response was not ok');
+                }
+            })
+            .catch(() => {
+                const uplinkEl = document.getElementById('uplink-status');
+                const dotEl = document.querySelector('.status-dot');
+
+                if (uplinkEl) {
+                    uplinkEl.textContent = 'OFFLINE';
+                    uplinkEl.style.color = '#ff3333';
+                }
+
+                if (dotEl) {
+                    dotEl.classList.remove('pulse-green');
+                    dotEl.classList.add('pulse-red');
+                }
+            });
+    }
+
+    function startWatchdog() {
+        measureLatency(); // Initial check
+        setInterval(measureLatency, 5000); // Check every 5 seconds
+    }
+
+    // Start the Watchdog
+    startWatchdog();
 
     // Configuration
     const IS_FILE_PROTOCOL = window.location.protocol === 'file:';
@@ -14,12 +70,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const alertsList = document.getElementById('alerts-list');
     const priceTicker = document.getElementById('price-ticker');
     const gaugeValue = document.querySelector('.gauge-value');
-    const gaugeLabel = document.querySelector('.gauge-label');
+    // === Local Storage Persistence ===
+    // Load saved ticker or default to 'QQQ'
+    const savedTicker = localStorage.getItem('pigment_current_ticker');
+    let currentTicker = savedTicker || 'QQQ';
+
+    // Initialize Ticker Dropdown
     const tickerSelect = document.getElementById('ticker-select');
+    if (tickerSelect) {
+        tickerSelect.value = currentTicker;
+        tickerSelect.addEventListener('change', (e) => {
+            currentTicker = e.target.value;
+            localStorage.setItem('pigment_current_ticker', currentTicker); // Save to storage
+
+            // Update Widgets
+            // Note: safeExecute is not defined in the provided snippet, assuming it's defined elsewhere or will be added.
+            // For now, direct calls are used.
+            createTradingViewWidget(currentTicker);
+            const whaleWidget = document.getElementById('whale-feed-widget');
+            if (whaleWidget && typeof whaleWidget.updateTicker === 'function') {
+                whaleWidget.updateTicker(currentTicker);
+            }
+        });
+    }
+    const gaugeLabel = document.querySelector('.gauge-label');
     const chartHeader = document.querySelector('#live-price-action h2');
 
     // Global State
-    let currentTicker = 'QQQ'; // Default to QQQ
+    // let currentTicker = 'QQQ'; // Default to QQQ // This line is now handled by the localStorage logic above
     let tvWidget = null;
 
     // TradingView Widget Integration
@@ -178,11 +256,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const volumeClass = opt.volume > 500 ? 'highlight-pink' : '';
 
             tr.innerHTML = `
-                <td>${opt.ticker}</td>
+    <td>${opt.ticker}</td>
                 <td>${opt.side}</td>
                 <td class="${volumeClass}">${opt.volume}</td>
                 <td>${opt.price}</td>
-            `;
+`;
             optionsBody.appendChild(tr);
         });
     }
@@ -200,9 +278,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const div = document.createElement('div');
             div.className = 'list-item';
             div.innerHTML = `
-                <span>${ins.ticker} ${ins.person}</span>
-                <span style="color: ${ins.type === 'BUY' ? '#00FFFF' : '#FF00FF'}">${ins.type} ${ins.value}</span>
-            `;
+    <span>${ins.ticker} ${ins.person}</span>
+        <span style="color: ${ins.type === 'BUY' ? '#00FFFF' : '#FF00FF'}">${ins.type} ${ins.value}</span>
+`;
             insiderList.appendChild(div);
         });
     }
@@ -249,18 +327,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const label2 = 'NO';
 
             item.innerHTML = `
-                <div class="polymarket-top-row">
+    <div class="polymarket-top-row">
                     <a href="https://polymarket.com/event/${market.slug}" target="_blank" class="polymarket-event">${market.event}</a>
                     <div class="polymarket-odds">
                         <span class="polymarket-odds-text polymarket-odds-yes">${prob1}% ${label1}${deltaBadge}</span>
                         <span class="polymarket-odds-text polymarket-odds-no">${prob2}% ${label2}</span>
                     </div>
                 </div>
-                <div class="polymarket-laser-gauge">
-                    <div class="polymarket-yes-segment" style="width: ${width1}%"></div>
-                    <div class="polymarket-no-segment" style="width: ${width2}%"></div>
-                </div>
-            `;
+    <div class="polymarket-laser-gauge">
+        <div class="polymarket-yes-segment" style="width: ${width1}%"></div>
+        <div class="polymarket-no-segment" style="width: ${width2}%"></div>
+    </div>
+`;
             container.appendChild(item);
         });
         console.log('Rendered', data.length, 'Polymarket items');
@@ -368,9 +446,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             div.className = classes.join(' ');
             div.innerHTML = `
-                <span style="color: #00FFFF; font-size: 10px; margin-right: 5px;">[${alert.time}]</span>
-                ${alert.message}
-            `;
+    <span style="color: #00FFFF; font-size: 10px; margin-right: 5px;">[${alert.time}]</span>
+        ${alert.message}
+`;
             alertsList.appendChild(div);
         });
     }
@@ -442,7 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const itemsHtml = currentSet.map(m => {
             const colorClass = m.type === 'gain' ? 'mover-gain' : 'mover-loss';
             const arrow = m.type === 'gain' ? '▲' : '▼';
-            const changeStr = m.change > 0 ? `+${m.change}%` : `${m.change}%`;
+            const changeStr = m.change > 0 ? `+ ${m.change}% ` : `${m.change}% `;
             return `<span class="mover-item ${colorClass}">
             <span class="mover-symbol">${m.symbol}</span>
             <span class="mover-separator">//</span>
@@ -451,8 +529,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join(' ');
 
         const contentHtml = `
-        <div class="ticker-content ticker-fade-in">
-            <span class="mover-label ${labelClass}">[ ${label} ]</span>
+    <div class="ticker-content ticker-fade-in">
+        <span class="mover-label ${labelClass}">[ ${label} ]</span>
             ${itemsHtml}
         </div>
     `;
@@ -511,6 +589,94 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('News Fetch Error:', error);
             updateStatus('status-news', false);
         }
+    }
+
+    // === MARKET MAP (TREEMAP) LOGIC ===
+    let currentSectorView = 'ALL';
+    const SECTOR_VIEWS = ['ALL', 'INDICES', 'TECH', 'CONSUMER', 'CRYPTO'];
+
+    async function fetchHeatmapData() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/heatmap`);
+            if (!response.ok) throw new Error('Heatmap API Error');
+
+            const data = await response.json();
+            renderMarketMap(data);
+            updateStatus('status-sectors', true);
+        } catch (error) {
+            console.error('Heatmap Fetch Error:', error);
+            updateStatus('status-sectors', false);
+            renderHeatmapError();
+        }
+    }
+
+    function renderHeatmapError() {
+        const grid = document.getElementById('heatmap-grid');
+        if (!grid) return;
+
+        grid.innerHTML = `
+            <div class="heatmap-error">
+                <div class="error-icon">⚠️</div>
+                <div class="error-text">MARKET DATA OFFLINE</div>
+                <div class="error-sub">RETRYING...</div>
+            </div>
+        `;
+    }
+
+    function renderMarketMap(data) {
+        const grid = document.getElementById('heatmap-grid');
+        if (!grid) return;
+
+        grid.innerHTML = ''; // Clear loading/previous
+
+        // Filter Data based on View
+        let filteredData = data;
+        if (currentSectorView !== 'ALL') {
+            filteredData = data.filter(item => item.sector === currentSectorView);
+        }
+
+        // Sort by size priority for better packing
+        const sizePriority = { 'mega': 4, 'large': 3, 'medium': 2, 'small': 1 };
+        filteredData.sort((a, b) => sizePriority[b.size] - sizePriority[a.size]);
+
+        filteredData.forEach(item => {
+            const div = document.createElement('div');
+
+            let colorClass = 'neutral';
+            if (item.change > 0) colorClass = 'positive';
+            if (item.change < 0) colorClass = 'negative';
+
+            // Add size class
+            const sizeClass = `size-${item.size || 'small'}`;
+
+            div.className = `heatmap-item ${colorClass} ${sizeClass}`;
+            div.innerHTML = `
+                <span class="sector-symbol">${item.symbol}</span>
+                <span class="sector-change">${item.change > 0 ? '+' : ''}${item.change}%</span>
+            `;
+            grid.appendChild(div);
+        });
+    }
+
+    // Sector Scroll Button Logic
+    const sectorBtn = document.getElementById('sector-scroll-btn');
+    const sectorBtnText = document.getElementById('sector-scroll-text');
+
+    if (sectorBtn) {
+        sectorBtn.addEventListener('click', () => {
+            // Cycle to next view
+            const currentIndex = SECTOR_VIEWS.indexOf(currentSectorView);
+            const nextIndex = (currentIndex + 1) % SECTOR_VIEWS.length;
+            currentSectorView = SECTOR_VIEWS[nextIndex];
+
+            // Update Button Text
+            if (sectorBtnText) {
+                sectorBtnText.textContent = `VIEW: ${currentSectorView}`;
+            }
+
+            // Re-render (trigger fetch to get data again - in real app we'd cache data)
+            fetchHeatmapData();
+        });
     }
 
     // fetchVIX removed (replaced by CNN Fear & Greed)
@@ -613,6 +779,10 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchCNNFearGreed();
     setInterval(fetchCNNFearGreed, 300000); // Refresh every 5 minutes (was 12 hours)
 
+    // Initialize Market Map
+    fetchHeatmapData();
+    setInterval(fetchHeatmapData, 300000); // Refresh every 5 minutes
+
     // Helper: Update API Status Indicator
     function updateStatus(elementId, isLive) {
         const container = document.getElementById(elementId);
@@ -637,6 +807,10 @@ document.addEventListener('DOMContentLoaded', () => {
         flowFeedContainer.addEventListener('mouseenter', () => { isFlowPaused = true; });
         flowFeedContainer.addEventListener('mouseleave', () => { isFlowPaused = false; });
     }
+
+    // Intel Feed Auto-Scroll Logic - Moved to startNewsTicker for sync
+    // const newsFeedContainer = document.getElementById('news-feed-container');
+    // ... logic moved ...
 
     // Real Whale Data Fetcher (Barchart Backend) - STRICT REAL DATA ONLY
     // Real Whale Data Fetcher (Barchart Backend) - STRICT REAL DATA ONLY
@@ -687,6 +861,79 @@ document.addEventListener('DOMContentLoaded', () => {
     // REMOVED: generateMockWhaleData() - Strict Real Data Policy
 
     // Check if US market is open (9:30 AM - 4:00 PM ET, Mon-Fri)
+    function updateClock() {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('en-US', { hour12: false });
+        const dateString = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+        document.getElementById('clock').textContent = timeString;
+        document.getElementById('date').textContent = dateString.toUpperCase();
+
+        updateMarketSessions(now);
+    }
+
+    // === GLOBAL MARKET SESSIONS LOGIC ===
+    function updateMarketSessions(now) {
+        console.log('Updating Market Sessions...');
+        // Market Hours in UTC (approximate)
+        // NY: 14:30 - 21:00 UTC (9:30 AM - 4:00 PM ET)
+        // LON: 08:00 - 16:30 UTC
+        // TOK: 00:00 - 06:00 UTC
+        // SYD: 23:00 - 05:00 UTC
+
+        const utcHour = now.getUTCHours();
+        const utcMin = now.getUTCMinutes();
+        const currentTime = utcHour + (utcMin / 60);
+
+        const markets = [
+            { id: 'session-ny', start: 14.5, end: 21.0 },
+            { id: 'session-lon', start: 8.0, end: 16.5 },
+            { id: 'session-tok', start: 0.0, end: 6.0 },
+            { id: 'session-syd', start: 23.0, end: 5.0 } // Crosses midnight handled simply here
+        ];
+
+        markets.forEach(m => {
+            const el = document.getElementById(m.id);
+            if (!el) return;
+
+            let isOpen = false;
+            let progress = 0;
+
+            // Simple check for midnight crossing (SYD)
+            if (m.start > m.end) {
+                // Crosses midnight (e.g. 23 to 5)
+                if (currentTime >= m.start || currentTime < m.end) {
+                    isOpen = true;
+                    // Calculate progress
+                    let duration = (24 - m.start) + m.end;
+                    let elapsed = (currentTime >= m.start) ? (currentTime - m.start) : ((24 - m.start) + currentTime);
+                    progress = (elapsed / duration) * 100;
+                }
+            } else {
+                // Normal day (e.g. 8 to 16.5)
+                if (currentTime >= m.start && currentTime < m.end) {
+                    isOpen = true;
+                    let duration = m.end - m.start;
+                    let elapsed = currentTime - m.start;
+                    progress = (elapsed / duration) * 100;
+                }
+            }
+
+            // Update UI
+            const bar = el.querySelector('.session-bar');
+            if (isOpen) {
+                el.classList.add('open');
+                bar.style.width = `${progress}%`;
+            } else {
+                el.classList.remove('open');
+                bar.style.width = '0%';
+            }
+        });
+    }
+
+    setInterval(updateClock, 1000);
+    updateClock();
+
     function isMarketOpen() {
         const now = new Date();
         const et = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
@@ -812,7 +1059,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const msUntilOpen = calculateMsUntilMarketOpen();
 
         if (msUntilOpen > 0) {
-            console.log(`⏰ Market opens in ${Math.round(msUntilOpen / 1000 / 60)} minutes. Scheduling auto-refresh...`);
+            console.log(`⏰ Market opens in ${Math.round(msUntilOpen / 1000 / 60)} minutes.Scheduling auto - refresh...`);
 
             // Set precise timeout for market open
             marketOpenTimeout = setTimeout(() => {
@@ -869,7 +1116,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // PRE-MARKET or WEEKEND: Show pulsing radar rings
                     const statusText = marketState.isWeekend ? "WEEKEND" : "PRE-MARKET";
                     flowFeedContainer.innerHTML = `
-                        <div class="whale-pre-market-container">
+    <div class="whale-pre-market-container">
                             <div class="radar-container">
                                 <div class="radar-ring radar-ring-1"></div>
                                 <div class="radar-ring radar-ring-2"></div>
@@ -880,7 +1127,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <span style="color: #888; font-size: 11px; font-family: var(--font-mono);">STATUS: ${statusText}. Monitoring for block orders...</span>
                             </div>
                         </div>
-                    `;
+    `;
                 } else {
                     // MARKET HOURS or AFTER HOURS: Show waiting message
                     const waitingDiv = document.createElement('div');
@@ -950,7 +1197,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         [...trades].reverse().forEach(flow => {
             // Unique ID using MAPPED properties
-            const id = `${flow.ticker}_${flow.strike}_${flow.type}_${flow.expiry}_${flow.volume}`;
+            const id = `${flow.ticker}_${flow.strike}_${flow.type}_${flow.expiry}_${flow.volume} `;
             currentSnapshotTradeIds.add(id); // Add to current snapshot for next comparison
 
             // Deduplicate against all seen trades in this session
@@ -1199,7 +1446,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Check if the top news item has changed
         const topItem = validNews[0];
-        const topItemSignature = topItem ? `${topItem.ticker || ''}_${topItem.time}_${topItem.title}` : '';
+        const topItemSignature = topItem ? `${topItem.ticker || ''}_${topItem.time}_${topItem.title} ` : '';
 
         let shouldSnap = false;
         if (topItemSignature && topItemSignature !== lastTopNewsSignature) {
@@ -1242,12 +1489,12 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (pub.includes('yahoo')) sourceColor = '#720e9e';
 
             div.innerHTML = `
-                <div class="news-meta">
+    <div class="news-meta">
                     <span class="news-source-tag" style="color: ${sourceColor}">${item.publisher || 'WIRE'}</span>
                     <span class="news-time">${timeStr}</span>
                 </div>
-                <div class="news-headline"><a href="${item.link}" target="_blank" style="color: inherit; text-decoration: none;">${item.title}</a></div>
-            `;
+    <div class="news-headline"><a href="${item.link}" target="_blank" style="color: inherit; text-decoration: none;">${item.title}</a></div>
+`;
             return div;
         };
 
@@ -1276,10 +1523,42 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.newsAnimationFrame) cancelAnimationFrame(window.newsAnimationFrame);
 
         // Event Listeners for Pause
-        container.onmouseenter = () => { isNewsHovered = true; };
-        container.onmouseleave = () => { isNewsHovered = false; };
-        container.ontouchstart = () => { isNewsHovered = true; };
-        container.ontouchend = () => { isNewsHovered = false; };
+        // Event Listeners for Pause (Targeting the whole widget for better UX)
+        const newsFeedContainer = document.getElementById('news-feed-container');
+        const targetForHover = newsFeedContainer || container;
+
+        const updateAutoScrollBtn = (paused) => {
+            const btn = document.getElementById('auto-scroll-indicator');
+            const txt = document.getElementById('auto-scroll-text');
+            if (btn && txt) {
+                if (paused) {
+                    btn.classList.remove('style-success');
+                    btn.classList.add('style-warning');
+                    txt.textContent = 'HOVER PAUSE';
+                } else {
+                    btn.classList.remove('style-warning');
+                    btn.classList.add('style-success');
+                    txt.textContent = 'AUTO-SCROLL';
+                }
+            }
+        };
+
+        targetForHover.onmouseenter = () => {
+            isNewsHovered = true;
+            updateAutoScrollBtn(true);
+        };
+        targetForHover.onmouseleave = () => {
+            isNewsHovered = false;
+            updateAutoScrollBtn(false);
+        };
+        targetForHover.ontouchstart = () => {
+            isNewsHovered = true;
+            updateAutoScrollBtn(true);
+        };
+        targetForHover.ontouchend = () => {
+            isNewsHovered = false;
+            updateAutoScrollBtn(false);
+        };
 
         let scrollPos = container.scrollLeft;
 
@@ -1326,7 +1605,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             fn();
         } catch (error) {
-            console.error(`[CRITICAL] ${widgetName} Crashed:`, error);
+            console.error(`[CRITICAL] ${widgetName} Crashed: `, error);
             // Optional: Update UI to show "OFFLINE" for this specific widget?
         }
     }

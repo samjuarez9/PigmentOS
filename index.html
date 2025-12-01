@@ -6,8 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PIGMENT OS</title>
     <meta name="description" content="Real-time Financial Intelligence Dashboard">
-    <link rel="icon"
-        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>❖</text></svg>">
+    <link rel="icon" type="image/png" href="assets/favicon.png">
     <link rel="stylesheet" href="styles.css?v=3.3">
     <link href="https://fonts.googleapis.com/css2?family=VT323&family=JetBrains+Mono:wght@400;700&display=swap"
         rel="stylesheet">
@@ -37,7 +36,50 @@
 
             <!-- LIVE Indicator placeholder (will be on right) -->
             <div class="header-right">
-                <!-- Status indicators go here -->
+                <!-- Global Market Sessions -->
+                <div id="market-sessions">
+                    <div class="session-item" id="session-ny">
+                        <div class="session-info">
+                            <span class="session-flag">🇺🇸</span>
+                            <span class="session-name">NY</span>
+                        </div>
+                        <div class="session-bar-container">
+                            <div class="session-bar"></div>
+                        </div>
+                    </div>
+                    <div class="session-item" id="session-lon">
+                        <div class="session-info">
+                            <span class="session-flag">🇬🇧</span>
+                            <span class="session-name">LON</span>
+                        </div>
+                        <div class="session-bar-container">
+                            <div class="session-bar"></div>
+                        </div>
+                    </div>
+                    <div class="session-item" id="session-tok">
+                        <div class="session-info">
+                            <span class="session-flag">🇯🇵</span>
+                            <span class="session-name">TOK</span>
+                        </div>
+                        <div class="session-bar-container">
+                            <div class="session-bar"></div>
+                        </div>
+                    </div>
+                    <div class="session-item" id="session-syd">
+                        <div class="session-info">
+                            <span class="session-flag">🇦🇺</span>
+                            <span class="session-name">SYD</span>
+                        </div>
+                        <div class="session-bar-container">
+                            <div class="session-bar"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="clock-date-container">
+                    <div id="clock" class="clock">00:00:00</div>
+                    <div id="date" class="date">MON, JAN 1</div>
+                </div>
             </div>
 
         </header>
@@ -86,9 +128,20 @@
                         <span
                             style="color: #FFFFFF; font-weight: 600; font-family: 'VT323', monospace; font-size: 18px; letter-spacing: 1px;">INTEL
                             FEED 📡</span>
-                        <div class="status-container" id="status-news">
-                            <span class="status-dot">●</span>
-                            <span class="status-text">LIVE</span>
+                        <div class="header-controls" style="display: flex; align-items: center; gap: 15px;">
+                            <!-- Auto-Scroll Button -->
+                            <div id="auto-scroll-indicator" class="auto-scroll-btn style-success">
+                                <span id="auto-scroll-text">AUTO-SCROLL</span>
+                                <div class="scroll-icon">
+                                    <div class="bar"></div>
+                                    <div class="bar"></div>
+                                </div>
+                            </div>
+
+                            <div class="status-container" id="status-news">
+                                <span class="status-dot">●</span>
+                                <span class="status-text">LIVE</span>
+                            </div>
                         </div>
                     </div>
                     <div id="news-items-list">
@@ -172,6 +225,29 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="widget" id="sector-heatmap">
+                    <div class="widget-header">
+                        <h2>MARKET MAP</h2>
+                        <div class="header-controls"
+                            style="display: flex; align-items: center; gap: 10px; margin-left: auto; margin-right: 10px;">
+                            <div id="sector-scroll-btn" class="auto-scroll-btn style-success">
+                                <span id="sector-scroll-text">VIEW: ALL</span>
+                            </div>
+                        </div>
+                        <div class="status-container" id="status-sectors">
+                            <span class="status-dot">●</span>
+                            <span class="status-text">LIVE</span>
+                        </div>
+                        <div class="decoration-line"></div>
+                    </div>
+                    <div class="widget-content">
+                        <div class="heatmap-grid" id="heatmap-grid">
+                            <!-- Populated by JS -->
+                            <div class="heatmap-item loading">LOADING...</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
 
@@ -186,7 +262,28 @@
     </div>
 
     <script src="mockData.js"></script>
-    <script src="app.js?v=3.6"></script>
+    <!-- Cyber Watchdog Connection Monitor -->
+    <div id="connection-monitor" class="watchdog-panel">
+        <div class="watchdog-header">
+            <span class="status-dot pulse-green"></span> SYSTEM_DIAGNOSTICS
+        </div>
+        <div class="watchdog-content">
+            <div class="metric-row">
+                <span class="label">UPLINK:</span>
+                <span class="value" id="uplink-status">ESTABLISHED</span>
+            </div>
+            <div class="metric-row">
+                <span class="label">LATENCY:</span>
+                <span class="value" id="latency-value">--ms</span>
+            </div>
+            <div class="metric-row">
+                <span class="label">SEC_LEVEL:</span>
+                <span class="value">MAXIMUM</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=3.3"></script>
 </body>
 
 </html>

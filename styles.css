@@ -18,6 +18,57 @@
     /* Feed Colors (Preserved) */
     --bullish-color: #00FF00;
     --bearish-color: #FF0099;
+    --warning-color: #FFCC00;
+    /* Yellow */
+}
+
+/* Auto-Scroll Button */
+.auto-scroll-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    transition: all 0.3s ease;
+    background: rgba(0, 0, 0, 0.4);
+    /* Glass effect */
+    backdrop-filter: blur(4px);
+    cursor: default;
+}
+
+.auto-scroll-btn.style-success {
+    border-color: var(--bullish-color);
+    color: var(--bullish-color);
+    box-shadow: 0 0 5px rgba(0, 255, 0, 0.2);
+}
+
+.auto-scroll-btn.style-warning {
+    border-color: var(--warning-color);
+    color: var(--warning-color);
+    box-shadow: 0 0 5px rgba(255, 204, 0, 0.2);
+    background: rgba(255, 204, 0, 0.1);
+}
+
+.scroll-icon {
+    display: flex;
+    gap: 2px;
+    height: 10px;
+    align-items: center;
+}
+
+.scroll-icon .bar {
+    width: 2px;
+    height: 100%;
+    border-radius: 2px;
+    background-color: currentColor;
+    /* Inherits text color */
+    transition: all 0.3s ease;
 }
 
 * {
@@ -215,7 +266,106 @@ h1 {
     letter-spacing: 2px;
     text-transform: uppercase;
     position: relative;
-    text-shadow: 0 0 5px var(--primary-color);
+    box-shadow: 0 0 8px var(--primary-color);
+}
+
+/* === GLOBAL MARKET SESSIONS === */
+#market-sessions {
+    display: flex;
+    gap: 15px;
+    margin-right: 20px;
+    align-items: center;
+}
+
+.session-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 40px;
+    width: 40px;
+    opacity: 0.7;
+    /* Increased visibility */
+    /* Default to closed/dimmed */
+    transition: all 0.5s ease;
+    z-index: 1000;
+    /* Ensure on top */
+}
+
+.session-item.open {
+    opacity: 1;
+}
+
+.session-info {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 2px;
+}
+
+.session-flag {
+    font-size: 12px;
+}
+
+.session-name {
+    font-family: 'VT323', monospace;
+    font-size: 14px;
+    color: #FFFFFF;
+    letter-spacing: 1px;
+}
+
+.session-item.open .session-name {
+    color: #FFFFFF;
+    text-shadow: 0 0 8px var(--primary-color);
+    font-weight: bold;
+}
+
+.session-bar-container {
+    width: 100%;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 1px;
+    overflow: hidden;
+}
+
+.session-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--primary-color);
+    box-shadow: 0 0 4px var(--primary-color);
+    transition: width 1s linear;
+}
+
+/* Heatmap Error State */
+.heatmap-error {
+    grid-column: span 4;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #FF3333;
+    background: rgba(255, 51, 51, 0.05);
+    border: 1px solid rgba(255, 51, 51, 0.2);
+}
+
+.heatmap-error .error-icon {
+    font-size: 24px;
+    margin-bottom: 10px;
+}
+
+.heatmap-error .error-text {
+    font-family: 'VT323', monospace;
+    font-size: 18px;
+    letter-spacing: 2px;
+    font-weight: bold;
+}
+
+.heatmap-error .error-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    opacity: 0.7;
+    margin-top: 5px;
+    animation: pulse 2s infinite;
 }
 
 /* Custom Dropdown */
@@ -451,7 +601,7 @@ h1 {
 
 #trader-fear-index {
     flex: 0 0 auto;
-    height: 220px;
+    height: 150px;
     /* Just enough for score + bar chart */
     margin-top: auto;
     /* Push to bottom of column */
@@ -905,6 +1055,7 @@ td {
     /* Compact height */
     display: flex;
     align-items: center;
+    /* Vertically center content */
     justify-content: center;
     overflow: hidden;
 }
@@ -3053,4 +3204,212 @@ td {
         opacity: 1;
         transform: translateX(0);
     }
+}
+
+/* === Cyber Watchdog Connection Monitor === */
+.watchdog-panel {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    width: auto;
+    background: transparent;
+    border: none;
+    font-family: 'VT323', monospace;
+    color: #FF3333;
+    z-index: 900;
+    box-shadow: none;
+    font-size: 13px;
+    pointer-events: none;
+    user-select: none;
+}
+
+.watchdog-header {
+    background: transparent;
+    padding: 0;
+    border-bottom: none;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    letter-spacing: 1px;
+    font-size: 12px;
+    color: #FFFFFF;
+    text-shadow: 0 0 5px rgba(255, 0, 0, 0.5);
+    margin-bottom: 4px;
+}
+
+.status-dot {
+    width: 6px;
+    /* Smaller dot */
+    height: 6px;
+    background-color: var(--primary-color);
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.pulse-green {
+    animation: pulse-green 2s infinite;
+}
+
+.pulse-red {
+    background-color: #ff3333;
+    animation: pulse-red 1s infinite;
+    box-shadow: 0 0 5px #ff3333;
+}
+
+.watchdog-content {
+    padding: 0;
+}
+
+.metric-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2px;
+}
+
+.metric-row .label {
+    color: #FF3333;
+    opacity: 1;
+    text-shadow: 0 0 5px rgba(255, 0, 0, 0.3);
+}
+
+.metric-row .value {
+    font-weight: bold;
+    color: #FFFFFF;
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+}
+
+@keyframes pulse-green {
+    0% {
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(0, 255, 65, 0.7);
+    }
+
+    70% {
+        opacity: 1;
+        box-shadow: 0 0 0 6px rgba(0, 255, 65, 0);
+    }
+
+    100% {
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(0, 255, 65, 0);
+    }
+}
+
+@keyframes pulse-red {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+/* --- SECTOR HEATMAP (TREEMAP STYLE) --- */
+.heatmap-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    /* 4 Columns */
+    grid-auto-rows: minmax(50px, auto);
+    grid-auto-flow: dense;
+    /* Packs items tightly */
+    gap: 1px;
+    /* Tight gap for FinViz look */
+    padding: 0;
+    height: 450px;
+    /* Increased height for more items */
+    overflow-y: auto;
+    background: #000;
+}
+
+.heatmap-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #FFFFFF;
+    transition: all 0.2s ease;
+    cursor: default;
+    position: relative;
+    overflow: hidden;
+}
+
+.heatmap-item:hover {
+    z-index: 10;
+    filter: brightness(1.2);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+/* Sizing Classes */
+.heatmap-item.size-mega {
+    grid-column: span 2;
+    grid-row: span 2;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.heatmap-item.size-large {
+    grid-column: span 2;
+    grid-row: span 1;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.heatmap-item.size-medium {
+    grid-column: span 1;
+    grid-row: span 1;
+    font-size: 11px;
+}
+
+.heatmap-item.size-small {
+    grid-column: span 1;
+    grid-row: span 1;
+    font-size: 10px;
+}
+
+.heatmap-item .sector-symbol {
+    font-weight: bold;
+    margin-bottom: 2px;
+}
+
+.heatmap-item .sector-change {
+    opacity: 0.9;
+}
+
+/* Color Coding - Solid Colors for Treemap */
+.heatmap-item.positive {
+    background: #0d5228;
+    /* Dark Green */
+    border: 1px solid #1e8e3e;
+}
+
+.heatmap-item.negative {
+    background: #661111;
+    /* Dark Red */
+    border: 1px solid #cc2222;
+}
+
+.heatmap-item.neutral {
+    background: #333333;
+    border: 1px solid #555;
+}
+
+.heatmap-item.loading {
+    grid-column: span 4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'VT323', monospace;
+    font-size: 14px;
+    color: var(--primary-color);
+    animation: pulse 1.5s infinite;
+    height: 100%;
 }

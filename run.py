@@ -473,6 +473,80 @@ def api_news():
         print(f"News Error: {e}")
         return jsonify(CACHE["news"]["data"] if CACHE["news"]["data"] else [])
 
+@app.route('/api/ping')
+def api_ping():
+    return jsonify({"status": "ok", "timestamp": time.time()})
+
+@app.route('/api/heatmap')
+def api_heatmap():
+    global CACHE
+    current_time = time.time()
+    
+    # Cache for 5 minutes (300s)
+    if "heatmap" in CACHE and current_time - CACHE["heatmap"]["timestamp"] < 300:
+        return jsonify(CACHE["heatmap"]["data"])
+        
+    # Tickers mapped to their "Size" category and "Sector" for filtering
+    # This ensures we get the right data for the right boxes
+    HEATMAP_TICKERS = {
+        # Indices
+        "SPY": {"size": "mega", "sector": "INDICES"},
+        "QQQ": {"size": "mega", "sector": "INDICES"},
+        "IWM": {"size": "large", "sector": "INDICES"},
+        "DIA": {"size": "large", "sector": "INDICES"},
+        
+        # Mag 7 (Tech)
+        "NVDA": {"size": "mega", "sector": "TECH"},
+        "AAPL": {"size": "mega", "sector": "TECH"},
+        "MSFT": {"size": "mega", "sector": "TECH"},
+        "GOOGL": {"size": "large", "sector": "TECH"},
+        "AMZN": {"size": "large", "sector": "CONSUMER"},
+        "META": {"size": "large", "sector": "TECH"},
+        "TSLA": {"size": "large", "sector": "CONSUMER"},
+        
+        # Others
+        "AMD": {"size": "medium", "sector": "TECH"},
+        "NFLX": {"size": "medium", "sector": "CONSUMER"},
+        "AVGO": {"size": "medium", "sector": "TECH"},
+        "PLTR": {"size": "small", "sector": "TECH"},
+        "COIN": {"size": "small", "sector": "CRYPTO"},
+        "MSTR": {"size": "small", "sector": "CRYPTO"},
+        "RIOT": {"size": "small", "sector": "CRYPTO"}
+    }
+    
+    try:
+        heatmap_data = []
+        tickers_obj = yf.Tickers(" ".join(HEATMAP_TICKERS.keys()))
+        
+        for symbol, meta in HEATMAP_TICKERS.items():
+            try:
+                t = tickers_obj.tickers[symbol]
+                last = t.fast_info.last_price
+                prev = t.fast_info.previous_close
+                
+                if last and prev:
+                    change = ((last - prev) / prev) * 100
+                    heatmap_data.append({
+                        "symbol": symbol,
+                        "change": round(change, 2),
+                        "price": round(last, 2),
+                        "size": meta["size"],
+                        "sector": meta["sector"]
+                    })
+            except Exception as e:
+                print(f"Error fetching {symbol}: {e}")
+                continue
+        
+        # Update Cache
+        if "heatmap" not in CACHE: CACHE["heatmap"] = {}
+        CACHE["heatmap"]["data"] = heatmap_data
+        CACHE["heatmap"]["timestamp"] = current_time
+        
+        return jsonify(heatmap_data)
+    except Exception as e:
+        print(f"Heatmap API Error: {e}")
+        return jsonify({"error": str(e)})
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8001))
     print(f"🚀 PigmentOS Flask Server running on port {port}", flush=True)
