@@ -2,7 +2,8 @@ import json
 import time
 import random
 import threading
-import requests
+import yfinance as yf
+import pandas as pd
 import yfinance as yf
 import pandas as pd
 import statistics
@@ -60,95 +61,100 @@ CACHE = {
 
 # --- HELPER FUNCTIONS ---
 
+# === CONFIGURATION ===
+WHALE_WATCHLIST = [
+    'NVDA', 'TSLA', 'SPY', 'QQQ', 'IWM', 'AAPL', 'AMD', 'MSFT', 'AMZN', 
+    'GOOGL', 'META', 'NFLX', 'COIN', 'MSTR', 'GME', 'PLTR', 'HOOD', 'ROKU'
+]
+
 def refresh_whales_logic():
     global CACHE
-    print("🐳 Fetching data from Barchart...", flush=True)
+    print("🐳 Scanning for Unusual Whales (Yahoo Finance)...", flush=True)
+    
+    found_whales = []
     
     try:
-        # 1. Setup Headers
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Accept": "application/json",
-            "Referer": "https://www.barchart.com/options/unusual-activity/stocks"
-        }
-
-        # 2. Get Cookies (XSRF)
-        session = requests.Session()
-        # First request to get cookies
-        session.get("https://www.barchart.com/options/unusual-activity/stocks", headers=headers, verify=False, timeout=10)
-        
-        xsrf = session.cookies.get_dict().get("XSRF-TOKEN")
-        if xsrf:
-            headers["X-XSRF-TOKEN"] = requests.utils.unquote(xsrf)
-
-        # 3. Request API
-        api_url = "https://www.barchart.com/proxies/core-api/v1/quotes/get"
-        params = {
-            "list": "options.unusual_activity.stocks",
-            "fields": "symbol,baseSymbol,strikePrice,expirationDate,putCall,volume,openInterest,tradeTime,lastPrice,priceChange,percentChange",
-            "orderBy": "volume",
-            "orderDir": "desc",
-            "limit": "50",
-            "meta": "field.shortName,field.type,field.description"
-        }
-
-        api_resp = session.get(api_url, headers=headers, params=params, verify=False, timeout=10)
-        
-        if api_resp.status_code == 200:
-            data = api_resp.json()
-            results = data.get('data', [])
-            
-            clean_whales = []
-            for item in results:
-                try:
-                    # Map Barchart fields to our frontend format
-                    # Barchart: symbol, baseSymbol, strikePrice, expirationDate, putCall, volume, openInterest, tradeTime
+        for symbol in WHALE_WATCHLIST:
+            try:
+                # print(f"  Checking {symbol}...", flush=True)
+                ticker = yf.Ticker(symbol)
+                
+                # Get expiration dates
+                expirations = ticker.options
+                if not expirations:
+                    continue
                     
-                    # Calculate Vol/OI
-                    vol = float(item.get('volume', 0).replace(',', ''))
-                    oi = float(item.get('openInterest', 0).replace(',', ''))
-                    vol_oi = round(vol / oi, 1) if oi > 0 else 0
+                # Check nearest expiration only for speed/relevance
+                expiry = expirations[0]
+                
+                # Fetch Option Chain
+                opts = ticker.option_chain(expiry)
+                
+                # Combine Calls and Puts
+                calls = opts.calls
+                calls['type'] = 'CALL'
+                puts = opts.puts
+                puts['type'] = 'PUT'
+                
+                chain = pd.concat([calls, puts])
+                
+                # === UNUSUAL CRITERIA ===
+                # 1. Volume > Open Interest (The classic signal)
+                # 2. Volume > 500 (Filter out noise)
+                # 3. Last Price > 0.10 (Filter out dead OTMs)
+                
+                unusual = chain[
+                    (chain['volume'] > chain['openInterest']) & 
+                    (chain['volume'] > 500) & 
+                    (chain['lastPrice'] > 0.10)
+                ]
+                
+                for _, row in unusual.iterrows():
+                    # Calculate Notional Value (Premium)
+                    notional = row['volume'] * row['lastPrice'] * 100
                     
-                    # Premium estimation (Barchart doesn't give premium directly in this endpoint, so we estimate or leave blank)
-                    # We can use lastPrice * volume * 100 as a rough proxy for notional
-                    last_price = float(item.get('lastPrice', 0).replace(',', ''))
-                    notional = vol * last_price * 100
-                    
+                    # Format Premium
                     def format_money(val):
                         if val >= 1_000_000: return f"${val/1_000_000:.1f}M"
                         if val >= 1_000: return f"${val/1_000:.0f}k"
                         return f"${val:.0f}"
 
-                    clean_whales.append({
-                        "baseSymbol": item.get('baseSymbol'),
-                        "symbol": item.get('symbol'),
-                        "strikePrice": float(item.get('strikePrice', 0)),
-                        "expirationDate": item.get('expirationDate'),
-                        "putCall": 'C' if item.get('putCall') == 'Call' else 'P',
-                        "volume": int(vol),
-                        "openInterest": int(oi),
-                        "lastPrice": last_price,
-                        "tradeTime": item.get('tradeTime'), # Keep string for now or parse if needed
-                        "vol_oi": vol_oi,
+                    found_whales.append({
+                        "baseSymbol": symbol,
+                        "symbol": row['contractSymbol'],
+                        "strikePrice": float(row['strike']),
+                        "expirationDate": expiry,
+                        "putCall": 'C' if row['type'] == 'CALL' else 'P',
+                        "volume": int(row['volume']),
+                        "openInterest": int(row['openInterest']),
+                        "lastPrice": float(row['lastPrice']),
+                        "tradeTime": datetime.now().strftime("%H:%M:%S"), # Approx time
+                        "vol_oi": round(row['volume'] / (row['openInterest'] if row['openInterest'] > 0 else 1), 1),
                         "premium": format_money(notional),
                         "notional_value": notional,
-                        "moneyness": "N/A", # Barchart doesn't give this easily
-                        "is_mega_whale": notional > 5_000_000,
-                        "delta": 0, # Not provided
-                        "iv": 0 # Not provided
+                        "moneyness": "N/A", 
+                        "is_mega_whale": notional > 1_000_000, # Lower threshold for individual contracts
+                        "delta": 0,
+                        "iv": row['impliedVolatility']
                     })
-                except Exception as e:
-                    continue
-            
-            CACHE["barchart"]["data"] = clean_whales
+                    
+            except Exception as e:
+                # print(f"  Skipping {symbol}: {e}")
+                continue
+        
+        # Sort by Notional Value (Premium) Descending
+        found_whales.sort(key=lambda x: x['notional_value'], reverse=True)
+        
+        # Update Cache
+        if found_whales:
+            CACHE["barchart"]["data"] = found_whales
             CACHE["barchart"]["timestamp"] = time.time()
-            print(f"🐳 Refreshed {len(clean_whales)} whale trades from Barchart.", flush=True)
-            
+            print(f"🐳 Found {len(found_whales)} unusual trades.", flush=True)
         else:
-            print(f"Barchart API Error: {api_resp.status_code}")
+            print("🐳 No unusual activity found this scan.", flush=True)
             
     except Exception as e:
-        print(f"Barchart Refresh Failed: {e}")
+        print(f"Whale Scan Failed: {e}")
 
 # --- FLASK ROUTES ---
 
