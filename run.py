@@ -13,6 +13,7 @@ import pytz
 from flask import Flask, jsonify, Response, request, send_from_directory, stream_with_context
 from flask_cors import CORS
 import feedparser
+import re
 
 # Fix for SSL Certificate Verify Failed
 try:
@@ -244,14 +245,34 @@ def api_polymarket():
         
         if resp.status_code == 200:
             events = resp.json()
-            # ... (Simplified Polymarket Logic - reusing core logic) ...
-            # For brevity in this migration, I'll implement the core filtering
-            clean_markets = []
-            TECH_KEYWORDS = ['apple', 'nvidia', 'microsoft', 'google', 'meta', 'tesla', 'amazon', 'ai', 'tech', 'fed', 'rate', 'inflation', 'bitcoin', 'crypto']
+            # Expanded Keywords for "Deep Intel"
+            KEYWORDS = {
+                "GEOPOL": ['war', 'invasion', 'strike', 'china', 'russia', 'israel', 'iran', 'taiwan', 'election', 'ukraine', 'gaza', 'border', 'military'],
+                "MACRO": ['fed', 'rate', 'inflation', 'cpi', 'jobs', 'recession', 'gdp', 'fomc'],
+                "CRYPTO": ['bitcoin', 'crypto', 'btc', 'eth', 'solana', 'nft'],
+                "TECH": ['apple', 'nvidia', 'microsoft', 'google', 'meta', 'tesla', 'amazon', 'ai', 'tech']
+            }
+
+            BLACKLIST = ['nfl', 'nba', 'super bowl', 'box office', 'pop', 'music', 'song', 'artist', 'movie', 'film', 'grammy', 'oscar', 'sport', 'football', 'basketball', 'soccer', 'tennis', 'golf']
             
+            clean_markets = []
             for event in events:
                 title = event.get('title', '')
-                if not any(k in title.lower() for k in TECH_KEYWORDS): continue
+                title_lower = title.lower()
+
+                # 1. Blacklist Check
+                if any(bad in title_lower for bad in BLACKLIST): continue
+                
+                # 2. Determine Category (Strict Regex)
+                category = "OTHER"
+                for cat, keys in KEYWORDS.items():
+                    # Match whole words only (e.g. "AI" matches "AI", but not "Saints")
+                    if any(re.search(r'\b' + re.escape(k) + r'\b', title_lower) for k in keys):
+                        category = cat
+                        break
+                
+                # Filter: Only show relevant categories
+                if category == "OTHER": continue
                 
                 markets = event.get('markets', [])
                 if not markets: continue
@@ -263,8 +284,26 @@ def api_polymarket():
                     prices = json.loads(m['outcomePrices']) if isinstance(m['outcomePrices'], str) else m['outcomePrices']
                     
                     if len(outcomes) >= 2 and len(prices) >= 2:
-                        prob1 = float(prices[0])
-                        prob2 = float(prices[1])
+                        # Pair outcomes with prices
+                        outcome_data = []
+                        for i in range(len(outcomes)):
+                            try:
+                                price = float(prices[i])
+                                label = str(outcomes[i])
+                                outcome_data.append({"label": label, "price": price})
+                            except: continue
+                        
+                        # Sort by price (probability) descending
+                        outcome_data.sort(key=lambda x: x['price'], reverse=True)
+                        
+                        # Take Top 2
+                        if len(outcome_data) < 2: continue
+                        
+                        top1 = outcome_data[0]
+                        top2 = outcome_data[1]
+                        
+                        prob1 = top1['price']
+                        prob2 = top2['price']
                         
                         # Delta
                         mid = m.get('id', '')
@@ -290,9 +329,9 @@ def api_polymarket():
                             "is_volatile": is_volatile,
                             "volume": format_money(vol),
                             "liquidity": format_money(liq),
-                            "outcome_1_label": str(outcomes[0]),
+                            "outcome_1_label": top1['label'],
                             "outcome_1_prob": int(prob1 * 100),
-                            "outcome_2_label": str(outcomes[1]),
+                            "outcome_2_label": top2['label'],
                             "outcome_2_prob": int(prob2 * 100),
                             "slug": event.get('slug', ''),
                             "delta": delta

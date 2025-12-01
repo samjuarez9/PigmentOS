@@ -322,9 +322,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const width1 = (prob1 / total) * 100;
             const width2 = (prob2 / total) * 100;
 
-            // Determine labels - STRICTLY YES/NO as requested
-            const label1 = 'YES';
-            const label2 = 'NO';
+            // Determine labels - Dynamic from Backend
+            let label1 = market.outcome_1_label || 'YES';
+            let label2 = market.outcome_2_label || 'NO';
+
+            // Truncate long labels
+            if (label1.length > 8) label1 = label1.substring(0, 8) + '..';
+            if (label2.length > 8) label2 = label2.substring(0, 8) + '..';
 
             item.innerHTML = `
     <div class="polymarket-top-row">
