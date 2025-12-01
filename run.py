@@ -778,9 +778,10 @@ def start_background_worker():
     t = threading.Thread(target=worker, daemon=True)
     t.start()
 
+# Start the background worker immediately on import (for Gunicorn)
+start_background_worker()
+
 if __name__ == "__main__":
-    # Start the background worker
-    start_background_worker()
     
     port = int(os.environ.get("PORT", 8001))
     print(f"🚀 PigmentOS Flask Server running on port {port}", flush=True)
