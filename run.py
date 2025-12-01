@@ -103,126 +103,152 @@ def refresh_whales_logic():
                 if not expirations:
                     continue
                     
-                # Check nearest expiration only for speed/relevance
-                expiry = expirations[0]
+                # Check next 4 expirations (approx 1 month out)
+                # This captures 0DTE, Weekly, and Monthly flows
+                target_expirations = expirations[:4]
                 
-                # Fetch Option Chain
-                opts = ticker.option_chain(expiry)
-                
-                # Combine Calls and Puts
-                calls = opts.calls
-                calls['type'] = 'CALL'
-                puts = opts.puts
-                puts['type'] = 'PUT'
-                
-                chain = pd.concat([calls, puts])
-                
-                # === UNUSUAL CRITERIA ===
-                # 1. Volume > Open Interest (The classic signal)
-                # 2. Volume > 500 (Filter out noise)
-                # 3. Last Price > 0.10 (Filter out dead OTMs)
-                
-                unusual = chain[
-                    (chain['volume'] > chain['openInterest']) & 
-                    (chain['volume'] > 500) & 
-                    (chain['lastPrice'] > 0.10)
-                ]
-                
-                for _, row in unusual.iterrows():
-                    # Calculate Notional Value (Premium)
-                    notional = row['volume'] * row['lastPrice'] * 100
-                    
-                    # Calculate Moneyness (ITM/OTM)
-                    strike = float(row['strike'])
-                    is_call = row['type'] == 'CALL'
-                    moneyness = "OTM"
-                    
-                    if is_call:
-                        if current_price > strike: moneyness = "ITM"
-                    else: # PUT
-                        if current_price < strike: moneyness = "ITM"
-                    
-                    # Format Premium
-                    def format_money(val):
-                        if val >= 1_000_000: return f"${val/1_000_000:.1f}M"
-                        if val >= 1_000: return f"${val/1_000:.0f}k"
-                        return f"${val:.0f}"
-                    
-                    # Handle Timestamp
-                    # yfinance returns a Timestamp object, convert to string for JSON
-                    trade_time_obj = row['lastTradeDate']
-                    if hasattr(trade_time_obj, 'strftime'):
-                        trade_time_str = trade_time_obj.strftime("%H:%M:%S")
-                        timestamp_val = trade_time_obj.timestamp()
-                    else:
-                        trade_time_str = str(trade_time_obj)
-                        timestamp_val = time.time() # Fallback
+                for expiry in target_expirations:
+                    try:
+                        # Fetch Option Chain
+                        opts = ticker.option_chain(expiry)
+                        
+                        # Combine Calls and Puts
+                        calls = opts.calls
+                        calls['type'] = 'CALL'
+                        puts = opts.puts
+                        puts['type'] = 'PUT'
+                        
+                        chain = pd.concat([calls, puts])
+                        
+                        # === UNUSUAL CRITERIA ===
+                        # 1. Volume > Open Interest (The classic signal)
+                        # 2. Volume > 500 (Filter out noise)
+                        # 3. Last Price > 0.10 (Filter out dead OTMs)
+                        
+                        unusual = chain[
+                            (chain['volume'] > chain['openInterest']) & 
+                            (chain['volume'] > 500) & 
+                            (chain['lastPrice'] > 0.10)
+                        ]
+                        
+                        for _, row in unusual.iterrows():
+                            # Calculate Notional Value (Premium)
+                            notional = row['volume'] * row['lastPrice'] * 100
+                            
+                            # === FILTER: MINIMUM WHALE SIZE ===
+                            # Filter out "guppies" (small bets < $15k)
+                            if notional < 15_000:
+                                continue
 
-                    # === VOLUME THRESHOLD LOGIC ===
-                    # To mimic a "stream", we only update if volume grows significantly
-                    contract_id = row['contractSymbol']
-                    current_vol = int(row['volume'])
-                    
-                    last_vol = WHALE_HISTORY.get(contract_id, 0)
-                    delta = current_vol - last_vol
-                    
-                    # If it's the first time seeing it, OR volume grew significantly
-                    if last_vol == 0 or delta >= VOLUME_THRESHOLD:
-                        # Update history
-                        WHALE_HISTORY[contract_id] = current_vol
-                        
-                        # Add to list with NEW volume
-                        found_whales.append({
-                            "baseSymbol": symbol,
-                            "symbol": row['contractSymbol'],
-                            "strikePrice": strike,
-                            "expirationDate": expiry,
-                            "putCall": 'C' if is_call else 'P',
-                            "volume": current_vol,
-                            "openInterest": int(row['openInterest']),
-                            "lastPrice": float(row['lastPrice']),
-                            "tradeTime": trade_time_str,
-                            "timestamp": timestamp_val, # For sorting
-                            "vol_oi": round(row['volume'] / (row['openInterest'] if row['openInterest'] > 0 else 1), 1),
-                            "premium": format_money(notional),
-                            "notional_value": notional,
-                            "moneyness": moneyness, 
-                            "is_mega_whale": notional > 1_000_000,
-                            "delta": 0,
-                            "iv": row['impliedVolatility']
-                        })
-                    else:
-                        # Volume didn't change enough. 
-                        # We still want to include it in the list (so it doesn't disappear),
-                        # BUT we report the OLD volume so the ID stays the same in frontend.
-                        # This prevents "replacing" animation.
-                        
-                        # Re-calculate notional based on old volume? No, keep current price.
-                        # Just force volume to be last_vol
-                        
-                        found_whales.append({
-                            "baseSymbol": symbol,
-                            "symbol": row['contractSymbol'],
-                            "strikePrice": strike,
-                            "expirationDate": expiry,
-                            "putCall": 'C' if is_call else 'P',
-                            "volume": last_vol, # <--- KEY: Report OLD volume
-                            "openInterest": int(row['openInterest']),
-                            "lastPrice": float(row['lastPrice']),
-                            "tradeTime": trade_time_str,
-                            "timestamp": timestamp_val,
-                            "vol_oi": round(last_vol / (row['openInterest'] if row['openInterest'] > 0 else 1), 1),
-                            "premium": format_money(last_vol * row['lastPrice'] * 100),
-                            "notional_value": last_vol * row['lastPrice'] * 100,
-                            "moneyness": moneyness, 
-                            "is_mega_whale": (last_vol * row['lastPrice'] * 100) > 1_000_000,
-                            "delta": 0,
-                            "iv": row['impliedVolatility']
-                        })
-                    
+                            # === FILTER: STRICT DATE CHECK ===
+                            # Ensure the trade happened TODAY
+                            trade_date = row['lastTradeDate'].date()
+                            today_date = datetime.now(pytz.timezone('US/Eastern')).date()
+                            
+                            if trade_date != today_date:
+                                # Skip old data (yesterday's high volume)
+                                continue
+                            
+                            # Calculate Moneyness (ITM/OTM)
+                            strike = float(row['strike'])
+                            is_call = row['type'] == 'CALL'
+                            moneyness = "OTM"
+                            
+                            if is_call:
+                                if current_price > strike: moneyness = "ITM"
+                            else: # PUT
+                                if current_price < strike: moneyness = "ITM"
+                            
+                            # Format Premium
+                            def format_money(val):
+                                if val >= 1_000_000: return f"${val/1_000_000:.1f}M"
+                                if val >= 1_000: return f"${val/1_000:.0f}k"
+                                return f"${val:.0f}"
+                            
+                            # Handle Timestamp
+                            # yfinance returns a Timestamp object, convert to string for JSON
+                            trade_time_obj = row['lastTradeDate']
+                            if hasattr(trade_time_obj, 'strftime'):
+                                trade_time_str = trade_time_obj.strftime("%H:%M:%S")
+                                timestamp_val = trade_time_obj.timestamp()
+                            else:
+                                trade_time_str = str(trade_time_obj)
+                                timestamp_val = time.time() # Fallback
+
+                            # === VOLUME THRESHOLD LOGIC ===
+                            # To mimic a "stream", we only update if volume grows significantly
+                            contract_id = row['contractSymbol']
+                            current_vol = int(row['volume'])
+                            
+                            last_vol = WHALE_HISTORY.get(contract_id, 0)
+                            delta = current_vol - last_vol
+                            
+                            # If it's the first time seeing it, OR volume grew significantly
+                            if last_vol == 0 or delta >= VOLUME_THRESHOLD:
+                                # Update history
+                                WHALE_HISTORY[contract_id] = current_vol
+                                
+                                # Add to list with NEW volume
+                                found_whales.append({
+                                    "baseSymbol": symbol,
+                                    "symbol": row['contractSymbol'],
+                                    "strikePrice": strike,
+                                    "expirationDate": expiry,
+                                    "putCall": 'C' if is_call else 'P',
+                                    "volume": current_vol,
+                                    "openInterest": int(row['openInterest']),
+                                    "lastPrice": float(row['lastPrice']),
+                                    "tradeTime": trade_time_str,
+                                    "timestamp": timestamp_val, # For sorting
+                                    "vol_oi": round(row['volume'] / (row['openInterest'] if row['openInterest'] > 0 else 1), 1),
+                                    "premium": format_money(notional),
+                                    "notional_value": notional,
+                                    "moneyness": moneyness, 
+                                    "is_mega_whale": notional > 1_000_000,
+                                    "delta": 0,
+                                    "iv": row['impliedVolatility']
+                                })
+                            else:
+                                # Volume didn't change enough. 
+                                # We still want to include it in the list (so it doesn't disappear),
+                                # BUT we report the OLD volume so the ID stays the same in frontend.
+                                # This prevents "replacing" animation.
+                                
+                                # Re-calculate notional based on old volume? No, keep current price.
+                                # Just force volume to be last_vol
+                                
+                                found_whales.append({
+                                    "baseSymbol": symbol,
+                                    "symbol": row['contractSymbol'],
+                                    "strikePrice": strike,
+                                    "expirationDate": expiry,
+                                    "putCall": 'C' if is_call else 'P',
+                                    "volume": last_vol, # <--- KEY: Report OLD volume
+                                    "openInterest": int(row['openInterest']),
+                                    "lastPrice": float(row['lastPrice']),
+                                    "tradeTime": trade_time_str,
+                                    "timestamp": timestamp_val,
+                                    "vol_oi": round(last_vol / (row['openInterest'] if row['openInterest'] > 0 else 1), 1),
+                                    "premium": format_money(last_vol * row['lastPrice'] * 100),
+                                    "notional_value": last_vol * row['lastPrice'] * 100,
+                                    "moneyness": moneyness, 
+                                    "is_mega_whale": (last_vol * row['lastPrice'] * 100) > 1_000_000,
+                                    "delta": 0,
+                                    "iv": row['impliedVolatility']
+                                })
+                    except Exception as e:
+                        # print(f"  Error checking expiry {expiry} for {symbol}: {e}")
+                        continue
+
             except Exception as e:
                 # print(f"  Skipping {symbol}: {e}")
                 continue
+            
+            # Rate Limit Protection
+            time.sleep(0.5)
+
+                    
+
         
         # Sort by Time (Most Recent First)
         found_whales.sort(key=lambda x: x['timestamp'], reverse=True)
