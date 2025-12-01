@@ -29,5 +29,18 @@ def verify_whales():
     else:
         print("❌ No trades found in cache!")
 
+    # Simulate a second run to check history logic
+    print("\n🧪 Running second scan to check history logic...")
+    refresh_whales_logic()
+    data2 = CACHE.get("barchart", {}).get("data", [])
+    print(f"📊 Second scan contains {len(data2)} trades")
+    
+    # Ideally, if volumes haven't changed much, the output should be stable
+    # We can't easily mock yfinance here without more complex patching,
+    # but we can verify the code runs without error and history is populated.
+    from run import WHALE_HISTORY
+    print(f"📜 History contains {len(WHALE_HISTORY)} tracked contracts")
+
+
 if __name__ == "__main__":
     verify_whales()
