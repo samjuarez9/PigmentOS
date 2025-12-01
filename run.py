@@ -4,6 +4,12 @@ import random
 import threading
 import requests
 import yfinance as yf
+# Set cache to /tmp for Render compatibility
+try:
+    yf.set_tz_cache_location("/tmp/yfinance_cache")
+except:
+    pass
+
 import pandas as pd
 import statistics
 import os
