@@ -335,6 +335,24 @@ h1 {
     transition: width 1s linear;
 }
 
+/* Open State - Green */
+.session-item.open .session-bar {
+    background: #00FF00;
+    box-shadow: 0 0 4px #00FF00;
+}
+
+/* Premarket State - Orange */
+.session-item.premarket .session-bar {
+    background: #FFCC00;
+    box-shadow: 0 0 4px #FFCC00;
+}
+
+/* Premarket Text Style */
+.session-item.premarket .session-name {
+    color: #FFCC00;
+    text-shadow: 0 0 5px rgba(255, 204, 0, 0.5);
+}
+
 /* Heatmap Error State */
 .heatmap-error {
     grid-column: span 4;
@@ -3227,6 +3245,21 @@ td {
     .header-left-group {
         width: 100%;
         justify-content: space-between;
+    }
+
+    /* Heatmap Mobile Optimization */
+    .heatmap-grid {
+        grid-template-columns: repeat(2, 1fr);
+        /* 2 Columns on Mobile */
+    }
+
+    /* Typography Adjustments */
+    .widget-content {
+        font-size: 14px;
+    }
+
+    .widget-header h2 {
+        font-size: 16px;
     }
 }
 

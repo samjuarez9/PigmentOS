@@ -888,10 +888,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // === GLOBAL MARKET SESSIONS LOGIC ===
+    // === GLOBAL MARKET SESSIONS LOGIC ===
     function updateMarketSessions(now) {
-        console.log('Updating Market Sessions...');
         // Market Hours in UTC (approximate)
-        // NY: 14:30 - 21:00 UTC (9:30 AM - 4:00 PM ET)
+        // NY: 14:30 - 21:00 UTC
         // LON: 08:00 - 16:30 UTC
         // TOK: 00:00 - 06:00 UTC
         // SYD: 23:00 - 05:00 UTC
@@ -904,43 +904,76 @@ document.addEventListener('DOMContentLoaded', () => {
             { id: 'session-ny', start: 14.5, end: 21.0 },
             { id: 'session-lon', start: 8.0, end: 16.5 },
             { id: 'session-tok', start: 0.0, end: 6.0 },
-            { id: 'session-syd', start: 23.0, end: 5.0 } // Crosses midnight handled simply here
+            { id: 'session-syd', start: 23.0, end: 5.0 }
         ];
+
+        const PREMARKET_DURATION = 1.5; // 90 minutes
 
         markets.forEach(m => {
             const el = document.getElementById(m.id);
             if (!el) return;
 
-            let isOpen = false;
+            let status = 'closed'; // closed, premarket, open
             let progress = 0;
 
-            // Simple check for midnight crossing (SYD)
-            if (m.start > m.end) {
-                // Crosses midnight (e.g. 23 to 5)
-                if (currentTime >= m.start || currentTime < m.end) {
-                    isOpen = true;
-                    // Calculate progress
-                    let duration = (24 - m.start) + m.end;
-                    let elapsed = (currentTime >= m.start) ? (currentTime - m.start) : ((24 - m.start) + currentTime);
-                    progress = (elapsed / duration) * 100;
-                }
+            // Helper to normalize time to 0-24
+            const norm = (t) => (t + 24) % 24;
+
+            // Calculate Start/End/PreStart handling midnight wrap
+            // We'll check if current time is within [start, end] for OPEN
+            // Or within [start - 1.5, start] for PREMARKET
+
+            // Check OPEN
+            let isOpen = false;
+            if (m.start < m.end) {
+                isOpen = currentTime >= m.start && currentTime < m.end;
             } else {
-                // Normal day (e.g. 8 to 16.5)
-                if (currentTime >= m.start && currentTime < m.end) {
-                    isOpen = true;
-                    let duration = m.end - m.start;
-                    let elapsed = currentTime - m.start;
-                    progress = (elapsed / duration) * 100;
+                // Wraps midnight (e.g. 23 to 5)
+                isOpen = currentTime >= m.start || currentTime < m.end;
+            }
+
+            if (isOpen) {
+                status = 'open';
+                // Calculate Progress (0-100%)
+                let duration = m.start < m.end ? (m.end - m.start) : (24 - m.start + m.end);
+                let elapsed = currentTime >= m.start ? (currentTime - m.start) : (24 - m.start + currentTime);
+                progress = (elapsed / duration) * 100;
+            } else {
+                // Check PREMARKET
+                // Pre-start is start - 1.5h
+                // We need to handle wrapping manually for comparison
+                let preStart = norm(m.start - PREMARKET_DURATION);
+                let isPre = false;
+
+                if (preStart < m.start) {
+                    // Normal case (e.g. 8.0 -> 6.5 to 8.0)
+                    isPre = currentTime >= preStart && currentTime < m.start;
+                } else {
+                    // Wraps midnight (e.g. 0.0 -> 22.5 to 0.0)
+                    isPre = currentTime >= preStart || currentTime < m.start;
+                }
+
+                if (isPre) {
+                    status = 'premarket';
+                    // Calculate Progress (0-100% of premarket phase)
+                    let elapsed = currentTime >= preStart ? (currentTime - preStart) : (24 - preStart + currentTime);
+                    progress = (elapsed / PREMARKET_DURATION) * 100;
                 }
             }
 
             // Update UI
             const bar = el.querySelector('.session-bar');
-            if (isOpen) {
+
+            // Reset Classes
+            el.classList.remove('open', 'premarket');
+
+            if (status === 'open') {
                 el.classList.add('open');
                 bar.style.width = `${progress}%`;
+            } else if (status === 'premarket') {
+                el.classList.add('premarket');
+                bar.style.width = `${progress}%`;
             } else {
-                el.classList.remove('open');
                 bar.style.width = '0%';
             }
         });
