@@ -2562,9 +2562,37 @@ td {
     overflow: hidden;
     text-overflow: ellipsis;
     margin-right: 10px;
+    transition: color 0.2s;
     position: relative;
     display: inline-block;
     max-width: 100%;
+}
+
+.polymarket-stats-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #666;
+}
+
+.poly-stat {
+    display: flex;
+    gap: 4px;
+}
+
+.stat-val {
+    color: #999;
+    font-weight: bold;
+}
+
+.polymarket-odds {
+    display: flex;
+    gap: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: bold;
 }
 
 .polymarket-odds-text {

@@ -271,9 +271,25 @@ def api_polymarket():
                         last_prob = POLY_STATE.get(mid, prob1)
                         delta = prob1 - last_prob
                         POLY_STATE[mid] = prob1
+                        # Volatility Threshold (5% move)
+                        is_volatile = abs(delta) >= 0.05
                         
+                        # Volume & Liquidity
+                        vol = float(m.get('volume', 0))
+                        liq = float(m.get('liquidity', 0))
+                        
+                        def format_money(val):
+                            if val >= 1_000_000: return f"${val/1_000_000:.1f}M"
+                            if val >= 1_000: return f"${val/1_000:.0f}k"
+                            return f"${val:.0f}"
+                        
+                        category = event.get('category', 'General') # Assuming category is available in event
                         clean_markets.append({
                             "event": title,
+                            "category": category,
+                            "is_volatile": is_volatile,
+                            "volume": format_money(vol),
+                            "liquidity": format_money(liq),
                             "outcome_1_label": str(outcomes[0]),
                             "outcome_1_prob": int(prob1 * 100),
                             "outcome_2_label": str(outcomes[1]),

@@ -334,6 +334,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class="polymarket-odds-text polymarket-odds-no">${prob2}% ${label2}</span>
                     </div>
                 </div>
+                <div class="polymarket-stats-row">
+                    <span class="poly-stat">VOL: <span class="stat-val">${market.volume}</span></span>
+                    <span class="poly-stat">LIQ: <span class="stat-val">${market.liquidity}</span></span>
+                </div>
     <div class="polymarket-laser-gauge">
         <div class="polymarket-yes-segment" style="width: ${width1}%"></div>
         <div class="polymarket-no-segment" style="width: ${width2}%"></div>
