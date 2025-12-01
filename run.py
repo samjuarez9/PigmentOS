@@ -251,19 +251,12 @@ def api_whales():
     current_time = time.time()
     stale = False
     
-    if current_time - CACHE["barchart"]["timestamp"] >= CACHE_DURATION:
-        try:
-            refresh_whales_logic()
-        except Exception as e:
-            print(f"Refresh failed: {e}")
-            stale = True
-            
     data = CACHE["barchart"]["data"]
     sliced = data[offset:offset+limit]
     
     return jsonify({
         "data": sliced,
-        "stale": stale,
+        "stale": False, # Always served from cache
         "timestamp": int(CACHE["barchart"]["timestamp"])
     })
 
@@ -273,17 +266,12 @@ def api_whales_stream():
         print("🐳 SSE Client Connected")
         # Initial Data
         current_time = time.time()
-        if current_time - CACHE["barchart"]["timestamp"] >= CACHE_DURATION:
-            refresh_whales_logic()
-            
-        data = CACHE["barchart"]["data"]
-        yield f"data: {json.dumps({'data': data, 'stale': False, 'timestamp': int(CACHE['barchart']['timestamp'])})}\n\n"
-        
+        # Just yield the cache periodically
         while True:
-            time.sleep(CACHE_DURATION)
-            refresh_whales_logic()
+            # Send immediately on connect
             data = CACHE["barchart"]["data"]
             yield f"data: {json.dumps({'data': data, 'stale': False, 'timestamp': int(CACHE['barchart']['timestamp'])})}\n\n"
+            time.sleep(5) # Check for updates every 5s (lightweight)
 
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
@@ -775,7 +763,25 @@ def api_heatmap():
         print(f"Heatmap API Error: {e}")
         return jsonify({"error": str(e)})
 
+def start_background_worker():
+    def worker():
+        print("🔧 Background Worker Started", flush=True)
+        while True:
+            try:
+                refresh_whales_logic()
+            except Exception as e:
+                print(f"Worker Error: {e}", flush=True)
+            
+            # Sleep for CACHE_DURATION
+            time.sleep(CACHE_DURATION)
+
+    t = threading.Thread(target=worker, daemon=True)
+    t.start()
+
 if __name__ == "__main__":
+    # Start the background worker
+    start_background_worker()
+    
     port = int(os.environ.get("PORT", 8001))
     print(f"🚀 PigmentOS Flask Server running on port {port}", flush=True)
     app.run(host='0.0.0.0', port=port, threaded=True)
