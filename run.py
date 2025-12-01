@@ -136,8 +136,8 @@ def refresh_whales_logic():
                             notional = row['volume'] * row['lastPrice'] * 100
                             
                             # === FILTER: MINIMUM WHALE SIZE ===
-                            # Filter out "guppies" (small bets < $15k)
-                            if notional < 15_000:
+                            # Filter out "guppies" (small bets < $1.5M)
+                            if notional < 1_500_000:
                                 continue
 
                             # === FILTER: STRICT DATE CHECK ===
@@ -204,7 +204,7 @@ def refresh_whales_logic():
                                     "premium": format_money(notional),
                                     "notional_value": notional,
                                     "moneyness": moneyness, 
-                                    "is_mega_whale": notional > 1_000_000,
+                                    "is_mega_whale": notional > 9_000_000,
                                     "delta": 0,
                                     "iv": row['impliedVolatility']
                                 })
