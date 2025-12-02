@@ -1320,7 +1320,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Switch to Chart
                 if (gammaFeedContainer) gammaFeedContainer.style.display = 'none';
                 if (whaleChartView) whaleChartView.style.display = 'block';
-                if (whaleWidgetTitle) whaleWidgetTitle.textContent = 'GAMMA WALL (SPY) 🧱';
+                if (whaleWidgetTitle) whaleWidgetTitle.textContent = 'GAMMA WALL (SPY) 👾';
                 whaleViewBtn.textContent = 'LIST';
                 whaleViewBtn.classList.add('active');
 
@@ -1387,7 +1387,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Update Header
         const title = document.querySelector('.gamma-title');
-        if (title) title.textContent = `GAMMA WALL (${data.symbol})`;
+        if (title) title.textContent = `GAMMA WALL (${data.symbol}) 👾`;
 
         // Find Max Volume for scaling
         let maxVol = 0;
