@@ -279,18 +279,7 @@ def index():
 
 @app.route('/<path:path>')
 def serve_static(path):
-    try:
-        full_path = os.path.join(os.getcwd(), path)
-        if os.path.exists(full_path):
-            size = os.path.getsize(full_path)
-            print(f"📂 Serving {path} ({size} bytes)", flush=True)
-            return send_from_directory('.', path)
-        else:
-            print(f"❌ File not found: {path}", flush=True)
-            return "File not found", 404
-    except Exception as e:
-        print(f"❌ Error serving {path}: {e}", flush=True)
-        return str(e), 500
+    return send_from_directory('.', path)
 
 @app.route('/api/whales')
 def api_whales():
