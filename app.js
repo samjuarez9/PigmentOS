@@ -1578,13 +1578,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Helper: Create flow element (New Grid Layout)
-    function createFlowElement(flow, tradeId) {
+    function createFlowElement(flow, tradeId, isNew) {
         const row = document.createElement('div');
-        row.className = 'whale-row new-row';
+        row.className = 'whale-row';
 
-        // Check if trade is NEW (within 10 minutes)
-        const firstSeenTime = tradeFirstSeen.get(tradeId);
-        const isNew = firstSeenTime && (Date.now() - firstSeenTime < NEW_BADGE_DURATION);
+        // Only add animation class if it's actually new
+        if (isNew) {
+            row.classList.add('new-row');
+        }
 
         // 1. Ticker Column with NEW badge
         const colTicker = document.createElement('div');
