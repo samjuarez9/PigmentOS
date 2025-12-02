@@ -1288,8 +1288,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Optional: Prune seenTrades set to keep memory low (if needed)
-        if (seenTrades.size > 1000) {
-            seenTrades.clear(); // Simple clear, or we could be smarter
+        // Removed aggressive clearing to prevent "flash" of re-rendering
+        if (seenTrades.size > 50000) {
+            seenTrades.clear();
         }
     }
 
