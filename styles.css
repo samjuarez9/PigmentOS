@@ -3395,7 +3395,8 @@ td {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     /* 4 Columns */
-    grid-auto-rows: minmax(50px, auto);
+    grid-auto-rows: minmax(35px, auto);
+    /* Reduced from 50px to fit all */
     grid-auto-flow: dense;
     /* Packs items tightly */
     gap: 1px;
@@ -3403,7 +3404,8 @@ td {
     padding: 0;
     height: 450px;
     /* Increased height for more items */
-    overflow-y: auto;
+    overflow-y: hidden;
+    /* Hide scrollbar if possible, auto if needed */
     background: #000;
 }
 
@@ -3414,7 +3416,8 @@ td {
     justify-content: center;
     background: rgba(255, 255, 255, 0.05);
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
+    font-size: 10px;
+    /* Base reduced */
     color: #FFFFFF;
     transition: all 0.2s ease;
     cursor: default;
@@ -3432,27 +3435,31 @@ td {
 .heatmap-item.size-mega {
     grid-column: span 2;
     grid-row: span 2;
-    font-size: 16px;
+    font-size: 14px;
+    /* Reduced from 16px */
     font-weight: bold;
 }
 
 .heatmap-item.size-large {
     grid-column: span 2;
     grid-row: span 1;
-    font-size: 13px;
+    font-size: 11px;
+    /* Reduced from 13px */
     font-weight: bold;
 }
 
 .heatmap-item.size-medium {
     grid-column: span 1;
     grid-row: span 1;
-    font-size: 11px;
+    font-size: 10px;
+    /* Reduced from 11px */
 }
 
 .heatmap-item.size-small {
     grid-column: span 1;
     grid-row: span 1;
-    font-size: 10px;
+    font-size: 9px;
+    /* Reduced from 10px */
 }
 
 .heatmap-item .sector-symbol {
