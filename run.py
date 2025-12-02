@@ -557,31 +557,29 @@ def api_fear_greed():
         except:
             vix_val = vix.history(period="1d")['Close'].iloc[-1]
             
-        # VIX Score: Consensus Tuning (Aggressive)
-        # In modern markets, VIX 12-14 is "Normal/Greed".
-        # VIX > 16 is starting to be "Fear". 
-        # VIX > 20 is "Extreme Fear".
-        # Formula: Map VIX 12->100, VIX 22->0
-        vix_score = 100 - ((vix_val - 12) * 10)
+        # VIX Score: Hyper-Sensitive Calibration
+        # The user wants "Extreme Fear" (Score ~22) at VIX ~16.8.
+        # We map VIX 12 -> 100 (Greed)
+        # We map VIX 16 -> 0 (Extreme Fear)
+        # Formula: 100 - (VIX - 12) * 25
+        vix_score = 100 - ((vix_val - 12) * 25)
         vix_score = max(0, min(100, vix_score))
 
-        # 2. Momentum Component (SPY vs 5d MA) - 50% Weight
+        # 2. Momentum Component (SPY vs 5d MA) - 30% Weight
+        # Reduced weight because price can be sticky/bullish even in fear.
         spy = yf.Ticker("SPY")
         hist = spy.history(period="10d")
         current_price = hist['Close'].iloc[-1]
         ma_5 = hist['Close'].tail(5).mean()
         
-        # Momentum Score:
-        # We want to be sensitive to ANY weakness.
         pct_diff = (current_price - ma_5) / ma_5
         
         # Map -1% to +1% range to 0-100 score
-        # If price is even slightly below 5d MA, it drags score down.
-        mom_score = 50 + (pct_diff * 5000) # 0.01 * 5000 = 50
+        mom_score = 50 + (pct_diff * 5000)
         mom_score = max(0, min(100, mom_score))
 
-        # 3. Composite Score
-        final_score = (vix_score * 0.5) + (mom_score * 0.5)
+        # 3. Composite Score (70% VIX, 30% Momentum)
+        final_score = (vix_score * 0.7) + (mom_score * 0.3)
         
         if final_score >= 75: rating = "Extreme Greed"
         elif final_score >= 55: rating = "Greed"
