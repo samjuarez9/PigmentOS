@@ -1389,15 +1389,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const title = document.querySelector('.gamma-title');
         if (title) title.textContent = `GAMMA WALL (${data.symbol}) 👾`;
 
-        // Find Max Volume for scaling
+        // Find Max Volume and Max OI for scaling
         let maxVol = 0;
+        let maxOI = 0;
+
         data.strikes.forEach(s => {
             if (s.call_vol > maxVol) maxVol = s.call_vol;
             if (s.put_vol > maxVol) maxVol = s.put_vol;
+            if (s.call_oi > maxOI) maxOI = s.call_oi;
+            if (s.put_oi > maxOI) maxOI = s.put_oi;
         });
 
+        // Prevent division by zero if pre-market (no volume)
+        if (maxVol === 0) maxVol = 1;
+        if (maxOI === 0) maxOI = 1;
+
         // Render Rows (Update existing or create new)
-        // We use a map to track existing rows by strike
         const existingRows = new Map();
         Array.from(gammaChartBars.children).forEach(row => {
             const strike = parseFloat(row.dataset.strike);
@@ -1408,19 +1415,26 @@ document.addEventListener('DOMContentLoaded', () => {
             let row = existingRows.get(strikeData.strike);
 
             // Calculate Widths
-            const putWidth = (strikeData.put_vol / maxVol) * 100;
-            const callWidth = (strikeData.call_vol / maxVol) * 100;
+            const putVolWidth = (strikeData.put_vol / maxVol) * 100;
+            const callVolWidth = (strikeData.call_vol / maxVol) * 100;
+
+            // Calculate OI Widths (scaled to 100% separately or same scale? Let's use separate scale for visibility)
+            const putOIWidth = (strikeData.put_oi / maxOI) * 100;
+            const callOIWidth = (strikeData.call_oi / maxOI) * 100;
 
             if (row) {
                 // Update Existing Row
                 const putBar = row.querySelector('.gamma-bar-put');
                 const callBar = row.querySelector('.gamma-bar-call');
+                const putOI = row.querySelector('.gamma-oi-put');
+                const callOI = row.querySelector('.gamma-oi-call');
 
-                if (putBar) putBar.style.width = `${putWidth}%`;
-                if (callBar) callBar.style.width = `${callWidth}%`;
+                if (putBar) putBar.style.width = `${putVolWidth}%`;
+                if (callBar) callBar.style.width = `${callVolWidth}%`;
+                if (putOI) putOI.style.width = `${putOIWidth}%`;
+                if (callOI) callOI.style.width = `${callOIWidth}%`;
 
-                // Update Tooltip Listeners (Re-attach with new data)
-                // Note: Ideally we'd update the data object attached to the element, but re-attaching is safer for now
+                // Update Tooltip Listeners
                 if (putBar) {
                     putBar.onmouseenter = (e) => showTooltip(e, strikeData, 'PUT', tooltip);
                     putBar.onmousemove = (e) => moveTooltip(e, tooltip);
@@ -1432,22 +1446,28 @@ document.addEventListener('DOMContentLoaded', () => {
                     callBar.onmouseleave = () => hideTooltip(tooltip);
                 }
 
-                // Remove from map to mark as processed
                 existingRows.delete(strikeData.strike);
             } else {
                 // Create New Row
                 row = document.createElement('div');
                 row.className = 'gamma-row';
-                row.dataset.strike = strikeData.strike; // Store strike for future updates
+                row.dataset.strike = strikeData.strike;
 
                 // Put Side
                 const putSide = document.createElement('div');
                 putSide.className = 'gamma-put-side';
+
+                // OI Bar (Background)
+                const putOI = document.createElement('div');
+                putOI.className = 'gamma-oi-put';
+                putOI.style.width = `${putOIWidth}%`;
+                putSide.appendChild(putOI);
+
+                // Volume Bar (Foreground)
                 const putBar = document.createElement('div');
                 putBar.className = 'gamma-bar-put';
-                putBar.style.width = `${putWidth}%`;
+                putBar.style.width = `${putVolWidth}%`;
 
-                // Tooltip Logic for Put
                 putBar.onmouseenter = (e) => showTooltip(e, strikeData, 'PUT', tooltip);
                 putBar.onmousemove = (e) => moveTooltip(e, tooltip);
                 putBar.onmouseleave = () => hideTooltip(tooltip);
@@ -1459,22 +1479,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 strikeLabel.className = 'gamma-strike';
                 strikeLabel.textContent = strikeData.strike.toFixed(1);
 
-                // Highlight Current Price
                 if (data.current_price >= strikeData.strike * 0.999 && data.current_price <= strikeData.strike * 1.001) {
                     strikeLabel.style.color = '#FFFFFF';
                     strikeLabel.style.fontWeight = 'bold';
                     strikeLabel.style.border = '1px solid #FFF';
-                    row.id = 'current-price-row'; // For auto-scroll
+                    row.id = 'current-price-row';
                 }
 
                 // Call Side
                 const callSide = document.createElement('div');
                 callSide.className = 'gamma-call-side';
+
+                // OI Bar (Background)
+                const callOI = document.createElement('div');
+                callOI.className = 'gamma-oi-call';
+                callOI.style.width = `${callOIWidth}%`;
+                callSide.appendChild(callOI);
+
+                // Volume Bar (Foreground)
                 const callBar = document.createElement('div');
                 callBar.className = 'gamma-bar-call';
-                callBar.style.width = `${callWidth}%`;
+                callBar.style.width = `${callVolWidth}%`;
 
-                // Tooltip Logic for Call
                 callBar.onmouseenter = (e) => showTooltip(e, strikeData, 'CALL', tooltip);
                 callBar.onmousemove = (e) => moveTooltip(e, tooltip);
                 callBar.onmouseleave = () => hideTooltip(tooltip);
@@ -1485,10 +1511,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 row.appendChild(strikeLabel);
                 row.appendChild(callSide);
 
-                // Insert in order (simplified: just append, assuming data is sorted)
-                // Since we are iterating sorted data, appending works for initial load.
-                // For updates, we might need to insert at correct index if new strikes appear.
-                // For now, we just append new ones.
                 gammaChartBars.appendChild(row);
             }
         });
