@@ -1298,37 +1298,36 @@ document.addEventListener('DOMContentLoaded', () => {
     // Define globally so renderGammaChart can access it
     let gammaChartBars = null;
 
-    document.addEventListener('DOMContentLoaded', () => {
-        let isGammaView = false;
-        const whaleViewBtn = document.getElementById('whale-view-btn');
-        const gammaFeedContainer = document.getElementById('flow-feed-container');
-        const whaleChartView = document.getElementById('whale-chart-view');
-        gammaChartBars = document.getElementById('gamma-chart-bars');
+    // Remove DOMContentLoaded wrapper since script is at bottom of body
+    let isGammaView = false;
+    const whaleViewBtn = document.getElementById('whale-view-btn');
+    const gammaFeedContainer = document.getElementById('flow-feed-container');
+    const whaleChartView = document.getElementById('whale-chart-view');
+    gammaChartBars = document.getElementById('gamma-chart-bars');
 
-        console.log("Gamma Init:", { whaleViewBtn, gammaFeedContainer, whaleChartView, gammaChartBars });
+    console.log("Gamma Init:", { whaleViewBtn, gammaFeedContainer, whaleChartView, gammaChartBars });
 
-        if (whaleViewBtn) {
-            whaleViewBtn.addEventListener('click', () => {
-                isGammaView = !isGammaView;
-                console.log("Toggle Gamma View:", isGammaView);
+    if (whaleViewBtn) {
+        whaleViewBtn.addEventListener('click', () => {
+            isGammaView = !isGammaView;
+            console.log("Toggle Gamma View:", isGammaView);
 
-                if (isGammaView) {
-                    // Switch to Chart
-                    if (gammaFeedContainer) gammaFeedContainer.style.display = 'none';
-                    if (whaleChartView) whaleChartView.style.display = 'block';
-                    whaleViewBtn.textContent = 'LIST';
-                    whaleViewBtn.classList.add('active');
-                    fetchGammaWall(); // Fetch data immediately
-                } else {
-                    // Switch to List
-                    if (gammaFeedContainer) gammaFeedContainer.style.display = 'block';
-                    if (whaleChartView) whaleChartView.style.display = 'none';
-                    whaleViewBtn.textContent = 'VIEW';
-                    whaleViewBtn.classList.remove('active');
-                }
-            });
-        }
-    });
+            if (isGammaView) {
+                // Switch to Chart
+                if (gammaFeedContainer) gammaFeedContainer.style.display = 'none';
+                if (whaleChartView) whaleChartView.style.display = 'block';
+                whaleViewBtn.textContent = 'LIST';
+                whaleViewBtn.classList.add('active');
+                fetchGammaWall(); // Fetch data immediately
+            } else {
+                // Switch to List
+                if (gammaFeedContainer) gammaFeedContainer.style.display = 'block';
+                if (whaleChartView) whaleChartView.style.display = 'none';
+                whaleViewBtn.textContent = 'VIEW';
+                whaleViewBtn.classList.remove('active');
+            }
+        });
+    }
 
     async function fetchGammaWall() {
         console.log("Fetching Gamma Wall...");
