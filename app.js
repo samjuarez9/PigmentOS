@@ -1294,17 +1294,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // === GAMMA WALL LOGIC ===
+    // === GAMMA WALL LOGIC ===
+    // Define globally so renderGammaChart can access it
+    let gammaChartBars = null;
+
     document.addEventListener('DOMContentLoaded', () => {
         let isGammaView = false;
         const whaleViewBtn = document.getElementById('whale-view-btn');
         const gammaFeedContainer = document.getElementById('flow-feed-container');
         const whaleChartView = document.getElementById('whale-chart-view');
-        // gammaChartBars is defined globally or we can get it here
-        const gammaChartBars = document.getElementById('gamma-chart-bars');
+        gammaChartBars = document.getElementById('gamma-chart-bars');
+
+        console.log("Gamma Init:", { whaleViewBtn, gammaFeedContainer, whaleChartView, gammaChartBars });
 
         if (whaleViewBtn) {
             whaleViewBtn.addEventListener('click', () => {
                 isGammaView = !isGammaView;
+                console.log("Toggle Gamma View:", isGammaView);
+
                 if (isGammaView) {
                     // Switch to Chart
                     if (gammaFeedContainer) gammaFeedContainer.style.display = 'none';
@@ -1324,9 +1331,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     async function fetchGammaWall() {
+        console.log("Fetching Gamma Wall...");
         try {
             const res = await fetch('/api/gamma?symbol=SPY');
             const data = await res.json();
+            console.log("Gamma Data:", data);
 
             if (data.error) {
                 console.error("Gamma Error:", data.error);
@@ -1340,7 +1349,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderGammaChart(data) {
-        if (!gammaChartBars) return;
+        if (!gammaChartBars) {
+            // Try to get it again if null
+            gammaChartBars = document.getElementById('gamma-chart-bars');
+        }
+        if (!gammaChartBars) {
+            console.error("Gamma Chart Bars container not found!");
+            return;
+        }
         gammaChartBars.innerHTML = ''; // Clear existing
 
         // Update Header
