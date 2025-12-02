@@ -811,8 +811,8 @@ def api_gamma():
     cache_key = f"gamma_{symbol}"
     current_time = time.time()
     
-    # Check Cache (5 minutes)
-    if cache_key in CACHE and current_time - CACHE[cache_key]["timestamp"] < 300:
+    # Check Cache (1 minute)
+    if cache_key in CACHE and current_time - CACHE[cache_key]["timestamp"] < 60:
         return jsonify(CACHE[cache_key]["data"])
         
     try:

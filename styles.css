@@ -3619,17 +3619,19 @@ td {
 }
 
 .gamma-bar-put {
-    height: 12px;
-    background: rgba(255, 59, 48, 0.6);
-    border-left: 2px solid #FF3B30;
-    transition: width 0.3s ease;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, var(--bearish-color));
+    border-right: 2px solid var(--bearish-color);
+    box-shadow: 0 0 5px var(--bearish-color);
+    transition: width 1s ease-in-out;
 }
 
 .gamma-bar-call {
-    height: 12px;
-    background: rgba(0, 255, 157, 0.6);
-    border-right: 2px solid #00FF9D;
-    transition: width 0.3s ease;
+    height: 100%;
+    background: linear-gradient(90deg, var(--bullish-color), transparent);
+    border-left: 2px solid var(--bullish-color);
+    box-shadow: 0 0 5px var(--bullish-color);
+    transition: width 1s ease-in-out;
 }
 
 .gamma-axis-label {
