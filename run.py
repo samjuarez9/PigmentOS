@@ -126,7 +126,7 @@ def refresh_whales_logic():
                         # 3. Last Price > 0.10 (Filter out dead OTMs)
                         
                         unusual = chain[
-                            (chain['volume'] > chain['openInterest']) & 
+                            (chain['volume'] > (chain['openInterest'] * 3)) & 
                             (chain['volume'] > 500) & 
                             (chain['lastPrice'] > 0.10)
                         ]
