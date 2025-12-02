@@ -840,23 +840,29 @@ def api_gamma():
         calls = opts.calls
         puts = opts.puts
         
-        # Aggregate Volume by Strike
-        # We want a dictionary: { strike: { call_vol: 0, put_vol: 0 } }
+        # Aggregate Volume and Open Interest by Strike
+        # We want a dictionary: { strike: { call_vol: 0, put_vol: 0, call_oi: 0, put_oi: 0 } }
         gamma_data = {}
         
         # Process Calls
         for _, row in calls.iterrows():
             strike = float(row['strike'])
             vol = int(row['volume']) if not pd.isna(row['volume']) else 0
-            if strike not in gamma_data: gamma_data[strike] = {"call_vol": 0, "put_vol": 0}
+            oi = int(row['openInterest']) if not pd.isna(row['openInterest']) else 0
+            
+            if strike not in gamma_data: gamma_data[strike] = {"call_vol": 0, "put_vol": 0, "call_oi": 0, "put_oi": 0}
             gamma_data[strike]["call_vol"] += vol
+            gamma_data[strike]["call_oi"] += oi
             
         # Process Puts
         for _, row in puts.iterrows():
             strike = float(row['strike'])
             vol = int(row['volume']) if not pd.isna(row['volume']) else 0
-            if strike not in gamma_data: gamma_data[strike] = {"call_vol": 0, "put_vol": 0}
+            oi = int(row['openInterest']) if not pd.isna(row['openInterest']) else 0
+            
+            if strike not in gamma_data: gamma_data[strike] = {"call_vol": 0, "put_vol": 0, "call_oi": 0, "put_oi": 0}
             gamma_data[strike]["put_vol"] += vol
+            gamma_data[strike]["put_oi"] += oi
             
         # Convert to List for Frontend
         # Filter for relevant range (e.g. +/- 10% of current price) to keep chart readable
@@ -869,7 +875,9 @@ def api_gamma():
                 final_data.append({
                     "strike": strike,
                     "call_vol": vols["call_vol"],
-                    "put_vol": vols["put_vol"]
+                    "put_vol": vols["put_vol"],
+                    "call_oi": vols["call_oi"],
+                    "put_oi": vols["put_oi"]
                 })
                 
         final_data.sort(key=lambda x: x['strike'])

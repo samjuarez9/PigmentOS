@@ -1361,6 +1361,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         gammaChartBars.innerHTML = ''; // Clear existing
 
+        // Create Tooltip Element if not exists
+        let tooltip = document.getElementById('gamma-tooltip');
+        if (!tooltip) {
+            tooltip = document.createElement('div');
+            tooltip.id = 'gamma-tooltip';
+            tooltip.className = 'gamma-tooltip';
+            tooltip.style.opacity = '0';
+            document.body.appendChild(tooltip);
+        }
+
         // Update Header
         const title = document.querySelector('.gamma-title');
         if (title) title.textContent = `GAMMA WALL (${data.symbol})`;
@@ -1373,37 +1383,103 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Render Rows
-        data.strikes.forEach(row => {
-            const div = document.createElement('div');
+        data.strikes.forEach(strikeData => {
+            const row = document.createElement('div');
+            row.className = 'gamma-row';
 
-            // Check if this is the "Current Price" row (approximate)
-            // We find the strike closest to current price
-            const isCurrent = Math.abs(row.strike - data.current_price) < 2.5; // Approx for SPY
-            div.className = isCurrent ? 'gamma-row current-price-row' : 'gamma-row';
+            // Put Side
+            const putSide = document.createElement('div');
+            putSide.className = 'gamma-put-side';
+            const putBar = document.createElement('div');
+            putBar.className = 'gamma-bar-put';
+            const putWidth = (strikeData.put_vol / maxVol) * 100;
+            putBar.style.width = `${putWidth}%`;
 
-            // Calculate Bar Widths (%)
-            const putWidth = (row.put_vol / maxVol) * 100;
-            const callWidth = (row.call_vol / maxVol) * 100;
+            // Tooltip Logic for Put
+            putBar.addEventListener('mouseenter', (e) => showTooltip(e, strikeData, 'PUT', tooltip));
+            putBar.addEventListener('mousemove', (e) => moveTooltip(e, tooltip));
+            putBar.addEventListener('mouseleave', () => hideTooltip(tooltip));
 
-            div.innerHTML = `
-                <div class="gamma-put-side">
-                    <div class="gamma-bar-put" style="width: ${putWidth}%;"></div>
-                </div>
-                <div class="gamma-strike">${row.strike}</div>
-                <div class="gamma-call-side">
-                    <div class="gamma-bar-call" style="width: ${callWidth}%;"></div>
-                </div>
-            `;
+            putSide.appendChild(putBar);
 
-            gammaChartBars.appendChild(div);
+            // Strike Label
+            const strikeLabel = document.createElement('div');
+            strikeLabel.className = 'gamma-strike';
+            strikeLabel.textContent = strikeData.strike.toFixed(1);
 
-            // Auto-scroll to current price
-            if (isCurrent) {
-                setTimeout(() => {
-                    div.scrollIntoView({ block: "center", behavior: "smooth" });
-                }, 100);
+            // Highlight Current Price
+            if (data.current_price >= strikeData.strike * 0.999 && data.current_price <= strikeData.strike * 1.001) {
+                strikeLabel.style.color = '#FFFFFF';
+                strikeLabel.style.fontWeight = 'bold';
+                strikeLabel.style.border = '1px solid #FFF';
+                row.id = 'current-price-row'; // For auto-scroll
             }
+
+            // Call Side
+            const callSide = document.createElement('div');
+            callSide.className = 'gamma-call-side';
+            const callBar = document.createElement('div');
+            callBar.className = 'gamma-bar-call';
+            const callWidth = (strikeData.call_vol / maxVol) * 100;
+            callBar.style.width = `${callWidth}%`;
+
+            // Tooltip Logic for Call
+            callBar.addEventListener('mouseenter', (e) => showTooltip(e, strikeData, 'CALL', tooltip));
+            callBar.addEventListener('mousemove', (e) => moveTooltip(e, tooltip));
+            callBar.addEventListener('mouseleave', () => hideTooltip(tooltip));
+
+            callSide.appendChild(callBar);
+
+            row.appendChild(putSide);
+            row.appendChild(strikeLabel);
+            row.appendChild(callSide);
+
+            gammaChartBars.appendChild(row);
         });
+
+        // Auto-scroll to current price
+        setTimeout(() => {
+            const currentRow = document.getElementById('current-price-row');
+            if (currentRow) {
+                currentRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 100);
+    }
+
+    function showTooltip(e, data, type, tooltip) {
+        const vol = type === 'CALL' ? data.call_vol : data.put_vol;
+        const oi = type === 'CALL' ? data.call_oi : data.put_oi;
+        const color = type === 'CALL' ? 'var(--bullish-color)' : 'var(--bearish-color)';
+
+        tooltip.className = `gamma-tooltip ${type === 'CALL' ? 'call-tooltip' : 'put-tooltip'}`;
+        tooltip.innerHTML = `
+            <div class="tooltip-header" style="color: ${color}">
+                <span>${type}</span>
+                <span>$${data.strike}</span>
+            </div>
+            <div class="tooltip-row">
+                <span class="tooltip-label">VOL:</span>
+                <span class="tooltip-value">${vol.toLocaleString()}</span>
+            </div>
+            <div class="tooltip-row">
+                <span class="tooltip-label">OI:</span>
+                <span class="tooltip-value">${oi ? oi.toLocaleString() : 'N/A'}</span>
+            </div>
+        `;
+
+        tooltip.style.opacity = '1';
+        moveTooltip(e, tooltip);
+    }
+
+    function moveTooltip(e, tooltip) {
+        const x = e.clientX + 15;
+        const y = e.clientY + 15;
+        tooltip.style.left = `${x}px`;
+        tooltip.style.top = `${y}px`;
+    }
+
+    function hideTooltip(tooltip) {
+        tooltip.style.opacity = '0';
     }
 
     // Helper: Create flow element (New Grid Layout)
