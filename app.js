@@ -1587,18 +1587,11 @@ document.addEventListener('DOMContentLoaded', () => {
             row.classList.add('new-row');
         }
 
-        // 1. Ticker Column with NEW badge
+        // 1. Ticker Column
         const colTicker = document.createElement('div');
         colTicker.className = 'col-ticker';
 
-        if (isNew) {
-            // Add NEW badge before ticker
-            const newBadge = document.createElement('span');
-            newBadge.className = 'whale-new-badge';
-            newBadge.textContent = 'NEW';
-            colTicker.appendChild(newBadge);
-            colTicker.appendChild(document.createTextNode(' '));
-        }
+        // Badge removed per user request
 
         const tickerSpan = document.createElement('span');
         tickerSpan.textContent = flow.ticker;

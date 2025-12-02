@@ -48,7 +48,7 @@ WATCHLIST = [
     "SPY", "QQQ", "IWM"
 ]
 
-MEGA_WHALE_THRESHOLD = 9_000_000  # $9M
+MEGA_WHALE_THRESHOLD = 8_000_000  # $8M
 
 # Cache structure
 CACHE_DURATION = 120
@@ -211,7 +211,7 @@ def refresh_whales_logic():
                                     "premium": format_money(notional),
                                     "notional_value": notional,
                                     "moneyness": moneyness, 
-                                    "is_mega_whale": notional > 9_000_000,
+                                    "is_mega_whale": notional > MEGA_WHALE_THRESHOLD,
                                     "delta": 0,
                                     "iv": row['impliedVolatility']
                                 })
@@ -239,7 +239,7 @@ def refresh_whales_logic():
                                     "premium": format_money(last_vol * row['lastPrice'] * 100),
                                     "notional_value": last_vol * row['lastPrice'] * 100,
                                     "moneyness": moneyness, 
-                                    "is_mega_whale": (last_vol * row['lastPrice'] * 100) > 1_000_000,
+                                    "is_mega_whale": (last_vol * row['lastPrice'] * 100) > MEGA_WHALE_THRESHOLD,
                                     "delta": 0,
                                     "iv": row['impliedVolatility']
                                 })
