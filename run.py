@@ -557,33 +557,36 @@ def api_fear_greed():
         except:
             vix_val = vix.history(period="1d")['Close'].iloc[-1]
             
-        # VIX Score: 100 (Low Vol) to 0 (High Vol)
-        # Normalizing VIX: 10 is "Calm" (100), 40 is "Panic" (0)
-        vix_score = 100 - ((vix_val - 10) / 30 * 100)
+        # VIX Score: Consensus Tuning (Aggressive)
+        # In modern markets, VIX 12-14 is "Normal/Greed".
+        # VIX > 16 is starting to be "Fear". 
+        # VIX > 20 is "Extreme Fear".
+        # Formula: Map VIX 12->100, VIX 22->0
+        vix_score = 100 - ((vix_val - 12) * 10)
         vix_score = max(0, min(100, vix_score))
 
         # 2. Momentum Component (SPY vs 5d MA) - 50% Weight
         spy = yf.Ticker("SPY")
-        hist = spy.history(period="10d") # Fetch enough for MA
+        hist = spy.history(period="10d")
         current_price = hist['Close'].iloc[-1]
         ma_5 = hist['Close'].tail(5).mean()
         
         # Momentum Score:
-        # Price > MA = Greed (>50)
-        # Price < MA = Fear (<50)
-        # We'll use a 2% deviation as "Extreme"
+        # We want to be sensitive to ANY weakness.
         pct_diff = (current_price - ma_5) / ma_5
-        # Map -2% to +2% range to 0-100 score
-        mom_score = 50 + (pct_diff * 2500) # 0.02 * 2500 = 50 -> 50+50=100
+        
+        # Map -1% to +1% range to 0-100 score
+        # If price is even slightly below 5d MA, it drags score down.
+        mom_score = 50 + (pct_diff * 5000) # 0.01 * 5000 = 50
         mom_score = max(0, min(100, mom_score))
 
         # 3. Composite Score
         final_score = (vix_score * 0.5) + (mom_score * 0.5)
         
-        if final_score >= 80: rating = "Extreme Greed"
-        elif final_score >= 60: rating = "Greed"
-        elif final_score >= 40: rating = "Neutral"
-        elif final_score >= 20: rating = "Fear"
+        if final_score >= 75: rating = "Extreme Greed"
+        elif final_score >= 55: rating = "Greed"
+        elif final_score >= 45: rating = "Neutral"
+        elif final_score >= 25: rating = "Fear"
         else: rating = "Extreme Fear"
         
         data = {
