@@ -1308,6 +1308,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     console.log("Gamma Init:", { whaleViewBtn, gammaFeedContainer, whaleChartView, gammaChartBars });
 
+    // Auto-refresh interval variable
+    let gammaInterval = null;
+
     if (whaleViewBtn) {
         whaleViewBtn.addEventListener('click', () => {
             isGammaView = !isGammaView;
@@ -1320,7 +1323,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (whaleWidgetTitle) whaleWidgetTitle.textContent = 'GAMMA WALL (SPY) 🧱';
                 whaleViewBtn.textContent = 'LIST';
                 whaleViewBtn.classList.add('active');
-                fetchGammaWall(); // Fetch data immediately
+
+                fetchGammaWall(); // Fetch immediately
+
+                // Start Auto-Refresh (Every 5 minutes to match backend cache)
+                if (gammaInterval) clearInterval(gammaInterval);
+                gammaInterval = setInterval(fetchGammaWall, 300000);
+                console.log("Gamma Auto-Refresh Started (5m)");
+
             } else {
                 // Switch to List
                 if (gammaFeedContainer) gammaFeedContainer.style.display = 'block';
@@ -1328,6 +1338,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (whaleWidgetTitle) whaleWidgetTitle.textContent = 'UNUSUAL WHALES 🐳';
                 whaleViewBtn.textContent = 'VIEW';
                 whaleViewBtn.classList.remove('active');
+
+                // Stop Auto-Refresh
+                if (gammaInterval) clearInterval(gammaInterval);
+                gammaInterval = null;
+                console.log("Gamma Auto-Refresh Stopped");
             }
         });
     }
