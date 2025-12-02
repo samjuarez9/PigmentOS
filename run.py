@@ -550,24 +550,48 @@ def api_fear_greed():
         return jsonify(CACHE["cnn_fear_greed"]["data"])
         
     try:
-        # Direct VIX fetch for simplicity in Flask (avoid subprocess if possible, but keeping logic)
-        # We can use yfinance directly here instead of subprocess for cleaner Flask app
+        # 1. VIX Component (Volatility) - 50% Weight
         vix = yf.Ticker("^VIX")
         try:
             vix_val = vix.fast_info['last_price']
         except:
             vix_val = vix.history(period="1d")['Close'].iloc[-1]
             
-        score = 100 - ((vix_val - 10) / 30 * 100)
-        score = max(0, min(100, score))
+        # VIX Score: 100 (Low Vol) to 0 (High Vol)
+        # Normalizing VIX: 10 is "Calm" (100), 40 is "Panic" (0)
+        vix_score = 100 - ((vix_val - 10) / 30 * 100)
+        vix_score = max(0, min(100, vix_score))
+
+        # 2. Momentum Component (SPY vs 5d MA) - 50% Weight
+        spy = yf.Ticker("SPY")
+        hist = spy.history(period="10d") # Fetch enough for MA
+        current_price = hist['Close'].iloc[-1]
+        ma_5 = hist['Close'].tail(5).mean()
         
-        if score >= 80: rating = "Extreme Greed"
-        elif score >= 60: rating = "Greed"
-        elif score >= 40: rating = "Neutral"
-        elif score >= 20: rating = "Fear"
+        # Momentum Score:
+        # Price > MA = Greed (>50)
+        # Price < MA = Fear (<50)
+        # We'll use a 2% deviation as "Extreme"
+        pct_diff = (current_price - ma_5) / ma_5
+        # Map -2% to +2% range to 0-100 score
+        mom_score = 50 + (pct_diff * 2500) # 0.02 * 2500 = 50 -> 50+50=100
+        mom_score = max(0, min(100, mom_score))
+
+        # 3. Composite Score
+        final_score = (vix_score * 0.5) + (mom_score * 0.5)
+        
+        if final_score >= 80: rating = "Extreme Greed"
+        elif final_score >= 60: rating = "Greed"
+        elif final_score >= 40: rating = "Neutral"
+        elif final_score >= 20: rating = "Fear"
         else: rating = "Extreme Fear"
         
-        data = {"value": round(score), "rating": rating, "vix_reference": round(vix_val, 2)}
+        data = {
+            "value": round(final_score), 
+            "rating": rating, 
+            "vix_reference": round(vix_val, 2),
+            "momentum_reference": f"{round(pct_diff * 100, 2)}%"
+        }
         CACHE["cnn_fear_greed"] = {"data": data, "timestamp": current_time}
         return jsonify(data)
     except Exception as e:
