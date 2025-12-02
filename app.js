@@ -1301,6 +1301,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Remove DOMContentLoaded wrapper since script is at bottom of body
     let isGammaView = false;
     const whaleViewBtn = document.getElementById('whale-view-btn');
+    const whaleWidgetTitle = document.getElementById('whale-widget-title');
     const gammaFeedContainer = document.getElementById('flow-feed-container');
     const whaleChartView = document.getElementById('whale-chart-view');
     gammaChartBars = document.getElementById('gamma-chart-bars');
@@ -1316,6 +1317,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Switch to Chart
                 if (gammaFeedContainer) gammaFeedContainer.style.display = 'none';
                 if (whaleChartView) whaleChartView.style.display = 'block';
+                if (whaleWidgetTitle) whaleWidgetTitle.textContent = 'GAMMA WALL (SPY) 🧱';
                 whaleViewBtn.textContent = 'LIST';
                 whaleViewBtn.classList.add('active');
                 fetchGammaWall(); // Fetch data immediately
@@ -1323,6 +1325,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Switch to List
                 if (gammaFeedContainer) gammaFeedContainer.style.display = 'block';
                 if (whaleChartView) whaleChartView.style.display = 'none';
+                if (whaleWidgetTitle) whaleWidgetTitle.textContent = 'UNUSUAL WHALES 🐳';
                 whaleViewBtn.textContent = 'VIEW';
                 whaleViewBtn.classList.remove('active');
             }

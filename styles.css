@@ -3505,26 +3505,7 @@ td {
     background: #000;
 }
 
-.gamma-header {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-bottom: 10px;
-}
-
-.gamma-title {
-    font-family: 'VT323', monospace;
-    font-size: 20px;
-    color: #00FF9D;
-    text-shadow: 0 0 5px rgba(0, 255, 157, 0.5);
-}
-
-.gamma-subtitle {
-    font-family: 'Inter', sans-serif;
-    font-size: 10px;
-    color: #666;
-    letter-spacing: 1px;
-}
+/* Gamma Header Removed - Title handled by widget header */
 
 #gamma-chart-bars {
     flex: 1;
