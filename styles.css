@@ -3588,7 +3588,8 @@ td {
 .gamma-row {
     display: flex;
     align-items: center;
-    height: 18px;
+    height: 12px;
+    /* Reduced from 18px */
     width: 100%;
     font-family: 'VT323', monospace;
     font-size: 12px;
@@ -3599,6 +3600,8 @@ td {
     flex: 1;
     display: flex;
     align-items: center;
+    height: 100%;
+    /* Ensure side containers fill the row height */
 }
 
 .gamma-put-side {
@@ -3614,26 +3617,40 @@ td {
 }
 
 .gamma-strike {
-    width: 50px;
+    width: 40px;
+    /* Reduced from 50px */
     text-align: center;
     color: #888;
     font-weight: bold;
+    font-size: 10px;
+    /* Reduced from 12px (inherited) */
 }
 
 .gamma-bar-put {
-    height: 100%;
-    background: linear-gradient(90deg, transparent, var(--bearish-color));
+    height: 8px;
+    /* Reduced from 14px */
+    /* Fixed height to prevent collapse */
+    background: var(--bearish-color);
+    /* Solid color, no gradient */
+    opacity: 0.8;
+    /* Slight transparency for retro feel */
     border-right: 2px solid var(--bearish-color);
-    box-shadow: 0 0 5px var(--bearish-color);
+    /* box-shadow removed to stop glow */
     transition: width 1s ease-in-out;
+    min-width: 2px;
+    /* Reduced from 4px */
 }
 
 .gamma-bar-call {
-    height: 100%;
-    background: linear-gradient(90deg, var(--bullish-color), transparent);
+    height: 8px;
+    /* Reduced from 14px */
+    /* Fixed height to prevent collapse */
+    background: var(--bullish-color);
+    /* Solid color, no gradient */
+    opacity: 0.8;
+    /* Slight transparency for retro feel */
     border-left: 2px solid var(--bullish-color);
-    box-shadow: 0 0 5px var(--bullish-color);
-    transition: width 1s ease-in-out;
+    /* Reduced from 4px */
 }
 
 .gamma-axis-label {

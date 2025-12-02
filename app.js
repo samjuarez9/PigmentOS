@@ -1384,6 +1384,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tooltip.style.opacity = '0';
             document.body.appendChild(tooltip);
         }
+
         // Update Header
         const title = document.querySelector('.gamma-title');
         if (title) title.textContent = `GAMMA WALL (${data.symbol}) 👾`;
@@ -1395,13 +1396,12 @@ document.addEventListener('DOMContentLoaded', () => {
         data.strikes.forEach(s => {
             if (s.call_vol > maxVol) maxVol = s.call_vol;
             if (s.put_vol > maxVol) maxVol = s.put_vol;
-            if (s.call_oi > maxOI) maxOI = s.call_oi; // Still need for tooltip
-            if (s.put_oi > maxOI) maxOI = s.put_oi; // Still need for tooltip
+            if (s.call_oi > maxOI) maxOI = s.call_oi;
+            if (s.put_oi > maxOI) maxOI = s.put_oi;
         });
 
-        // Prevent division by zero if pre-market (no volume)
+        // Prevent division by zero
         if (maxVol === 0) maxVol = 1;
-        // maxOI is not used for bar scaling anymore, so no need to prevent division by zero for it here.
 
         // Render Rows (Update existing or create new)
         const existingRows = new Map();
@@ -1409,6 +1409,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const strike = parseFloat(row.dataset.strike);
             if (!isNaN(strike)) existingRows.set(strike, row);
         });
+
+        // Sort strikes to ensure order
+        data.strikes.sort((a, b) => b.strike - a.strike); // High to low? Or low to high? 
+        // Usually vertical charts are high price at top? Or low at top?
+        // Let's check previous behavior. Usually low to high (ascending) for standard charts, 
+        // but option chains often have high at top.
+        // The previous code didn't sort, it assumed data.strikes was sorted. 
+        // Let's assume data.strikes comes sorted from backend (it does).
 
         data.strikes.forEach(strikeData => {
             let row = existingRows.get(strikeData.strike);
@@ -1421,24 +1429,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Update Existing Row
                 const putBar = row.querySelector('.gamma-bar-put');
                 const callBar = row.querySelector('.gamma-bar-call');
-                // const putOI = row.querySelector('.gamma-oi-put'); // Removed OI bar
-                // const callOI = row.querySelector('.gamma-oi-call'); // Removed OI bar
 
-                if (putBar) putBar.style.width = `${putWidth}%`;
-                if (callBar) callBar.style.width = `${callWidth}%`;
-                // if (putOI) putOI.style.width = `${putOIWidth}%`; // Removed OI bar
-                // if (callOI) callOI.style.width = `${callOIWidth}%`; // Removed OI bar
-
-                // Update Tooltip Listeners
                 if (putBar) {
+                    putBar.style.width = `${putWidth}%`;
+                    // Update tooltip listeners
                     putBar.onmouseenter = (e) => showTooltip(e, strikeData, 'PUT', tooltip);
                     putBar.onmousemove = (e) => moveTooltip(e, tooltip);
                     putBar.onmouseleave = () => hideTooltip(tooltip);
                 }
                 if (callBar) {
+                    callBar.style.width = `${callWidth}%`;
+                    // Update tooltip listeners
                     callBar.onmouseenter = (e) => showTooltip(e, strikeData, 'CALL', tooltip);
                     callBar.onmousemove = (e) => moveTooltip(e, tooltip);
                     callBar.onmouseleave = () => hideTooltip(tooltip);
+                }
+
+                // Check if it's ATM
+                const strikeLabel = row.querySelector('.gamma-strike');
+                if (data.current_price >= strikeData.strike * 0.999 && data.current_price <= strikeData.strike * 1.001) {
+                    if (strikeLabel) {
+                        strikeLabel.style.color = '#FFFFFF';
+                        strikeLabel.style.fontWeight = 'bold';
+                        strikeLabel.style.border = '1px solid #FFF';
+                    }
+                    row.id = 'current-price-row';
+                } else {
+                    if (strikeLabel) {
+                        strikeLabel.style.color = '#888';
+                        strikeLabel.style.fontWeight = 'normal';
+                        strikeLabel.style.border = 'none';
+                    }
+                    if (row.id === 'current-price-row') row.removeAttribute('id');
                 }
 
                 existingRows.delete(strikeData.strike);
@@ -1451,12 +1473,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Put Side
                 const putSide = document.createElement('div');
                 putSide.className = 'gamma-put-side';
-
-                // OI Bar (Background) - REMOVED
-                // const putOI = document.createElement('div');
-                // putOI.className = 'gamma-oi-put';
-                // putOI.style.width = `${putOIWidth}%`;
-                // putSide.appendChild(putOI);
 
                 // Volume Bar (Foreground)
                 const putBar = document.createElement('div');
@@ -1485,12 +1501,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const callSide = document.createElement('div');
                 callSide.className = 'gamma-call-side';
 
-                // OI Bar (Background) - REMOVED
-                // const callOI = document.createElement('div');
-                // callOI.className = 'gamma-oi-call';
-                // callOI.style.width = `${callOIWidth}%`;
-                // callSide.appendChild(callOI);
-
                 // Volume Bar (Foreground)
                 const callBar = document.createElement('div');
                 callBar.className = 'gamma-bar-call';
@@ -1506,14 +1516,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 row.appendChild(strikeLabel);
                 row.appendChild(callSide);
 
+                // Insert in correct order? 
+                // Since we iterate data.strikes (sorted), appending to end works if we clear first.
+                // But here we are updating. 
+                // For simplicity, let's just append. If order is wrong, we might need to re-sort DOM.
+                // But usually strikes don't change order.
                 gammaChartBars.appendChild(row);
             }
         });
 
-        // Remove stale rows (strikes that are no longer in the data)
+        // Remove stale rows
         existingRows.forEach((row) => row.remove());
 
-        // Auto-scroll ONLY on first load (check if we haven't scrolled yet)
+        // Auto-scroll ONLY on first load
         if (!gammaChartBars.dataset.scrolled) {
             setTimeout(() => {
                 const currentRow = document.getElementById('current-price-row');
