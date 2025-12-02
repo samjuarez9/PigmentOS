@@ -1384,25 +1384,24 @@ document.addEventListener('DOMContentLoaded', () => {
             tooltip.style.opacity = '0';
             document.body.appendChild(tooltip);
         }
-
         // Update Header
         const title = document.querySelector('.gamma-title');
         if (title) title.textContent = `GAMMA WALL (${data.symbol}) 👾`;
 
-        // Find Max Volume and Max OI for scaling
+        // Find Max Volume for scaling
         let maxVol = 0;
-        let maxOI = 0;
+        let maxOI = 0; // Keep maxOI for tooltip, but not for bar scaling
 
         data.strikes.forEach(s => {
             if (s.call_vol > maxVol) maxVol = s.call_vol;
             if (s.put_vol > maxVol) maxVol = s.put_vol;
-            if (s.call_oi > maxOI) maxOI = s.call_oi;
-            if (s.put_oi > maxOI) maxOI = s.put_oi;
+            if (s.call_oi > maxOI) maxOI = s.call_oi; // Still need for tooltip
+            if (s.put_oi > maxOI) maxOI = s.put_oi; // Still need for tooltip
         });
 
         // Prevent division by zero if pre-market (no volume)
         if (maxVol === 0) maxVol = 1;
-        if (maxOI === 0) maxOI = 1;
+        // maxOI is not used for bar scaling anymore, so no need to prevent division by zero for it here.
 
         // Render Rows (Update existing or create new)
         const existingRows = new Map();
@@ -1415,24 +1414,20 @@ document.addEventListener('DOMContentLoaded', () => {
             let row = existingRows.get(strikeData.strike);
 
             // Calculate Widths
-            const putVolWidth = (strikeData.put_vol / maxVol) * 100;
-            const callVolWidth = (strikeData.call_vol / maxVol) * 100;
-
-            // Calculate OI Widths (scaled to 100% separately or same scale? Let's use separate scale for visibility)
-            const putOIWidth = (strikeData.put_oi / maxOI) * 100;
-            const callOIWidth = (strikeData.call_oi / maxOI) * 100;
+            const putWidth = (strikeData.put_vol / maxVol) * 100;
+            const callWidth = (strikeData.call_vol / maxVol) * 100;
 
             if (row) {
                 // Update Existing Row
                 const putBar = row.querySelector('.gamma-bar-put');
                 const callBar = row.querySelector('.gamma-bar-call');
-                const putOI = row.querySelector('.gamma-oi-put');
-                const callOI = row.querySelector('.gamma-oi-call');
+                // const putOI = row.querySelector('.gamma-oi-put'); // Removed OI bar
+                // const callOI = row.querySelector('.gamma-oi-call'); // Removed OI bar
 
-                if (putBar) putBar.style.width = `${putVolWidth}%`;
-                if (callBar) callBar.style.width = `${callVolWidth}%`;
-                if (putOI) putOI.style.width = `${putOIWidth}%`;
-                if (callOI) callOI.style.width = `${callOIWidth}%`;
+                if (putBar) putBar.style.width = `${putWidth}%`;
+                if (callBar) callBar.style.width = `${callWidth}%`;
+                // if (putOI) putOI.style.width = `${putOIWidth}%`; // Removed OI bar
+                // if (callOI) callOI.style.width = `${callOIWidth}%`; // Removed OI bar
 
                 // Update Tooltip Listeners
                 if (putBar) {
@@ -1457,16 +1452,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const putSide = document.createElement('div');
                 putSide.className = 'gamma-put-side';
 
-                // OI Bar (Background)
-                const putOI = document.createElement('div');
-                putOI.className = 'gamma-oi-put';
-                putOI.style.width = `${putOIWidth}%`;
-                putSide.appendChild(putOI);
+                // OI Bar (Background) - REMOVED
+                // const putOI = document.createElement('div');
+                // putOI.className = 'gamma-oi-put';
+                // putOI.style.width = `${putOIWidth}%`;
+                // putSide.appendChild(putOI);
 
                 // Volume Bar (Foreground)
                 const putBar = document.createElement('div');
                 putBar.className = 'gamma-bar-put';
-                putBar.style.width = `${putVolWidth}%`;
+                putBar.style.width = `${putWidth}%`;
 
                 putBar.onmouseenter = (e) => showTooltip(e, strikeData, 'PUT', tooltip);
                 putBar.onmousemove = (e) => moveTooltip(e, tooltip);
@@ -1490,16 +1485,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const callSide = document.createElement('div');
                 callSide.className = 'gamma-call-side';
 
-                // OI Bar (Background)
-                const callOI = document.createElement('div');
-                callOI.className = 'gamma-oi-call';
-                callOI.style.width = `${callOIWidth}%`;
-                callSide.appendChild(callOI);
+                // OI Bar (Background) - REMOVED
+                // const callOI = document.createElement('div');
+                // callOI.className = 'gamma-oi-call';
+                // callOI.style.width = `${callOIWidth}%`;
+                // callSide.appendChild(callOI);
 
                 // Volume Bar (Foreground)
                 const callBar = document.createElement('div');
                 callBar.className = 'gamma-bar-call';
-                callBar.style.width = `${callVolWidth}%`;
+                callBar.style.width = `${callWidth}%`;
 
                 callBar.onmouseenter = (e) => showTooltip(e, strikeData, 'CALL', tooltip);
                 callBar.onmousemove = (e) => moveTooltip(e, tooltip);
