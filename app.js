@@ -1293,6 +1293,98 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // === GAMMA WALL LOGIC ===
+    let isGammaView = false;
+    const whaleViewBtn = document.getElementById('whale-view-btn');
+    const gammaFeedContainer = document.getElementById('flow-feed-container');
+    const whaleChartView = document.getElementById('whale-chart-view');
+    const gammaChartBars = document.getElementById('gamma-chart-bars');
+
+    if (whaleViewBtn) {
+        whaleViewBtn.addEventListener('click', () => {
+            isGammaView = !isGammaView;
+            if (isGammaView) {
+                // Switch to Chart
+                gammaFeedContainer.style.display = 'none';
+                whaleChartView.style.display = 'block';
+                whaleViewBtn.textContent = 'LIST';
+                whaleViewBtn.classList.add('active');
+                fetchGammaWall(); // Fetch data immediately
+            } else {
+                // Switch to List
+                gammaFeedContainer.style.display = 'block';
+                whaleChartView.style.display = 'none';
+                whaleViewBtn.textContent = 'VIEW';
+                whaleViewBtn.classList.remove('active');
+            }
+        });
+    }
+
+    async function fetchGammaWall() {
+        try {
+            const res = await fetch('/api/gamma?symbol=SPY');
+            const data = await res.json();
+
+            if (data.error) {
+                console.error("Gamma Error:", data.error);
+                return;
+            }
+
+            renderGammaChart(data);
+        } catch (e) {
+            console.error("Gamma Fetch Failed:", e);
+        }
+    }
+
+    function renderGammaChart(data) {
+        if (!gammaChartBars) return;
+        gammaChartBars.innerHTML = ''; // Clear existing
+
+        // Update Header
+        const title = document.querySelector('.gamma-title');
+        if (title) title.textContent = `GAMMA WALL (${data.symbol})`;
+
+        // Find Max Volume for Scaling
+        let maxVol = 0;
+        data.strikes.forEach(s => {
+            if (s.call_vol > maxVol) maxVol = s.call_vol;
+            if (s.put_vol > maxVol) maxVol = s.put_vol;
+        });
+
+        // Render Rows
+        data.strikes.forEach(row => {
+            const div = document.createElement('div');
+
+            // Check if this is the "Current Price" row (approximate)
+            // We find the strike closest to current price
+            const isCurrent = Math.abs(row.strike - data.current_price) < 2.5; // Approx for SPY
+            div.className = isCurrent ? 'gamma-row current-price-row' : 'gamma-row';
+
+            // Calculate Bar Widths (%)
+            const putWidth = (row.put_vol / maxVol) * 100;
+            const callWidth = (row.call_vol / maxVol) * 100;
+
+            div.innerHTML = `
+                <div class="gamma-put-side">
+                    <div class="gamma-bar-put" style="width: ${putWidth}%;"></div>
+                </div>
+                <div class="gamma-strike">${row.strike}</div>
+                <div class="gamma-call-side">
+                    <div class="gamma-bar-call" style="width: ${callWidth}%;"></div>
+                </div>
+            `;
+
+            gammaChartBars.appendChild(div);
+
+            // Auto-scroll to current price
+            if (isCurrent) {
+                setTimeout(() => {
+                    div.scrollIntoView({ block: "center", behavior: "smooth" });
+                }, 100);
+            }
+        });
+    }
+
     // Helper: Create flow element (New Grid Layout)
     function createFlowElement(flow, tradeId) {
         const row = document.createElement('div');

@@ -802,6 +802,94 @@ def api_heatmap():
         print(f"Heatmap API Error: {e}")
         return jsonify({"error": str(e)})
 
+@app.route('/api/gamma')
+def api_gamma():
+    global CACHE
+    symbol = request.args.get('symbol', 'SPY').upper()
+    
+    # Cache key for Gamma
+    cache_key = f"gamma_{symbol}"
+    current_time = time.time()
+    
+    # Check Cache (5 minutes)
+    if cache_key in CACHE and current_time - CACHE[cache_key]["timestamp"] < 300:
+        return jsonify(CACHE[cache_key]["data"])
+        
+    try:
+        ticker = yf.Ticker(symbol)
+        
+        # Get Current Price
+        try:
+            current_price = ticker.fast_info.last_price
+        except:
+            current_price = ticker.info.get('regularMarketPrice', 0)
+            
+        if not current_price:
+            return jsonify({"error": "Price not found"})
+            
+        # Get Nearest Expiration
+        expirations = ticker.options
+        if not expirations:
+            return jsonify({"error": "No options found"})
+            
+        # Use the first expiration (0DTE/Weekly)
+        expiry = expirations[0]
+        
+        # Fetch Chain
+        opts = ticker.option_chain(expiry)
+        calls = opts.calls
+        puts = opts.puts
+        
+        # Aggregate Volume by Strike
+        # We want a dictionary: { strike: { call_vol: 0, put_vol: 0 } }
+        gamma_data = {}
+        
+        # Process Calls
+        for _, row in calls.iterrows():
+            strike = float(row['strike'])
+            vol = int(row['volume']) if not pd.isna(row['volume']) else 0
+            if strike not in gamma_data: gamma_data[strike] = {"call_vol": 0, "put_vol": 0}
+            gamma_data[strike]["call_vol"] += vol
+            
+        # Process Puts
+        for _, row in puts.iterrows():
+            strike = float(row['strike'])
+            vol = int(row['volume']) if not pd.isna(row['volume']) else 0
+            if strike not in gamma_data: gamma_data[strike] = {"call_vol": 0, "put_vol": 0}
+            gamma_data[strike]["put_vol"] += vol
+            
+        # Convert to List for Frontend
+        # Filter for relevant range (e.g. +/- 10% of current price) to keep chart readable
+        lower_bound = current_price * 0.90
+        upper_bound = current_price * 1.10
+        
+        final_data = []
+        for strike, vols in gamma_data.items():
+            if lower_bound <= strike <= upper_bound:
+                final_data.append({
+                    "strike": strike,
+                    "call_vol": vols["call_vol"],
+                    "put_vol": vols["put_vol"]
+                })
+                
+        final_data.sort(key=lambda x: x['strike'])
+        
+        result = {
+            "symbol": symbol,
+            "current_price": current_price,
+            "expiration": expiry,
+            "strikes": final_data
+        }
+        
+        # Update Cache
+        CACHE[cache_key] = {"data": result, "timestamp": current_time}
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"Gamma API Error: {e}")
+        return jsonify({"error": str(e)})
+
 def start_background_worker():
     def worker():
         print("🔧 Background Worker Started", flush=True)

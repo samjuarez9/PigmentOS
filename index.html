@@ -96,13 +96,28 @@
                         <h2>UNUSUAL WHALES 🐳</h2>
                         <div class="status-container" id="status-whales">
                             <span class="status-dot">●</span>
-                            <span class="status-text">OFFLINE</span>
+                            <span class="status-text">LIVE</span>
                         </div>
+                        <button id="whale-view-btn" class="view-btn">VIEW</button>
                         <div class="decoration-line"></div>
                     </div>
                     <div class="widget-content list-container" id="flow-feed-container">
                         <!-- Populated by JS -->
                         <div class="placeholder-item">Scanning for High Value Flow...</div>
+                    </div>
+                    <div class="widget-content chart-container" id="whale-chart-view" style="display: none;">
+                        <!-- Gamma Wall Chart -->
+                        <div class="gamma-chart-wrapper">
+                            <div class="gamma-header">
+                                <span class="gamma-title">GAMMA WALL (SPY)</span>
+                                <span class="gamma-subtitle">VOLUME BY STRIKE</span>
+                            </div>
+                            <div id="gamma-chart-bars"></div>
+                            <div class="gamma-axis-label">
+                                <span>PUTS (BEARISH)</span>
+                                <span>CALLS (BULLISH)</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

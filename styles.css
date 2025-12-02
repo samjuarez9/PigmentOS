@@ -3490,3 +3490,152 @@ td {
     animation: pulse 1.5s infinite;
     height: 100%;
 }
+/* === GAMMA WALL CHART === */
+.gamma-chart-wrapper {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    box-sizing: border-box;
+    background: #000;
+}
+
+.gamma-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.gamma-title {
+    font-family: 'VT323', monospace;
+    font-size: 20px;
+    color: #00FF9D;
+    text-shadow: 0 0 5px rgba(0, 255, 157, 0.5);
+}
+
+.gamma-subtitle {
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    color: #666;
+    letter-spacing: 1px;
+}
+
+#gamma-chart-bars {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    gap: 2px;
+    padding-right: 5px;
+}
+
+/* Scrollbar for chart */
+#gamma-chart-bars::-webkit-scrollbar {
+    width: 4px;
+}
+#gamma-chart-bars::-webkit-scrollbar-track {
+    background: #111;
+}
+#gamma-chart-bars::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 2px;
+}
+
+.gamma-row {
+    display: flex;
+    align-items: center;
+    height: 18px;
+    width: 100%;
+    font-family: 'VT323', monospace;
+    font-size: 12px;
+}
+
+.gamma-put-side {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding-right: 5px;
+    border-right: 1px solid #333;
+}
+
+.gamma-call-side {
+    flex: 1;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    padding-left: 5px;
+    border-left: 1px solid #333;
+}
+
+.gamma-strike {
+    width: 50px;
+    text-align: center;
+    color: #888;
+    font-weight: bold;
+}
+
+.gamma-bar-put {
+    height: 12px;
+    background: rgba(255, 59, 48, 0.6);
+    border-left: 2px solid #FF3B30;
+    transition: width 0.3s ease;
+}
+
+.gamma-bar-call {
+    height: 12px;
+    background: rgba(0, 255, 157, 0.6);
+    border-right: 2px solid #00FF9D;
+    transition: width 0.3s ease;
+}
+
+.gamma-axis-label {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 20px;
+    font-family: 'Inter', sans-serif;
+    font-size: 9px;
+    color: #444;
+    border-top: 1px solid #222;
+    margin-top: 5px;
+}
+
+/* Current Price Indicator */
+.current-price-row {
+    background: rgba(255, 255, 255, 0.05);
+    border-top: 1px dashed #666;
+    border-bottom: 1px dashed #666;
+}
+
+.current-price-row .gamma-strike {
+    color: #FFF;
+    text-shadow: 0 0 5px #FFF;
+}
+
+/* VIEW Button */
+.view-btn {
+    background: transparent;
+    border: 1px solid #333;
+    color: #666;
+    font-family: 'VT323', monospace;
+    font-size: 14px;
+    padding: 2px 8px;
+    cursor: pointer;
+    margin-left: auto;
+    margin-right: 10px;
+    transition: all 0.2s;
+}
+
+.view-btn:hover {
+    border-color: #00FF9D;
+    color: #00FF9D;
+    box-shadow: 0 0 5px rgba(0, 255, 157, 0.3);
+}
+
+.view-btn.active {
+    background: rgba(0, 255, 157, 0.1);
+    border-color: #00FF9D;
+    color: #00FF9D;
+}
