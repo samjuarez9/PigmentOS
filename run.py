@@ -866,12 +866,7 @@ def api_debug_system():
         "sample_data": sample_data
     })
 
-@app.route('/api/heatmap')
-def api_heatmap():
-    global CACHE
-    current_time = time.time()
-    
-    # Cache for 1 minute (60s)
+
 @app.route('/api/heatmap')
 def api_heatmap():
     global CACHE
