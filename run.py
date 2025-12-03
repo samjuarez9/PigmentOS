@@ -205,7 +205,7 @@ def refresh_single_whale(symbol):
         if new_whales:
             with CACHE_LOCK:
                 # Merge with existing cache
-                current_data = CACHE["barchart"]["data"]
+                current_data = CACHE["whales"]["data"]
                 # Filter out THIS symbol's old data to avoid duplicates
                 other_data = [w for w in current_data if w['baseSymbol'] != symbol]
                 updated_data = other_data + new_whales
@@ -213,8 +213,8 @@ def refresh_single_whale(symbol):
                 # Sort all
                 updated_data.sort(key=lambda x: x['timestamp'], reverse=True)
                 
-                CACHE["barchart"]["data"] = updated_data
-                CACHE["barchart"]["timestamp"] = time.time()
+                CACHE["whales"]["data"] = updated_data
+                CACHE["whales"]["timestamp"] = time.time()
                 print(f"🐳 {symbol}: Found {len(new_whales)} whales.", flush=True)
             
     except Exception as e:
@@ -311,13 +311,13 @@ def api_whales():
     current_time = time.time()
     stale = False
     
-    data = CACHE["barchart"]["data"]
+    data = CACHE["whales"]["data"]
     sliced = data[offset:offset+limit]
     
     return jsonify({
         "data": sliced,
         "stale": False, # Always served from cache
-        "timestamp": int(CACHE["barchart"]["timestamp"])
+        "timestamp": int(CACHE["whales"]["timestamp"])
     })
 
 @app.route('/api/whales/stream')
@@ -329,8 +329,8 @@ def api_whales_stream():
         # Just yield the cache periodically
         while True:
             # Send immediately on connect
-            data = CACHE["barchart"]["data"]
-            yield f"data: {json.dumps({'data': data, 'stale': False, 'timestamp': int(CACHE['barchart']['timestamp'])})}\n\n"
+            data = CACHE["whales"]["data"]
+            yield f"data: {json.dumps({'data': data, 'stale': False, 'timestamp': int(CACHE['whales']['timestamp'])})}\n\n"
             time.sleep(5) # Check for updates every 5s (lightweight)
 
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
@@ -976,7 +976,7 @@ def start_background_worker():
                 time.sleep(3)
             
             # 4. Whales (Market Hours OR Empty Cache)
-            whales_needs_hydration = not CACHE.get("barchart", {}).get("data")
+            whales_needs_hydration = not CACHE.get("whales", {}).get("data")
             
             if is_market_open or whales_needs_hydration:
                 for symbol in WHALE_WATCHLIST:
