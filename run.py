@@ -829,9 +829,11 @@ def refresh_gamma_logic():
     
     symbol = "SPY"
     try:
+        print(f"DEBUG: Gamma - Init Ticker {symbol}", flush=True)
         ticker = yf.Ticker(symbol)
         
         # Get Current Price
+        print("DEBUG: Gamma - Getting Price", flush=True)
         try:
             current_price = ticker.fast_info.last_price
         except:
@@ -842,6 +844,7 @@ def refresh_gamma_logic():
             return
             
         # Get Nearest Expiration
+        print("DEBUG: Gamma - Getting Options", flush=True)
         expirations = ticker.options
         if not expirations:
             print(f"Gamma Scan Failed: No options for {symbol}")
@@ -849,9 +852,12 @@ def refresh_gamma_logic():
             
         # Use the first expiration (0DTE/Weekly)
         expiry = expirations[0]
+        print(f"DEBUG: Gamma - Using Expiry {expiry}", flush=True)
         
         # Fetch Chain
+        print("DEBUG: Gamma - Fetching Chain", flush=True)
         opts = ticker.option_chain(expiry)
+        print("DEBUG: Gamma - Chain Fetched", flush=True)
         calls = opts.calls
         puts = opts.puts
         
