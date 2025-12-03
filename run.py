@@ -756,8 +756,7 @@ def api_news():
     # Serve directly from cache (background worker handles updates)
     return jsonify(CACHE["news"]["data"] if CACHE["news"]["data"] else [])
 
-    except Exception as e:
-        print(f"Heatmap Update Failed: {e}")
+
 
 def refresh_news_logic():
     global CACHE
