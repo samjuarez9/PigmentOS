@@ -66,7 +66,9 @@ CACHE = {
     "cnn_fear_greed": {"data": {"value": 50, "rating": "Neutral"}, "timestamp": 0},
     "polymarket": {"data": [], "timestamp": 0, "is_mock": False},
     "movers": {"data": [], "timestamp": 0},
-    "news": {"data": [], "timestamp": 0}
+    "movers": {"data": [], "timestamp": 0},
+    "news": {"data": [], "timestamp": 0},
+    "heatmap": {"data": [], "timestamp": 0}
 }
 
 # --- HELPER FUNCTIONS ---
@@ -286,6 +288,77 @@ def refresh_whales_logic():
             
     except Exception as e:
         print(f"Whale Scan Failed: {e}")
+
+def refresh_heatmap_logic():
+    global CACHE
+    print("🔥 Scanning Heatmap...", flush=True)
+    
+    # Tickers mapped to their "Size" category and "Sector" for filtering
+    HEATMAP_TICKERS = {
+        # Indices
+        "SPY": {"size": "mega", "sector": "INDICES"},
+        "QQQ": {"size": "mega", "sector": "INDICES"},
+        "IWM": {"size": "large", "sector": "INDICES"},
+        "DIA": {"size": "large", "sector": "INDICES"},
+        
+        # Mag 7 (Tech)
+        "NVDA": {"size": "mega", "sector": "TECH"},
+        "AAPL": {"size": "mega", "sector": "TECH"},
+        "MSFT": {"size": "mega", "sector": "TECH"},
+        "GOOGL": {"size": "large", "sector": "TECH"},
+        "AMZN": {"size": "large", "sector": "CONSUMER"},
+        "META": {"size": "large", "sector": "TECH"},
+        "TSLA": {"size": "large", "sector": "CONSUMER"},
+        
+        # Others
+        "AMD": {"size": "medium", "sector": "TECH"},
+        "NFLX": {"size": "medium", "sector": "CONSUMER"},
+        "AVGO": {"size": "medium", "sector": "TECH"},
+        "PLTR": {"size": "small", "sector": "TECH"},
+        "COIN": {"size": "small", "sector": "CRYPTO"},
+        "MSTR": {"size": "small", "sector": "CRYPTO"},
+        "RIOT": {"size": "small", "sector": "CRYPTO"}
+    }
+    
+    try:
+        heatmap_data = []
+        tickers_obj = yf.Tickers(" ".join(HEATMAP_TICKERS.keys()))
+        
+        for symbol, meta in HEATMAP_TICKERS.items():
+            try:
+                t = tickers_obj.tickers[symbol]
+                
+                # Try to get extended hours data from .info (slower but richer)
+                try:
+                    # Use fast_info primarily for speed
+                    price = t.fast_info.last_price
+                    prev_close = t.fast_info.previous_close
+                except:
+                    continue
+
+                if price and prev_close:
+                    change = ((price - prev_close) / prev_close) * 100
+                    heatmap_data.append({
+                        "symbol": symbol,
+                        "change": round(change, 2),
+                        "price": round(price, 2),
+                        "size": meta["size"],
+                        "sector": meta["sector"]
+                    })
+            except Exception as e:
+                continue
+            
+            # Small jitter to be polite
+            time.sleep(random.uniform(0.1, 0.3))
+        
+        # Update Cache
+        if heatmap_data:
+            CACHE["heatmap"]["data"] = heatmap_data
+            CACHE["heatmap"]["timestamp"] = time.time()
+            print(f"🔥 Heatmap Updated ({len(heatmap_data)} items)", flush=True)
+            
+    except Exception as e:
+        print(f"Heatmap Update Failed: {e}")
 
 # --- FLASK ROUTES ---
 
@@ -799,92 +872,11 @@ def api_heatmap():
     current_time = time.time()
     
     # Cache for 1 minute (60s)
-    if "heatmap" in CACHE and current_time - CACHE["heatmap"]["timestamp"] < 60:
-        return jsonify(CACHE["heatmap"]["data"])
-        
-    # Tickers mapped to their "Size" category and "Sector" for filtering
-    # This ensures we get the right data for the right boxes
-    HEATMAP_TICKERS = {
-        # Indices
-        "SPY": {"size": "mega", "sector": "INDICES"},
-        "QQQ": {"size": "mega", "sector": "INDICES"},
-        "IWM": {"size": "large", "sector": "INDICES"},
-        "DIA": {"size": "large", "sector": "INDICES"},
-        
-        # Mag 7 (Tech)
-        "NVDA": {"size": "mega", "sector": "TECH"},
-        "AAPL": {"size": "mega", "sector": "TECH"},
-        "MSFT": {"size": "mega", "sector": "TECH"},
-        "GOOGL": {"size": "large", "sector": "TECH"},
-        "AMZN": {"size": "large", "sector": "CONSUMER"},
-        "META": {"size": "large", "sector": "TECH"},
-        "TSLA": {"size": "large", "sector": "CONSUMER"},
-        
-        # Others
-        "AMD": {"size": "medium", "sector": "TECH"},
-        "NFLX": {"size": "medium", "sector": "CONSUMER"},
-        "AVGO": {"size": "medium", "sector": "TECH"},
-        "PLTR": {"size": "small", "sector": "TECH"},
-        "COIN": {"size": "small", "sector": "CRYPTO"},
-        "MSTR": {"size": "small", "sector": "CRYPTO"},
-        "RIOT": {"size": "small", "sector": "CRYPTO"}
-    }
-    
-    try:
-        heatmap_data = []
-        tickers_obj = yf.Tickers(" ".join(HEATMAP_TICKERS.keys()))
-        
-        for symbol, meta in HEATMAP_TICKERS.items():
-            try:
-                t = tickers_obj.tickers[symbol]
-                
-                # Try to get extended hours data from .info (slower but richer)
-                # If .info fails or is missing keys, fall back to fast_info
-                try:
-                    info = t.info
-                    state = info.get('marketState', 'REGULAR')
-                    
-                    price = info.get('regularMarketPrice')
-                    prev_close = info.get('regularMarketPreviousClose')
-                    
-                    # Handle Pre/Post Market
-                    if state in ['PRE', 'PREPRE'] and info.get('preMarketPrice'):
-                        price = info['preMarketPrice']
-                    elif state in ['POST', 'POSTPOST'] and info.get('postMarketPrice'):
-                        price = info['postMarketPrice']
-                        
-                    # Fallback to fast_info if info is incomplete
-                    if not price or not prev_close:
-                        price = t.fast_info.last_price
-                        prev_close = t.fast_info.previous_close
-                        
-                except:
-                    # Fallback if .info fails completely
-                    price = t.fast_info.last_price
-                    prev_close = t.fast_info.previous_close
-
-                if price and prev_close:
-                    change = ((price - prev_close) / prev_close) * 100
-                    heatmap_data.append({
-                        "symbol": symbol,
-                        "change": round(change, 2),
-                        "price": round(price, 2),
-                        "size": meta["size"],
-                        "sector": meta["sector"]
-                    })
-            except Exception as e:
-                print(f"Error fetching {symbol}: {e}")
-                continue
-        
-        # Update Cache
-        if "heatmap" not in CACHE: CACHE["heatmap"] = {}
-        CACHE["heatmap"]["data"] = heatmap_data
-        CACHE["heatmap"]["timestamp"] = current_time
-        
-        return jsonify(heatmap_data)
-    except Exception as e:
-        print(f"Heatmap API Error: {e}")
-        return jsonify({"error": str(e)})
+@app.route('/api/heatmap')
+def api_heatmap():
+    global CACHE
+    # Serve directly from cache (background worker handles updates)
+    return jsonify(CACHE["heatmap"]["data"])
 
 @app.route('/api/gamma')
 def api_gamma():
@@ -989,7 +981,12 @@ def start_background_worker():
             try:
                 refresh_whales_logic()
             except Exception as e:
-                print(f"Worker Error: {e}", flush=True)
+                print(f"Worker Error (Whales): {e}", flush=True)
+
+            try:
+                refresh_heatmap_logic()
+            except Exception as e:
+                print(f"Worker Error (Heatmap): {e}", flush=True)
             
             # Sleep for CACHE_DURATION
             time.sleep(CACHE_DURATION)
