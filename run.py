@@ -1015,7 +1015,7 @@ def start_background_worker():
     t.start()
 
 # Start the background worker immediately on import (for Gunicorn)
-# start_background_worker()
+start_background_worker()
 
 if __name__ == "__main__":
     
