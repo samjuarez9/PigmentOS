@@ -1055,8 +1055,8 @@ def start_background_worker():
     t = threading.Thread(target=worker, daemon=True)
     t.start()
 
-# Start the background worker immediately on import (for Gunicorn)
-start_background_worker()
+# Start the background worker (handled by Gunicorn hook in production)
+# start_background_worker()  # Commented - Gunicorn config calls this
 
 if __name__ == "__main__":
     

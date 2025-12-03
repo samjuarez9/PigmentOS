@@ -1,0 +1,8 @@
+def post_worker_init(worker):
+    """
+    Start background worker thread AFTER Gunicorn forks.
+    This ensures the thread exists in the worker process, not the master.
+    """
+    from run import start_background_worker
+    start_background_worker()
+    print(f"✅ Background worker started in process {worker.pid}", flush=True)
