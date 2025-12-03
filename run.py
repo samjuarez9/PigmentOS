@@ -201,20 +201,20 @@ def refresh_single_whale(symbol):
 
             except Exception: continue
 
-        # Update Cache safely
-        if new_whales:
-            with CACHE_LOCK:
-                # Merge with existing cache
-                current_data = CACHE["whales"]["data"]
-                # Filter out THIS symbol's old data to avoid duplicates
-                other_data = [w for w in current_data if w['baseSymbol'] != symbol]
-                updated_data = other_data + new_whales
-                
-                # Sort all
-                updated_data.sort(key=lambda x: x['timestamp'], reverse=True)
-                
-                CACHE["whales"]["data"] = updated_data
-                CACHE["whales"]["timestamp"] = time.time()
+        # Update Cache safely (Always update to allow clearing old data)
+        with CACHE_LOCK:
+            # Merge with existing cache
+            current_data = CACHE["whales"]["data"]
+            # Filter out THIS symbol's old data to avoid duplicates (or to clear it if new_whales is empty)
+            other_data = [w for w in current_data if w['baseSymbol'] != symbol]
+            updated_data = other_data + new_whales
+            
+            # Sort all
+            updated_data.sort(key=lambda x: x['timestamp'], reverse=True)
+            
+            CACHE["whales"]["data"] = updated_data
+            CACHE["whales"]["timestamp"] = time.time()
+            if new_whales:
                 print(f"🐳 {symbol}: Found {len(new_whales)} whales.", flush=True)
             
     except Exception as e:
@@ -794,10 +794,20 @@ def refresh_gamma_logic():
         # Aggregate Volume and Open Interest by Strike
         gamma_data = {}
         
+        # Helper to check if trade is from today
+        tz_eastern = pytz.timezone('US/Eastern')
+        today_date = datetime.now(tz_eastern).date()
+
+        def is_today(ts):
+            if pd.isna(ts): return False
+            if ts.tzinfo is None: ts = pytz.utc.localize(ts)
+            return ts.astimezone(tz_eastern).date() == today_date
+
         # Process Calls
         for _, row in calls.iterrows():
             strike = float(row['strike'])
-            vol = int(row['volume']) if not pd.isna(row['volume']) else 0
+            # Only count volume if trade is from TODAY
+            vol = int(row['volume']) if (not pd.isna(row['volume']) and is_today(row['lastTradeDate'])) else 0
             oi = int(row['openInterest']) if not pd.isna(row['openInterest']) else 0
             
             if strike not in gamma_data: gamma_data[strike] = {"call_vol": 0, "put_vol": 0, "call_oi": 0, "put_oi": 0}
@@ -807,7 +817,8 @@ def refresh_gamma_logic():
         # Process Puts
         for _, row in puts.iterrows():
             strike = float(row['strike'])
-            vol = int(row['volume']) if not pd.isna(row['volume']) else 0
+            # Only count volume if trade is from TODAY
+            vol = int(row['volume']) if (not pd.isna(row['volume']) and is_today(row['lastTradeDate'])) else 0
             oi = int(row['openInterest']) if not pd.isna(row['openInterest']) else 0
             
             if strike not in gamma_data: gamma_data[strike] = {"call_vol": 0, "put_vol": 0, "call_oi": 0, "put_oi": 0}
@@ -932,10 +943,17 @@ def start_background_worker():
         print("✅ Hydration Complete. Starting Trickle Worker.", flush=True)
 
     def worker():
-        # Run Hydration ONCE on startup
-        hydrate_on_startup()
+        # Run Hydration ONCE on startup (Background)
+        try:
+            hydrate_on_startup()
+        except Exception as e:
+            print(f"⚠️ Hydration Failed: {e}", flush=True)
         
-        print("🔧 Trickle Worker Started", flush=True)
+        print("🔧 Trickle Worker Started (v2)", flush=True)
+        
+        last_gamma_update = 0
+        last_heatmap_update = 0
+        last_news_update = 0
         
         while True:
             # === MARKET HOURS CHECK ===
@@ -955,23 +973,30 @@ def start_background_worker():
                 (now.hour < 16)
             )
 
-            # 1. Heatmap (Runs in Extended Hours)
-            if is_extended_hours:
-                try: refresh_heatmap_logic()
+            # 1. Heatmap (Runs in Extended Hours) - THROTTLED TO 10 MINS
+            if is_extended_hours and (time.time() - last_heatmap_update > 600):
+                try: 
+                    refresh_heatmap_logic()
+                    last_heatmap_update = time.time()
                 except Exception as e: print(f"Worker Error (Heatmap): {e}")
                 time.sleep(3)
             
-            # 2. News (Always Runs, but slower at night)
-            try: refresh_news_logic()
-            except Exception as e: print(f"Worker Error (News): {e}")
-            time.sleep(3)
+            # 2. News (Always Runs, but slower at night) - THROTTLED TO 5 MINS
+            if time.time() - last_news_update > 300:
+                try: 
+                    refresh_news_logic()
+                    last_news_update = time.time()
+                except Exception as e: print(f"Worker Error (News): {e}")
+                time.sleep(3)
             
-            # 3. Gamma (Market Hours OR Empty Cache)
+            # 3. Gamma (Market Hours OR Empty Cache) - THROTTLED TO 5 MINS
             # If cache is empty (server restart), we MUST fetch data even if closed
             gamma_needs_hydration = not CACHE.get("gamma_SPY", {}).get("data")
             
-            if is_market_open or gamma_needs_hydration:
-                try: refresh_gamma_logic()
+            if (is_market_open or gamma_needs_hydration) and (time.time() - last_gamma_update > 300):
+                try: 
+                    refresh_gamma_logic()
+                    last_gamma_update = time.time()
                 except Exception as e: print(f"Worker Error (Gamma): {e}")
                 time.sleep(3)
             
