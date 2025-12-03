@@ -575,25 +575,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const FRED_API_KEY = "YOUR_FRED_API_KEY"; // Placeholder";
 
     // Consolidated News Fetcher
-    async function fetchNews() {
+    async function fetchNews(retryCount = 0) {
         try {
             const response = await fetch(`${API_BASE_URL}/api/news`);
             if (!response.ok) throw new Error('News API Error');
 
-            const newsItems = await response.json();
+            const result = await response.json();
+
+            // Check if backend is still loading
+            if (result.loading && retryCount < 3) {
+                console.log(`📰 News still loading, retrying in 2s... (attempt ${retryCount + 1}/3)`);
+                setTimeout(() => fetchNews(retryCount + 1), 2000);
+                return;
+            }
+
+            const newsItems = result.data || result;
             console.log(`📰 News Fetch: Received ${newsItems ? newsItems.length : 0} items`);
 
             if (!newsItems || newsItems.length === 0) {
                 console.warn("📰 News Feed Empty");
-                updateStatus('status-news', true); // Still LIVE, just no items
-                renderNews([]); // Render empty state
+                updateStatus('status-news', true);
+                renderNews([]);
                 return;
             }
 
-            // Use the renderNews function which handles filtering and rendering
             renderNews(newsItems);
-
-            // Set status to LIVE after successful render
             updateStatus('status-news', true);
 
         } catch (error) {
@@ -606,16 +612,24 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSectorView = 'ALL';
     const SECTOR_VIEWS = ['ALL', 'INDICES', 'TECH', 'CONSUMER', 'CRYPTO'];
 
-    async function fetchHeatmapData() {
+    async function fetchHeatmapData(retryCount = 0) {
         try {
             const response = await fetch(`${API_BASE_URL}/api/heatmap`);
             if (!response.ok) throw new Error('Heatmap API Error');
 
-            const data = await response.json();
+            const result = await response.json();
+
+            // Check if backend is still loading
+            if (result.loading && retryCount < 3) {
+                console.log(`🔥 Heatmap still loading, retrying in 2s... (attempt ${retryCount + 1}/3)`);
+                setTimeout(() => fetchHeatmapData(retryCount + 1), 2000);
+                return;
+            }
+
+            const data = result.data || result;
             renderMarketMap(data);
             updateStatus('status-sectors', true);
 
-            // Update Header with Market State Badge - REVERTED
             const headerTitle = document.querySelector('#market-map .widget-title');
             if (headerTitle) {
                 const existingBadge = headerTitle.querySelector('.market-state-badge');
