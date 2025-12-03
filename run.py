@@ -691,51 +691,74 @@ def api_news():
 
 def refresh_news_logic():
     global CACHE
-    print("📰 Fetching News (yfinance only)...", flush=True)
+    print("📰 Fetching News (RSS)...", flush=True)
     
-    current_time = time.time()
+    RSS_FEEDS = [
+        "https://www.investing.com/rss/news.rss",
+        "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664",
+        "https://techcrunch.com/feed/"
+    ]
+    
     all_news = []
+    current_time = time.time()
     
-    # Tickers to fetch news for
-    NEWS_TICKERS = ['SPY', 'QQQ', 'NVDA', 'TSLA', 'AAPL', 'MSFT', 'AMD', 'COIN', 'MSTR']
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5'
+    }
     
     try:
-        for ticker in NEWS_TICKERS:
+        for url in RSS_FEEDS:
             try:
-                t = yf.Ticker(ticker)
-                news = t.news
-                for n in news:
-                    # Deduplicate based on link or title if needed, but for now just add
+                print(f"📰 Fetching {url}...", flush=True)
+                time.sleep(1)
+                
+                response = requests.get(url, headers=headers, verify=False, timeout=10)
+                print(f"📰 Status: {response.status_code}", flush=True)
+                
+                if response.status_code != 200:
+                    print(f"⚠️ Feed Error {url}: Status {response.status_code}", flush=True)
+                    continue
+                
+                feed = feedparser.parse(response.content)
+                print(f"📰 Entries found: {len(feed.entries)}", flush=True)
+                
+                if not feed.entries:
+                    print(f"⚠️ Feed Empty {url}", flush=True)
+                    continue
+
+                for entry in feed.entries[:5]:
+                    pub_ts = int(time.time())
+                    if hasattr(entry, 'published_parsed') and entry.published_parsed:
+                        pub_ts = int(calendar.timegm(entry.published_parsed))
+                    
+                    publisher = "Market Wire"
+                    if "cnbc" in url: publisher = "CNBC"
+                    elif "techcrunch" in url: publisher = "TechCrunch"
+                    elif "investing.com" in url: publisher = "Investing.com"
+                    
                     all_news.append({
-                        "title": n.get('title', ''),
-                        "publisher": n.get('publisher', 'Yahoo Finance'),
-                        "link": n.get('link', ''),
-                        "time": n.get('providerPublishTime', int(time.time())),
-                        "ticker": ticker
+                        "title": entry.get('title', ''),
+                        "publisher": publisher,
+                        "link": entry.get('link', ''),
+                        "time": pub_ts,
+                        "ticker": "NEWS"
                     })
             except Exception as e:
-                print(f"⚠️ News Error ({ticker}): {e}")
+                print(f"⚠️ Feed Error {url}: {e}", flush=True)
                 continue
+            
+        all_news.sort(key=lambda x: x['time'], reverse=True)
         
-        # Deduplicate by link
-        seen_links = set()
-        unique_news = []
-        for item in all_news:
-            if item['link'] not in seen_links:
-                seen_links.add(item['link'])
-                unique_news.append(item)
-        
-        # Sort by time (newest first)
-        unique_news.sort(key=lambda x: x['time'], reverse=True)
-        
-        # Update Cache
-        if unique_news:
-            CACHE["news"]["data"] = unique_news
+        if all_news:
+            CACHE["news"]["data"] = all_news
             CACHE["news"]["timestamp"] = current_time
             CACHE["news"]["last_error"] = None
-            print(f"📰 News Updated ({len(unique_news)} items)", flush=True)
+            print(f"📰 News Updated ({len(all_news)} items)", flush=True)
         else:
-            print("⚠️ No news found via yfinance", flush=True)
+            print("⚠️ No news found from any RSS feed", flush=True)
+            CACHE["news"]["last_error"] = "All RSS feeds empty or blocked"
             
     except Exception as e:
         print(f"News Update Failed: {e}")
