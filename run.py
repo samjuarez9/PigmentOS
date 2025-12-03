@@ -2,6 +2,7 @@ import json
 import time
 import random
 import threading
+import concurrent.futures
 import requests
 import socket
 
@@ -58,11 +59,12 @@ MEGA_WHALE_THRESHOLD = 8_000_000  # $8M
 
 # Cache structure
 CACHE_DURATION = 120 # 2 minutes (was 300)
-MACRO_CACHE_DURATION = 1800
+MACRO_CACHE_DURATION = 120 # 2 minutes (was 300)
+CACHE_LOCK = threading.Lock()
 POLY_STATE = {}
 
 CACHE = {
-    "barchart": {"data": [], "timestamp": 0},
+    "whales": {"data": [], "timestamp": 0},
     "vix": {"data": {"value": 0, "rating": "Neutral"}, "timestamp": 0},
     "cnn_fear_greed": {"data": {"value": 50, "rating": "Neutral"}, "timestamp": 0},
     "polymarket": {"data": [], "timestamp": 0, "is_mock": False},
@@ -201,18 +203,19 @@ def refresh_single_whale(symbol):
 
         # Update Cache safely
         if new_whales:
-            # Merge with existing cache
-            current_data = CACHE["barchart"]["data"]
-            # Filter out THIS symbol's old data to avoid duplicates
-            other_data = [w for w in current_data if w['baseSymbol'] != symbol]
-            updated_data = other_data + new_whales
-            
-            # Sort all
-            updated_data.sort(key=lambda x: x['timestamp'], reverse=True)
-            
-            CACHE["barchart"]["data"] = updated_data
-            CACHE["barchart"]["timestamp"] = time.time()
-            print(f"🐳 {symbol}: Found {len(new_whales)} whales.", flush=True)
+            with CACHE_LOCK:
+                # Merge with existing cache
+                current_data = CACHE["barchart"]["data"]
+                # Filter out THIS symbol's old data to avoid duplicates
+                other_data = [w for w in current_data if w['baseSymbol'] != symbol]
+                updated_data = other_data + new_whales
+                
+                # Sort all
+                updated_data.sort(key=lambda x: x['timestamp'], reverse=True)
+                
+                CACHE["barchart"]["data"] = updated_data
+                CACHE["barchart"]["timestamp"] = time.time()
+                print(f"🐳 {symbol}: Found {len(new_whales)} whales.", flush=True)
             
     except Exception as e:
         print(f"Whale Scan Failed ({symbol}): {e}")
@@ -912,7 +915,26 @@ def api_gamma():
     return jsonify({"error": "Loading..."})
 
 def start_background_worker():
+    def hydrate_on_startup():
+        print("🌊 Starting FAST Hydration (Parallel)...", flush=True)
+        # 1. Fetch Whales in Parallel
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            executor.map(refresh_single_whale, WHALE_WATCHLIST)
+        
+        # 2. Fetch Gamma & Heatmap
+        try: refresh_gamma_logic()
+        except: pass
+        try: refresh_heatmap_logic()
+        except: pass
+        try: refresh_news_logic()
+        except: pass
+        
+        print("✅ Hydration Complete. Starting Trickle Worker.", flush=True)
+
     def worker():
+        # Run Hydration ONCE on startup
+        hydrate_on_startup()
+        
         print("🔧 Trickle Worker Started", flush=True)
         
         while True:
