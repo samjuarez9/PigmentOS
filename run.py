@@ -308,15 +308,16 @@ def api_whales():
     limit = int(request.args.get('limit', 25))
     offset = int(request.args.get('offset', 0))
     
-    current_time = time.time()
-    stale = False
+    # Check if data has been hydrated
+    if CACHE["whales"]["timestamp"] == 0:
+        return jsonify({"loading": True, "data": [], "stale": False, "timestamp": 0})
     
     data = CACHE["whales"]["data"]
     sliced = data[offset:offset+limit]
     
     return jsonify({
         "data": sliced,
-        "stale": False, # Always served from cache
+        "stale": False,
         "timestamp": int(CACHE["whales"]["timestamp"])
     })
 
@@ -684,8 +685,10 @@ def api_movers():
 @app.route('/api/news')
 def api_news():
     global CACHE
-    # Serve directly from cache (background worker handles updates)
-    return jsonify(CACHE["news"]["data"] if CACHE["news"]["data"] else [])
+    # Check if data has been hydrated (timestamp > 0 means we've fetched at least once)
+    if CACHE["news"]["timestamp"] == 0:
+        return jsonify({"loading": True, "data": []})
+    return jsonify(CACHE["news"]["data"])
 
 
 
@@ -938,7 +941,8 @@ def api_debug_news():
 @app.route('/api/heatmap')
 def api_heatmap():
     global CACHE
-    # Serve directly from cache (background worker handles updates)
+    if CACHE["heatmap"]["timestamp"] == 0:
+        return jsonify({"loading": True, "data": []})
     return jsonify(CACHE["heatmap"]["data"])
 
 @app.route('/api/gamma')
