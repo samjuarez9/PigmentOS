@@ -148,12 +148,21 @@ def refresh_whales_logic():
                                 continue
 
                             # === FILTER: STRICT DATE CHECK ===
-                            # Ensure the trade happened TODAY
-                            trade_date = row['lastTradeDate'].date()
-                            today_date = datetime.now(pytz.timezone('US/Eastern')).date()
+                            # Ensure the trade happened TODAY (in US/Eastern time)
+                            # Convert trade timestamp to Eastern to avoid UTC rollover issues
+                            tz_eastern = pytz.timezone('US/Eastern')
                             
-                            if trade_date != today_date:
-                                # Skip old data (yesterday's high volume)
+                            # Handle potential naive timestamp
+                            trade_ts = row['lastTradeDate']
+                            if trade_ts.tzinfo is None:
+                                # Assume UTC if naive, then convert
+                                trade_ts = pytz.utc.localize(trade_ts)
+                            
+                            trade_date_eastern = trade_ts.astimezone(tz_eastern).date()
+                            today_eastern = datetime.now(tz_eastern).date()
+                            
+                            if trade_date_eastern != today_eastern:
+                                # Skip old data
                                 continue
                             
                             # Calculate Moneyness (ITM/OTM)
@@ -733,6 +742,49 @@ def api_news():
 @app.route('/api/ping')
 def api_ping():
     return jsonify({"status": "ok", "timestamp": time.time()})
+
+@app.route('/api/debug/system')
+def api_debug_system():
+    """
+    Debug endpoint to check server time, IP, and connectivity.
+    """
+    try:
+        import socket
+        hostname = socket.gethostname()
+        ip_address = socket.gethostbyname(hostname)
+    except:
+        hostname = "unknown"
+        ip_address = "unknown"
+        
+    tz_eastern = pytz.timezone('US/Eastern')
+    now_utc = datetime.now(pytz.utc)
+    now_eastern = datetime.now(tz_eastern)
+    
+    # Test Connectivity to Yahoo Finance
+    yf_status = "unknown"
+    yf_error = None
+    sample_data = None
+    
+    try:
+        # Try to fetch SPY info
+        ticker = yf.Ticker("SPY")
+        # fast_info triggers the request
+        price = ticker.fast_info.last_price
+        yf_status = "ok"
+        sample_data = {"symbol": "SPY", "price": price}
+    except Exception as e:
+        yf_status = "error"
+        yf_error = str(e)
+        
+    return jsonify({
+        "server_time_utc": str(now_utc),
+        "server_time_eastern": str(now_eastern),
+        "hostname": hostname,
+        "ip_address": ip_address, # Internal IP
+        "yfinance_status": yf_status,
+        "yfinance_error": yf_error,
+        "sample_data": sample_data
+    })
 
 @app.route('/api/heatmap')
 def api_heatmap():
