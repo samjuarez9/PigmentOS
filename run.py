@@ -19,6 +19,7 @@ import pandas as pd
 import statistics
 import os
 import ssl
+import calendar
 from datetime import datetime, date
 import pytz
 from flask import Flask, jsonify, Response, request, send_from_directory, stream_with_context
@@ -752,30 +753,31 @@ def api_movers():
 @app.route('/api/news')
 def api_news():
     global CACHE
+    # Serve directly from cache (background worker handles updates)
+    return jsonify(CACHE["news"]["data"] if CACHE["news"]["data"] else [])
+
+    except Exception as e:
+        print(f"Heatmap Update Failed: {e}")
+
+def refresh_news_logic():
+    global CACHE
+    print("📰 Fetching News...", flush=True)
+    
+    RSS_FEEDS = [
+        "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664", # Finance
+        "https://techcrunch.com/feed/", # Tech
+        "https://www.investing.com/rss/news.rss" # General Markets
+    ]
+    
+    all_news = []
     current_time = time.time()
     
-    # 1. Check Cache (3 minutes = 180s)
-    if current_time - CACHE["news"]["timestamp"] < 180 and CACHE["news"]["data"]:
-        return jsonify(CACHE["news"]["data"])
-
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+    
     try:
-        # Simplified News Logic
-        import calendar
-        
-        RSS_URLS = [
-            "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114", # CNBC Top News
-            "https://techcrunch.com/feed/", # TechCrunch
-            "https://www.investing.com/rss/news.rss" # Investing.com
-        ]
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-
-        all_news = []
-        print("📰 Fetching fresh news...", flush=True)
-        
-        for url in RSS_URLS:
+        for url in RSS_FEEDS:
             try:
                 # Polite Delay
                 time.sleep(1)
@@ -811,13 +813,13 @@ def api_news():
         all_news.sort(key=lambda x: x['time'], reverse=True)
         
         # Update Cache
-        CACHE["news"]["data"] = all_news
-        CACHE["news"]["timestamp"] = current_time
-        
-        return jsonify(all_news)
+        if all_news:
+            CACHE["news"]["data"] = all_news
+            CACHE["news"]["timestamp"] = current_time
+            print(f"📰 News Updated ({len(all_news)} items)", flush=True)
+            
     except Exception as e:
-        print(f"News Error: {e}")
-        return jsonify(CACHE["news"]["data"] if CACHE["news"]["data"] else [])
+        print(f"News Update Failed: {e}")
 
 @app.route('/api/ping')
 def api_ping():
@@ -982,6 +984,11 @@ def start_background_worker():
                 refresh_heatmap_logic()
             except Exception as e:
                 print(f"Worker Error (Heatmap): {e}", flush=True)
+
+            try:
+                refresh_news_logic()
+            except Exception as e:
+                print(f"Worker Error (News): {e}", flush=True)
             
             # Sleep for CACHE_DURATION
             time.sleep(CACHE_DURATION)
