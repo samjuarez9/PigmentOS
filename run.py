@@ -990,8 +990,16 @@ def start_background_worker():
             if time.time() - last_news_update > 300:
                 try: 
                     refresh_news_logic()
-                    last_news_update = time.time()
-                except Exception as e: print(f"Worker Error (News): {e}")
+                    # Check if we actually got news
+                    news_data = CACHE.get("news", {}).get("data", [])
+                    if news_data:
+                        last_news_update = time.time() # Success: Wait 5 mins
+                    else:
+                        print("⚠️ News Fetch Empty - Retrying in 60s", flush=True)
+                        last_news_update = time.time() - 240 # Failure: Wait only 60s (300 - 240 = 60)
+                except Exception as e: 
+                    print(f"Worker Error (News): {e}")
+                    last_news_update = time.time() - 240 # Error: Wait only 60s
                 time.sleep(3)
             
             # 3. Gamma (Market Hours OR Empty Cache) - THROTTLED TO 5 MINS
