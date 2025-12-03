@@ -701,9 +701,16 @@ def refresh_news_logic():
     
     all_news = []
     current_time = time.time()
+    last_error = None
     
+    # Robust Headers to mimic a real browser
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Referer': 'https://www.google.com/',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
     }
     
     try:
@@ -713,11 +720,19 @@ def refresh_news_logic():
                 time.sleep(1)
                 
                 # Use requests to handle headers and SSL
-                response = requests.get(url, headers=headers, verify=False, timeout=5)
-                if response.status_code != 200: continue
+                response = requests.get(url, headers=headers, verify=False, timeout=10)
+                
+                if response.status_code != 200: 
+                    print(f"⚠️ Feed Error {url}: Status {response.status_code}", flush=True)
+                    last_error = f"Status {response.status_code} from {url}"
+                    continue
                 
                 feed = feedparser.parse(response.content)
                 
+                if not feed.entries:
+                    print(f"⚠️ Feed Empty {url}", flush=True)
+                    continue
+
                 for entry in feed.entries[:5]:
                     pub_ts = int(time.time())
                     if hasattr(entry, 'published_parsed') and entry.published_parsed:
@@ -738,6 +753,7 @@ def refresh_news_logic():
                     })
             except Exception as e:
                 print(f"Feed Error {url}: {e}")
+                last_error = str(e)
                 continue
             
         all_news.sort(key=lambda x: x['time'], reverse=True)
@@ -746,10 +762,16 @@ def refresh_news_logic():
         if all_news:
             CACHE["news"]["data"] = all_news
             CACHE["news"]["timestamp"] = current_time
+            CACHE["news"]["last_error"] = None # Clear error if successful
             print(f"📰 News Updated ({len(all_news)} items)", flush=True)
+        else:
+            # If we failed to get ANY news, record the last error
+            if last_error:
+                CACHE["news"]["last_error"] = last_error
             
     except Exception as e:
         print(f"News Update Failed: {e}")
+        CACHE["news"]["last_error"] = str(e)
 
 
 
@@ -917,6 +939,7 @@ def api_debug_news():
         "timestamp_human": datetime.fromtimestamp(data.get("timestamp", 0)).strftime('%Y-%m-%d %H:%M:%S'),
         "item_count": len(news_items),
         "sample_item": news_items[0] if news_items else None,
+        "last_error": data.get("last_error", None),
         "server_time": time.time()
     })
 
