@@ -3013,7 +3013,7 @@ td {
     opacity: 0;
     width: 20px;
     height: 20px;
-    will-change: transform, opacity, width, height;
+    /* will-change removed for performance stability */
 }
 
 .radar-ring-1 {
@@ -3063,7 +3063,7 @@ td {
     border-radius: 50%;
     box-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
     animation: center-pulse 2s ease-in-out infinite;
-    will-change: transform, opacity;
+    /* will-change removed for performance stability */
 }
 
 @keyframes center-pulse {

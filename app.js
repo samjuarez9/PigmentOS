@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Note: safeExecute is not defined in the provided snippet, assuming it's defined elsewhere or will be added.
             // For now, direct calls are used.
             createTradingViewWidget(currentTicker);
-            const whaleWidget = document.getElementById('whale-feed-widget');
+            const whaleWidget = document.getElementById('unusual-whales');
             if (whaleWidget && typeof whaleWidget.updateTicker === 'function') {
                 whaleWidget.updateTicker(currentTicker);
             }
@@ -102,47 +102,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // TradingView Widget Integration
     function createTradingViewWidget(ticker) {
-        // Clear container first
-        const container = document.getElementById('chart-container');
-        if (!container) return;
-        container.innerHTML = '';
+        try {
+            // Clear container first
+            const container = document.getElementById('chart-container');
+            if (!container) return;
+            container.innerHTML = '';
 
-        // Ensure container has dimensions
-        if (container.clientHeight === 0) {
-            container.style.height = '400px'; // Force height if missing
+            // Ensure container has dimensions
+            if (container.clientHeight === 0) {
+                container.style.height = '400px'; // Force height if missing
+            }
+
+            new TradingView.widget({
+                "autosize": true,
+                "symbol": "NASDAQ:" + ticker,
+                "interval": "5",
+                "timezone": "Etc/UTC",
+                "theme": "dark",
+                "style": "1", // Candle style
+                "locale": "en",
+                "enable_publishing": false,
+                "backgroundColor": "#0C0C18", // Deep Cosmos Background
+                "gridColor": "rgba(30, 144, 255, 0.1)", // Subtle Deep Sky Blue grid
+                "hide_top_toolbar": true,
+                "studies": [
+                    "MASimple@tv-basicstudies"
+                ],
+                "container_id": "chart-container"
+            });
+
+            // MOBILE FIX: Force resize after load to prevent squished graph
+            if (window.innerWidth <= 768) {
+                setTimeout(() => {
+                    const iframe = container.querySelector('iframe');
+                    if (iframe) {
+                        iframe.style.height = '300px';
+                        iframe.style.minHeight = '300px';
+                    }
+                }, 1000);
+            }
+
+            // Mark chart as live
+            updateStatus('status-chart', true);
+        } catch (e) {
+            console.error("TradingView Widget Error:", e);
+            updateStatus('status-chart', false);
         }
-
-        new TradingView.widget({
-            "autosize": true,
-            "symbol": "NASDAQ:" + ticker,
-            "interval": "5",
-            "timezone": "Etc/UTC",
-            "theme": "dark",
-            "style": "1", // Candle style
-            "locale": "en",
-            "enable_publishing": false,
-            "backgroundColor": "#0C0C18", // Deep Cosmos Background
-            "gridColor": "rgba(30, 144, 255, 0.1)", // Subtle Deep Sky Blue grid
-            "hide_top_toolbar": true,
-            "studies": [
-                "MASimple@tv-basicstudies"
-            ],
-            "container_id": "chart-container"
-        });
-
-        // MOBILE FIX: Force resize after load to prevent squished graph
-        if (window.innerWidth <= 768) {
-            setTimeout(() => {
-                const iframe = container.querySelector('iframe');
-                if (iframe) {
-                    iframe.style.height = '300px';
-                    iframe.style.minHeight = '300px';
-                }
-            }, 1000);
-        }
-
-        // Mark chart as live
-        updateStatus('status-chart', true);
     }
 
     // ... (Watchlist code remains same) ...
