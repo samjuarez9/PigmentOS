@@ -765,9 +765,35 @@ def refresh_news_logic():
             CACHE["news"]["last_error"] = None # Clear error if successful
             print(f"📰 News Updated ({len(all_news)} items)", flush=True)
         else:
-            # If we failed to get ANY news, record the last error
-            if last_error:
-                CACHE["news"]["last_error"] = last_error
+            # Fallback to yfinance if RSS failed
+            print("⚠️ RSS Empty, trying yfinance fallback...", flush=True)
+            try:
+                yf_news = []
+                for ticker in ['SPY', 'NVDA', 'AAPL', 'TSLA']:
+                    t = yf.Ticker(ticker)
+                    news = t.news
+                    for n in news:
+                        yf_news.append({
+                            "title": n.get('title', ''),
+                            "publisher": n.get('publisher', 'Yahoo Finance'),
+                            "link": n.get('link', ''),
+                            "time": n.get('providerPublishTime', int(time.time())),
+                            "ticker": ticker
+                        })
+                
+                if yf_news:
+                    yf_news.sort(key=lambda x: x['time'], reverse=True)
+                    CACHE["news"]["data"] = yf_news
+                    CACHE["news"]["timestamp"] = current_time
+                    CACHE["news"]["last_error"] = "Used yfinance fallback"
+                    print(f"📰 News Updated via yfinance ({len(yf_news)} items)", flush=True)
+                else:
+                    if last_error:
+                        CACHE["news"]["last_error"] = last_error
+            except Exception as e:
+                print(f"yfinance Fallback Failed: {e}")
+                if last_error:
+                    CACHE["news"]["last_error"] = last_error + f" | YF: {e}"
             
     except Exception as e:
         print(f"News Update Failed: {e}")
