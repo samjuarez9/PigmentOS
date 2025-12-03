@@ -1055,8 +1055,11 @@ def start_background_worker():
     t = threading.Thread(target=worker, daemon=True)
     t.start()
 
-# Start the background worker (handled by Gunicorn hook in production)
-# start_background_worker()  # Commented - Gunicorn config calls this
+# Start the background worker immediately on import
+# Guard ensures it only runs once even if module is imported multiple times
+if not hasattr(start_background_worker, '_started'):
+    start_background_worker()
+    start_background_worker._started = True
 
 if __name__ == "__main__":
     
