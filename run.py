@@ -691,109 +691,51 @@ def api_news():
 
 def refresh_news_logic():
     global CACHE
-    print("📰 Fetching News...", flush=True)
+    print("📰 Fetching News (yfinance only)...", flush=True)
     
-    RSS_FEEDS = [
-        "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664", # Finance
-        "https://techcrunch.com/feed/", # Tech
-        "https://www.investing.com/rss/news.rss" # General Markets
-    ]
-    
-    all_news = []
     current_time = time.time()
-    last_error = None
+    all_news = []
     
-    # Robust Headers to mimic a real browser
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Referer': 'https://www.google.com/',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-    }
+    # Tickers to fetch news for
+    NEWS_TICKERS = ['SPY', 'QQQ', 'NVDA', 'TSLA', 'AAPL', 'MSFT', 'AMD', 'COIN', 'MSTR']
     
     try:
-        for url in RSS_FEEDS:
+        for ticker in NEWS_TICKERS:
             try:
-                # Polite Delay
-                time.sleep(1)
-                
-                # Use requests to handle headers and SSL
-                response = requests.get(url, headers=headers, verify=False, timeout=10)
-                
-                if response.status_code != 200: 
-                    print(f"⚠️ Feed Error {url}: Status {response.status_code}", flush=True)
-                    last_error = f"Status {response.status_code} from {url}"
-                    continue
-                
-                feed = feedparser.parse(response.content)
-                
-                if not feed.entries:
-                    print(f"⚠️ Feed Empty {url}", flush=True)
-                    continue
-
-                for entry in feed.entries[:5]:
-                    pub_ts = int(time.time())
-                    if hasattr(entry, 'published_parsed') and entry.published_parsed:
-                        pub_ts = int(calendar.timegm(entry.published_parsed))
-                    
-                    # Determine publisher from URL or Feed Title
-                    publisher = "Market Wire"
-                    if "cnbc" in url: publisher = "CNBC"
-                    elif "techcrunch" in url: publisher = "TechCrunch"
-                    elif "investing.com" in url: publisher = "Investing.com"
-                    
+                t = yf.Ticker(ticker)
+                news = t.news
+                for n in news:
+                    # Deduplicate based on link or title if needed, but for now just add
                     all_news.append({
-                        "title": entry.get('title', ''),
-                        "publisher": publisher,
-                        "link": entry.get('link', ''),
-                        "time": pub_ts,
-                        "ticker": "NEWS"
+                        "title": n.get('title', ''),
+                        "publisher": n.get('publisher', 'Yahoo Finance'),
+                        "link": n.get('link', ''),
+                        "time": n.get('providerPublishTime', int(time.time())),
+                        "ticker": ticker
                     })
             except Exception as e:
-                print(f"Feed Error {url}: {e}")
-                last_error = str(e)
+                print(f"⚠️ News Error ({ticker}): {e}")
                 continue
-            
-        all_news.sort(key=lambda x: x['time'], reverse=True)
+        
+        # Deduplicate by link
+        seen_links = set()
+        unique_news = []
+        for item in all_news:
+            if item['link'] not in seen_links:
+                seen_links.add(item['link'])
+                unique_news.append(item)
+        
+        # Sort by time (newest first)
+        unique_news.sort(key=lambda x: x['time'], reverse=True)
         
         # Update Cache
-        if all_news:
-            CACHE["news"]["data"] = all_news
+        if unique_news:
+            CACHE["news"]["data"] = unique_news
             CACHE["news"]["timestamp"] = current_time
-            CACHE["news"]["last_error"] = None # Clear error if successful
-            print(f"📰 News Updated ({len(all_news)} items)", flush=True)
+            CACHE["news"]["last_error"] = None
+            print(f"📰 News Updated ({len(unique_news)} items)", flush=True)
         else:
-            # Fallback to yfinance if RSS failed
-            print("⚠️ RSS Empty, trying yfinance fallback...", flush=True)
-            try:
-                yf_news = []
-                for ticker in ['SPY', 'NVDA', 'AAPL', 'TSLA']:
-                    t = yf.Ticker(ticker)
-                    news = t.news
-                    for n in news:
-                        yf_news.append({
-                            "title": n.get('title', ''),
-                            "publisher": n.get('publisher', 'Yahoo Finance'),
-                            "link": n.get('link', ''),
-                            "time": n.get('providerPublishTime', int(time.time())),
-                            "ticker": ticker
-                        })
-                
-                if yf_news:
-                    yf_news.sort(key=lambda x: x['time'], reverse=True)
-                    CACHE["news"]["data"] = yf_news
-                    CACHE["news"]["timestamp"] = current_time
-                    CACHE["news"]["last_error"] = "Used yfinance fallback"
-                    print(f"📰 News Updated via yfinance ({len(yf_news)} items)", flush=True)
-                else:
-                    if last_error:
-                        CACHE["news"]["last_error"] = last_error
-            except Exception as e:
-                print(f"yfinance Fallback Failed: {e}")
-                if last_error:
-                    CACHE["news"]["last_error"] = last_error + f" | YF: {e}"
+            print("⚠️ No news found via yfinance", flush=True)
             
     except Exception as e:
         print(f"News Update Failed: {e}")
