@@ -69,7 +69,8 @@ CACHE = {
     "movers": {"data": [], "timestamp": 0},
     "movers": {"data": [], "timestamp": 0},
     "news": {"data": [], "timestamp": 0},
-    "heatmap": {"data": [], "timestamp": 0}
+    "heatmap": {"data": [], "timestamp": 0},
+    "gamma_SPY": {"data": None, "timestamp": 0}
 }
 
 # --- HELPER FUNCTIONS ---
@@ -820,6 +821,97 @@ def refresh_news_logic():
     except Exception as e:
         print(f"News Update Failed: {e}")
 
+
+
+def refresh_gamma_logic():
+    global CACHE
+    print("👾 Scanning Gamma (SPY)...", flush=True)
+    
+    symbol = "SPY"
+    try:
+        ticker = yf.Ticker(symbol)
+        
+        # Get Current Price
+        try:
+            current_price = ticker.fast_info.last_price
+        except:
+            current_price = ticker.info.get('regularMarketPrice', 0)
+            
+        if not current_price:
+            print(f"Gamma Scan Failed: No price for {symbol}")
+            return
+            
+        # Get Nearest Expiration
+        expirations = ticker.options
+        if not expirations:
+            print(f"Gamma Scan Failed: No options for {symbol}")
+            return
+            
+        # Use the first expiration (0DTE/Weekly)
+        expiry = expirations[0]
+        
+        # Fetch Chain
+        opts = ticker.option_chain(expiry)
+        calls = opts.calls
+        puts = opts.puts
+        
+        # Aggregate Volume and Open Interest by Strike
+        gamma_data = {}
+        
+        # Process Calls
+        for _, row in calls.iterrows():
+            strike = float(row['strike'])
+            vol = int(row['volume']) if not pd.isna(row['volume']) else 0
+            oi = int(row['openInterest']) if not pd.isna(row['openInterest']) else 0
+            
+            if strike not in gamma_data: gamma_data[strike] = {"call_vol": 0, "put_vol": 0, "call_oi": 0, "put_oi": 0}
+            gamma_data[strike]["call_vol"] += vol
+            gamma_data[strike]["call_oi"] += oi
+            
+        # Process Puts
+        for _, row in puts.iterrows():
+            strike = float(row['strike'])
+            vol = int(row['volume']) if not pd.isna(row['volume']) else 0
+            oi = int(row['openInterest']) if not pd.isna(row['openInterest']) else 0
+            
+            if strike not in gamma_data: gamma_data[strike] = {"call_vol": 0, "put_vol": 0, "call_oi": 0, "put_oi": 0}
+            gamma_data[strike]["put_vol"] += vol
+            gamma_data[strike]["put_oi"] += oi
+            
+        # Convert to List for Frontend
+        # Filter for relevant range (e.g. +/- 10% of current price) to keep chart readable
+        lower_bound = current_price * 0.90
+        upper_bound = current_price * 1.10
+        
+        final_data = []
+        for strike, data in gamma_data.items():
+            if lower_bound <= strike <= upper_bound:
+                final_data.append({
+                    "strike": strike,
+                    "call_vol": data["call_vol"],
+                    "put_vol": data["put_vol"],
+                    "call_oi": data["call_oi"],
+                    "put_oi": data["put_oi"]
+                })
+                
+        # Sort by strike
+        final_data.sort(key=lambda x: x['strike'])
+        
+        result = {
+            "symbol": symbol,
+            "current_price": current_price,
+            "expiry": expiry,
+            "strikes": final_data
+        }
+        
+        # Update Cache
+        cache_key = f"gamma_{symbol}"
+        CACHE[cache_key] = {"data": result, "timestamp": time.time()}
+        print(f"👾 Gamma Updated for {symbol} ({len(final_data)} strikes)", flush=True)
+        
+    except Exception as e:
+        print(f"Gamma Scan Failed: {e}")
+
 @app.route('/api/ping')
 def api_ping():
     return jsonify({"status": "ok", "timestamp": time.time()})
@@ -878,97 +970,13 @@ def api_heatmap():
 def api_gamma():
     global CACHE
     symbol = request.args.get('symbol', 'SPY').upper()
-    
-    # Cache key for Gamma
     cache_key = f"gamma_{symbol}"
-    current_time = time.time()
     
-    # Check Cache (1 minute)
-    if cache_key in CACHE and current_time - CACHE[cache_key]["timestamp"] < 60:
+    # Serve directly from cache
+    if cache_key in CACHE and CACHE[cache_key]["data"]:
         return jsonify(CACHE[cache_key]["data"])
         
-    try:
-        ticker = yf.Ticker(symbol)
-        
-        # Get Current Price
-        try:
-            current_price = ticker.fast_info.last_price
-        except:
-            current_price = ticker.info.get('regularMarketPrice', 0)
-            
-        if not current_price:
-            return jsonify({"error": "Price not found"})
-            
-        # Get Nearest Expiration
-        expirations = ticker.options
-        if not expirations:
-            return jsonify({"error": "No options found"})
-            
-        # Use the first expiration (0DTE/Weekly)
-        expiry = expirations[0]
-        
-        # Fetch Chain
-        opts = ticker.option_chain(expiry)
-        calls = opts.calls
-        puts = opts.puts
-        
-        # Aggregate Volume and Open Interest by Strike
-        # We want a dictionary: { strike: { call_vol: 0, put_vol: 0, call_oi: 0, put_oi: 0 } }
-        gamma_data = {}
-        
-        # Process Calls
-        for _, row in calls.iterrows():
-            strike = float(row['strike'])
-            vol = int(row['volume']) if not pd.isna(row['volume']) else 0
-            oi = int(row['openInterest']) if not pd.isna(row['openInterest']) else 0
-            
-            if strike not in gamma_data: gamma_data[strike] = {"call_vol": 0, "put_vol": 0, "call_oi": 0, "put_oi": 0}
-            gamma_data[strike]["call_vol"] += vol
-            gamma_data[strike]["call_oi"] += oi
-            
-        # Process Puts
-        for _, row in puts.iterrows():
-            strike = float(row['strike'])
-            vol = int(row['volume']) if not pd.isna(row['volume']) else 0
-            oi = int(row['openInterest']) if not pd.isna(row['openInterest']) else 0
-            
-            if strike not in gamma_data: gamma_data[strike] = {"call_vol": 0, "put_vol": 0, "call_oi": 0, "put_oi": 0}
-            gamma_data[strike]["put_vol"] += vol
-            gamma_data[strike]["put_oi"] += oi
-            
-        # Convert to List for Frontend
-        # Filter for relevant range (e.g. +/- 10% of current price) to keep chart readable
-        lower_bound = current_price * 0.90
-        upper_bound = current_price * 1.10
-        
-        final_data = []
-        for strike, vols in gamma_data.items():
-            if lower_bound <= strike <= upper_bound:
-                final_data.append({
-                    "strike": strike,
-                    "call_vol": vols["call_vol"],
-                    "put_vol": vols["put_vol"],
-                    "call_oi": vols["call_oi"],
-                    "put_oi": vols["put_oi"]
-                })
-                
-        final_data.sort(key=lambda x: x['strike'])
-        
-        result = {
-            "symbol": symbol,
-            "current_price": current_price,
-            "expiration": expiry,
-            "strikes": final_data
-        }
-        
-        # Update Cache
-        CACHE[cache_key] = {"data": result, "timestamp": current_time}
-        
-        return jsonify(result)
-        
-    except Exception as e:
-        print(f"Gamma API Error: {e}")
-        return jsonify({"error": str(e)})
+    return jsonify({"error": "Loading..."})
 
 def start_background_worker():
     def worker():
@@ -988,6 +996,11 @@ def start_background_worker():
                 refresh_news_logic()
             except Exception as e:
                 print(f"Worker Error (News): {e}", flush=True)
+
+            try:
+                refresh_gamma_logic()
+            except Exception as e:
+                print(f"Worker Error (Gamma): {e}", flush=True)
             
             # Sleep for CACHE_DURATION
             time.sleep(CACHE_DURATION)
