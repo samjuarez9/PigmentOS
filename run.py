@@ -56,7 +56,7 @@ WATCHLIST = [
 MEGA_WHALE_THRESHOLD = 8_000_000  # $8M
 
 # Cache structure
-CACHE_DURATION = 120
+CACHE_DURATION = 300 # 5 minutes (was 120)
 MACRO_CACHE_DURATION = 1800
 POLY_STATE = {}
 
@@ -266,7 +266,9 @@ def refresh_whales_logic():
                 continue
             
             # Rate Limit Protection
-            time.sleep(0.5)
+            # Random jitter to look more human (1.0 to 2.5 seconds)
+            sleep_time = random.uniform(1.0, 2.5)
+            time.sleep(sleep_time)
 
                     
 
