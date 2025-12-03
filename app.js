@@ -296,7 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Render Polymarket Odds
     function renderPolymarket(data) {
-        console.log('renderPolymarket called with:', data);
+
         const container = document.getElementById('polymarket-container');
         if (!container) {
             console.error('polymarket-container not found!');
@@ -354,7 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             container.appendChild(item);
         });
-        console.log('Rendered', data.length, 'Polymarket items');
+
     }
 
     // Polymarket Fetcher
@@ -374,7 +374,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const responseData = await response.json();
-            console.log('Polymarket response received:', responseData);
+
 
             const { data, is_mock } = responseData;
 
@@ -506,7 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${API_BASE_URL}/api/movers`);
             if (!response.ok) throw new Error('Movers API Failed');
             moversData = await response.json();
-            console.log('Movers Data:', moversData);
+
             updateMoversTape();
         } catch (err) {
             console.warn('Movers API Error:', err);
@@ -589,13 +589,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Check if backend is still loading
             if (result.loading && retryCount < 3) {
-                console.log(`📰 News still loading, retrying in 2s... (attempt ${retryCount + 1}/3)`);
+
                 setTimeout(() => fetchNews(retryCount + 1), 2000);
                 return;
             }
 
             const newsItems = result.data || result;
-            console.log(`📰 News Fetch: Received ${newsItems ? newsItems.length : 0} items`);
+
 
             if (!newsItems || newsItems.length === 0) {
                 console.warn("📰 News Feed Empty");
@@ -626,7 +626,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Check if backend is still loading
             if (result.loading && retryCount < 3) {
-                console.log(`🔥 Heatmap still loading, retrying in 2s... (attempt ${retryCount + 1}/3)`);
+
                 setTimeout(() => fetchHeatmapData(retryCount + 1), 2000);
                 return;
             }
@@ -719,7 +719,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // fetchVIX removed (replaced by CNN Fear & Greed)
 
     function updateTFI(value, rating) {
-        console.log('updateTFI START - value:', value, 'rating:', rating);
+
         // Configuration
         const IS_FILE_PROTOCOL = window.location.protocol === 'file:';
         const API_BASE_URL = IS_FILE_PROTOCOL ? 'http://localhost:8001' : '';
@@ -731,8 +731,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const tfiSegmentsContainer = document.getElementById('tfi-segments');
         const tfiContainer = document.querySelector('.tfi-container');
 
-        console.log('tfiSegmentsContainer found:', !!tfiSegmentsContainer);
-        console.log('tfiContainer found:', !!tfiContainer);
+
+
 
         if (!tfiSegmentsContainer) {
             console.error('TFI elements not found!');
@@ -761,19 +761,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (value < 25) {
             tfiContainer.classList.add('tfi-extreme-fear');
-            console.log('Added class: tfi-extreme-fear');
+
         } else if (value < 45) {
             tfiContainer.classList.add('tfi-red');
-            console.log('Added class: tfi-red');
+
         } else if (value > 75) {
             tfiContainer.classList.add('tfi-extreme-greed');
-            console.log('Added class: tfi-extreme-greed');
+
         } else if (value > 55) {
             tfiContainer.classList.add('tfi-green');
-            console.log('Added class: tfi-green');
+
         } else {
             tfiContainer.classList.add('tfi-yellow');
-            console.log('Added class: tfi-yellow');
+
         }
 
         // Clear segments
@@ -792,21 +792,21 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             tfiSegmentsContainer.appendChild(seg);
         }
-        console.log('updateTFI COMPLETE - activeCount:', activeCount);
+
     }
 
     // Initialize TFI
     async function fetchCNNFearGreed() {
         try {
-            console.log('Fetching CNN Fear & Greed...');
+
             const response = await fetch(`${API_BASE_URL}/api/cnn-fear-greed`);
             if (!response.ok) throw new Error('CNN Fear & Greed API Failed');
 
             const data = await response.json();
-            console.log('CNN Fear & Greed data received:', data);
-            console.log('Value:', data.value, 'Rating:', data.rating);
+
+
             updateTFI(data.value, data.rating);
-            console.log('updateTFI called with:', data.value, data.rating);
+
             updateStatus('status-tfi', true);
         } catch (error) {
             console.error('CNN Fear & Greed API Failed:', error);
@@ -867,7 +867,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             updateStatus('status-whales', true); // Status: LIVE
-            console.log(`Whale API returned ${json.data.length} trades`);
+
 
             const trades = json.data.map(item => ({
                 ticker: item.baseSymbol || item.symbol,
@@ -886,7 +886,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 notional_value: item.notional_value || 0
             }));
 
-            console.log(`Mapped to ${trades.length} trade objects`, trades[0]);
+
             return trades;
         } catch (err) {
             console.warn("Whale API Failed:", err);
@@ -1129,11 +1129,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const msUntilOpen = calculateMsUntilMarketOpen();
 
         if (msUntilOpen > 0) {
-            console.log(`⏰ Market opens in ${Math.round(msUntilOpen / 1000 / 60)} minutes.Scheduling auto - refresh...`);
+
 
             // Set precise timeout for market open
             marketOpenTimeout = setTimeout(() => {
-                console.log('🔔 MARKET OPEN - Transitioning to live feed');
+
                 // Force a refresh to fetch new trades
                 if (window.initWhaleStream) {
                     window.initWhaleStream();
@@ -1152,7 +1152,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const isSystemHealthy = !stale;
         const hasData = data && data.length > 0;
 
-        console.log('🔍 handleWhaleData called:', { hasData, isSystemHealthy, dataLength: data?.length, stale });
+
 
         // Update Status: Only show OFFLINE if system is actually down (stale)
         updateStatus('status-whales', isSystemHealthy);
@@ -1173,16 +1173,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Handle empty data
         if (!hasData) {
-            console.log('🔍 No whale data, checking market state...');
+
             // Clear existing items
             flowFeedContainer.innerHTML = '';
 
             if (isSystemHealthy) {
                 const marketState = getMarketState();
-                console.log('🔍 Market State:', marketState);
+
 
                 if (marketState.isPreMarket || marketState.isWeekend) {
-                    console.log('✅ Injecting radar animation for', marketState.isWeekend ? 'WEEKEND' : 'PRE-MARKET');
+
                     // PRE-MARKET or WEEKEND: Show pulsing radar rings
                     const statusText = marketState.isWeekend ? "WEEKEND" : "PRE-MARKET";
                     flowFeedContainer.innerHTML = `
@@ -1329,7 +1329,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const whaleChartView = document.getElementById('whale-chart-view');
     gammaChartBars = document.getElementById('gamma-chart-bars');
 
-    console.log("Gamma Init:", { whaleViewBtn, gammaFeedContainer, whaleChartView, gammaChartBars });
+
 
     // Auto-refresh interval variable
     let gammaInterval = null;
@@ -1337,7 +1337,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (whaleViewBtn) {
         whaleViewBtn.addEventListener('click', () => {
             isGammaView = !isGammaView;
-            console.log("Toggle Gamma View:", isGammaView);
+
 
             if (isGammaView) {
                 // Switch to Chart
@@ -1352,7 +1352,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Start Auto-Refresh (Every 1 minute to match backend cache)
                 if (gammaInterval) clearInterval(gammaInterval);
                 gammaInterval = setInterval(fetchGammaWall, 60000);
-                console.log("Gamma Auto-Refresh Started (1m)");
+
 
             } else {
                 // Switch to List
@@ -1365,17 +1365,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Stop Auto-Refresh
                 if (gammaInterval) clearInterval(gammaInterval);
                 gammaInterval = null;
-                console.log("Gamma Auto-Refresh Stopped");
+
             }
         });
     }
 
     async function fetchGammaWall() {
-        console.log("Fetching Gamma Wall...");
+
         try {
             const res = await fetch('/api/gamma?symbol=SPY');
             const data = await res.json();
-            console.log("Gamma Data:", data);
+
 
             if (data.error) {
                 console.error("Gamma Error:", data.error);
@@ -1729,7 +1729,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Check if TradingView is loaded
         if (typeof TradingView === 'undefined') {
-            console.log('TradingView not loaded yet, retrying...');
+
             setTimeout(initPCRChart, 1000);
             return;
         }
@@ -1797,7 +1797,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const last24Hours = now - 86400;
 
         const validNews = newsItems.filter(item => item.time >= last24Hours);
-        console.log(`📰 News Render: ${validNews.length} items passed 24h filter`);
+
 
         if (validNews.length === 0) {
             track.innerHTML = '<div class="news-item placeholder"><div class="news-headline" style="color: #666;">NO RECENT NEWS FOUND</div></div>';
@@ -1813,7 +1813,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let shouldSnap = false;
         if (topItemSignature && topItemSignature !== lastTopNewsSignature) {
-            console.log('📰 New Top News Detected! Snapping to start.');
+
             shouldSnap = true;
             lastTopNewsSignature = topItemSignature;
         }

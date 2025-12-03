@@ -92,7 +92,7 @@ VOLUME_THRESHOLD = 100 # Only show update if volume increases by this much
 
 def refresh_single_whale(symbol):
     global CACHE
-    # print(f"🐳 Checking {symbol}...", flush=True)
+
     
     try:
         ticker = yf.Ticker(symbol)
@@ -218,14 +218,14 @@ def refresh_single_whale(symbol):
             CACHE["whales"]["data"] = updated_data
             CACHE["whales"]["timestamp"] = time.time()
             if new_whales:
-                print(f"🐳 {symbol}: Found {len(new_whales)} whales.", flush=True)
+
             
     except Exception as e:
         print(f"Whale Scan Failed ({symbol}): {e}")
 
 def refresh_heatmap_logic():
     global CACHE
-    print("🔥 Scanning Heatmap...", flush=True)
+
     
     # Tickers mapped to their "Size" category and "Sector" for filtering
     HEATMAP_TICKERS = {
@@ -290,7 +290,7 @@ def refresh_heatmap_logic():
         if heatmap_data:
             CACHE["heatmap"]["data"] = heatmap_data
             CACHE["heatmap"]["timestamp"] = time.time()
-            print(f"🔥 Heatmap Updated ({len(heatmap_data)} items)", flush=True)
+
             
     except Exception as e:
         print(f"Heatmap Update Failed: {e}")
@@ -327,7 +327,7 @@ def api_whales():
 @app.route('/api/whales/stream')
 def api_whales_stream():
     def generate():
-        print("🐳 SSE Client Connected")
+
         # Initial Data
         current_time = time.time()
         # Just yield the cache periodically
@@ -360,7 +360,7 @@ def api_polymarket():
         api_key = os.environ.get("POLYMARKET_API_KEY")
         if api_key:
             headers['Authorization'] = f"Bearer {api_key}"
-            print("🔑 Using Polymarket API Key", flush=True)
+
             
         resp = requests.get(url, headers=headers, verify=False, timeout=5)
         
@@ -697,7 +697,7 @@ def api_news():
 
 def refresh_news_logic():
     global CACHE
-    print("📰 Fetching News (RSS)...", flush=True)
+
     
     RSS_FEEDS = [
         "https://www.investing.com/rss/news.rss",
@@ -717,18 +717,18 @@ def refresh_news_logic():
     try:
         for url in RSS_FEEDS:
             try:
-                print(f"📰 Fetching {url}...", flush=True)
+
                 time.sleep(1)
                 
                 response = requests.get(url, headers=headers, verify=False, timeout=10)
-                print(f"📰 Status: {response.status_code}", flush=True)
+
                 
                 if response.status_code != 200:
                     print(f"⚠️ Feed Error {url}: Status {response.status_code}", flush=True)
                     continue
                 
                 feed = feedparser.parse(response.content)
-                print(f"📰 Entries found: {len(feed.entries)}", flush=True)
+
                 
                 if not feed.entries:
                     print(f"⚠️ Feed Empty {url}", flush=True)
@@ -761,7 +761,7 @@ def refresh_news_logic():
             CACHE["news"]["data"] = all_news
             CACHE["news"]["timestamp"] = current_time
             CACHE["news"]["last_error"] = None
-            print(f"📰 News Updated ({len(all_news)} items)", flush=True)
+
         else:
             print("⚠️ No news found from any RSS feed", flush=True)
             CACHE["news"]["last_error"] = "All RSS feeds empty or blocked"
@@ -774,15 +774,15 @@ def refresh_news_logic():
 
 def refresh_gamma_logic():
     global CACHE
-    print("👾 Scanning Gamma (SPY)...", flush=True)
+
     
     symbol = "SPY"
     try:
-        print(f"DEBUG: Gamma - Init Ticker {symbol}", flush=True)
+
         ticker = yf.Ticker(symbol)
         
         # Get Current Price
-        print("DEBUG: Gamma - Getting Price", flush=True)
+
         try:
             current_price = ticker.fast_info.last_price
         except:
@@ -793,7 +793,7 @@ def refresh_gamma_logic():
             return
             
         # Get Nearest Expiration
-        print("DEBUG: Gamma - Getting Options", flush=True)
+
         expirations = ticker.options
         if not expirations:
             print(f"Gamma Scan Failed: No options for {symbol}")
@@ -801,12 +801,12 @@ def refresh_gamma_logic():
             
         # Use the first expiration (0DTE/Weekly)
         expiry = expirations[0]
-        print(f"DEBUG: Gamma - Using Expiry {expiry}", flush=True)
+
         
         # Fetch Chain
-        print("DEBUG: Gamma - Fetching Chain", flush=True)
+
         opts = ticker.option_chain(expiry)
-        print("DEBUG: Gamma - Chain Fetched", flush=True)
+
         calls = opts.calls
         puts = opts.puts
         
@@ -873,7 +873,7 @@ def refresh_gamma_logic():
         # Update Cache
         cache_key = f"gamma_{symbol}"
         CACHE[cache_key] = {"data": result, "timestamp": time.time()}
-        print(f"👾 Gamma Updated for {symbol} ({len(final_data)} strikes)", flush=True)
+
         
     except Exception as e:
         print(f"Gamma Scan Failed: {e}")
@@ -962,7 +962,7 @@ def api_gamma():
 
 def start_background_worker():
     def hydrate_on_startup():
-        print("🌊 Starting FAST Hydration (Parallel)...", flush=True)
+
         # 1. Fetch Whales in Parallel
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             executor.map(refresh_single_whale, WHALE_WATCHLIST)
@@ -975,7 +975,7 @@ def start_background_worker():
         try: refresh_news_logic()
         except: pass
         
-        print("✅ Hydration Complete. Starting Trickle Worker.", flush=True)
+
 
     def worker():
         # Run Hydration ONCE on startup (Background)
@@ -984,7 +984,7 @@ def start_background_worker():
         except Exception as e:
             print(f"⚠️ Hydration Failed: {e}", flush=True)
         
-        print("🔧 Trickle Worker Started (v2)", flush=True)
+
         
         last_gamma_update = 0
         last_heatmap_update = 0
