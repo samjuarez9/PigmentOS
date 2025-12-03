@@ -581,9 +581,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error('News API Error');
 
             const newsItems = await response.json();
+            console.log(`📰 News Fetch: Received ${newsItems ? newsItems.length : 0} items`);
 
             if (!newsItems || newsItems.length === 0) {
+                console.warn("📰 News Feed Empty");
                 updateStatus('status-news', true); // Still LIVE, just no items
+                renderNews([]); // Render empty state
                 return;
             }
 
@@ -1775,8 +1778,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const last24Hours = now - 86400;
 
         const validNews = newsItems.filter(item => item.time >= last24Hours);
+        console.log(`📰 News Render: ${validNews.length} items passed 24h filter`);
 
-        if (validNews.length === 0) return;
+        if (validNews.length === 0) {
+            track.innerHTML = '<div class="news-item placeholder"><div class="news-headline" style="color: #666;">NO RECENT NEWS FOUND</div></div>';
+            return;
+        }
 
         // Sort Newest First
         validNews.sort((a, b) => b.time - a.time);

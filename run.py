@@ -906,6 +906,20 @@ def api_debug_system():
         "sample_data": sample_data
     })
 
+@app.route('/api/debug/news')
+def api_debug_news():
+    global CACHE
+    data = CACHE.get("news", {})
+    news_items = data.get("data", [])
+    
+    return jsonify({
+        "timestamp": data.get("timestamp", 0),
+        "timestamp_human": datetime.fromtimestamp(data.get("timestamp", 0)).strftime('%Y-%m-%d %H:%M:%S'),
+        "item_count": len(news_items),
+        "sample_item": news_items[0] if news_items else None,
+        "server_time": time.time()
+    })
+
 
 @app.route('/api/heatmap')
 def api_heatmap():
