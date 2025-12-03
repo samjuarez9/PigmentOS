@@ -234,6 +234,7 @@ def refresh_heatmap_logic():
         "AAPL": {"size": "mega", "sector": "TECH"},
         "MSFT": {"size": "mega", "sector": "TECH"},
         "GOOGL": {"size": "large", "sector": "TECH"},
+        "GOOG": {"size": "large", "sector": "TECH"},
         "AMZN": {"size": "large", "sector": "CONSUMER"},
         "META": {"size": "large", "sector": "TECH"},
         "TSLA": {"size": "large", "sector": "CONSUMER"},
