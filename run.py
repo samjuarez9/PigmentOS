@@ -57,7 +57,7 @@ WATCHLIST = [
 MEGA_WHALE_THRESHOLD = 8_000_000  # $8M
 
 # Cache structure
-CACHE_DURATION = 300 # 5 minutes (was 120)
+CACHE_DURATION = 120 # 2 minutes (was 300)
 MACRO_CACHE_DURATION = 1800
 POLY_STATE = {}
 
@@ -112,9 +112,9 @@ def refresh_whales_logic():
                 if not expirations:
                     continue
                     
-                # Check next 4 expirations (approx 1 month out)
-                # This captures 0DTE, Weekly, and Monthly flows
-                target_expirations = expirations[:4]
+                # Check next 2 expirations (approx 2 weeks out)
+                # This captures 0DTE and Weekly flows (90% of volume)
+                target_expirations = expirations[:2]
                 
                 for expiry in target_expirations:
                     try:
