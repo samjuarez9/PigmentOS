@@ -915,29 +915,51 @@ def start_background_worker():
     def worker():
         print("🔧 Trickle Worker Started", flush=True)
         
-        # Task Queue
-        # We cycle through this list endlessly
         while True:
-            # 1. Heatmap
-            try: refresh_heatmap_logic()
-            except Exception as e: print(f"Worker Error (Heatmap): {e}")
-            time.sleep(3) # Trickle Sleep
+            # === MARKET HOURS CHECK ===
+            tz_eastern = pytz.timezone('US/Eastern')
+            now = datetime.now(tz_eastern)
             
-            # 2. News
+            # Market Hours: 9:30 AM - 4:00 PM ET, Mon-Fri
+            is_weekday = now.weekday() < 5
+            # Extended Hours for Heatmap/News: 4:00 AM - 8:00 PM ET
+            is_extended_hours = is_weekday and (
+                (now.hour > 4 or (now.hour == 4 and now.minute >= 0)) and 
+                (now.hour < 20)
+            )
+            # Core Market Hours for Options (Whales/Gamma): 9:30 AM - 4:00 PM ET
+            is_market_open = is_weekday and (
+                (now.hour > 9 or (now.hour == 9 and now.minute >= 30)) and 
+                (now.hour < 16)
+            )
+
+            # 1. Heatmap (Runs in Extended Hours)
+            if is_extended_hours:
+                try: refresh_heatmap_logic()
+                except Exception as e: print(f"Worker Error (Heatmap): {e}")
+                time.sleep(3)
+            
+            # 2. News (Always Runs, but slower at night)
             try: refresh_news_logic()
             except Exception as e: print(f"Worker Error (News): {e}")
             time.sleep(3)
             
-            # 3. Gamma
-            try: refresh_gamma_logic()
-            except Exception as e: print(f"Worker Error (Gamma): {e}")
-            time.sleep(3)
+            # 3. Gamma (Only Market Hours)
+            if is_market_open:
+                try: refresh_gamma_logic()
+                except Exception as e: print(f"Worker Error (Gamma): {e}")
+                time.sleep(3)
             
-            # 4. Whales (One by One)
-            for symbol in WHALE_WATCHLIST:
-                try: refresh_single_whale(symbol)
-                except Exception as e: print(f"Worker Error (Whale {symbol}): {e}")
-                time.sleep(3) # Trickle Sleep between stocks
+            # 4. Whales (Only Market Hours)
+            if is_market_open:
+                for symbol in WHALE_WATCHLIST:
+                    try: refresh_single_whale(symbol)
+                    except Exception as e: print(f"Worker Error (Whale {symbol}): {e}")
+                    time.sleep(3)
+            else:
+                # If market closed, sleep longer to save resources
+                # But keep checking News/Heatmap occasionally
+                time.sleep(60)
 
     t = threading.Thread(target=worker, daemon=True)
     t.start()
