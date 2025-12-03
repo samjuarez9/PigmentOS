@@ -3,6 +3,11 @@ import time
 import random
 import threading
 import requests
+import socket
+
+# Set global timeout to prevent hanging requests (e.g. blocked yfinance)
+socket.setdefaulttimeout(5)
+
 import yfinance as yf
 # Set cache to /tmp for Render compatibility
 try:
