@@ -944,21 +944,25 @@ def start_background_worker():
             except Exception as e: print(f"Worker Error (News): {e}")
             time.sleep(3)
             
-            # 3. Gamma (Only Market Hours)
-            if is_market_open:
+            # 3. Gamma (Market Hours OR Empty Cache)
+            # If cache is empty (server restart), we MUST fetch data even if closed
+            gamma_needs_hydration = not CACHE.get("gamma_SPY", {}).get("data")
+            
+            if is_market_open or gamma_needs_hydration:
                 try: refresh_gamma_logic()
                 except Exception as e: print(f"Worker Error (Gamma): {e}")
                 time.sleep(3)
             
-            # 4. Whales (Only Market Hours)
-            if is_market_open:
+            # 4. Whales (Market Hours OR Empty Cache)
+            whales_needs_hydration = not CACHE.get("barchart", {}).get("data")
+            
+            if is_market_open or whales_needs_hydration:
                 for symbol in WHALE_WATCHLIST:
                     try: refresh_single_whale(symbol)
                     except Exception as e: print(f"Worker Error (Whale {symbol}): {e}")
                     time.sleep(3)
             else:
-                # If market closed, sleep longer to save resources
-                # But keep checking News/Heatmap occasionally
+                # If market closed AND cache populated, sleep longer
                 time.sleep(60)
 
     t = threading.Thread(target=worker, daemon=True)
