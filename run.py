@@ -1009,7 +1009,10 @@ def start_background_worker():
             )
 
             # 1. Heatmap (Runs in Extended Hours) - THROTTLED TO 10 MINS
-            if is_extended_hours and (time.time() - last_heatmap_update > 600):
+            # Force hydration if cache is empty (e.g. server restart at night)
+            heatmap_needs_hydration = not CACHE.get("heatmap", {}).get("data")
+            
+            if (is_extended_hours or heatmap_needs_hydration) and (time.time() - last_heatmap_update > 600):
                 try: 
                     refresh_heatmap_logic()
                     last_heatmap_update = time.time()
