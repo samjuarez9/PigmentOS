@@ -3153,9 +3153,9 @@ td {
     /* Fix Chart Distortion */
     #chart-container,
     #pcr-chart-container {
-        height: 300px !important;
+        height: 250px !important;
         /* Force taller height on mobile */
-        min-height: 300px !important;
+        min-height: 250px !important;
     }
 
     /* Adjust widget content padding */

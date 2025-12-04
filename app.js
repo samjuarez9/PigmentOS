@@ -1772,8 +1772,8 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 const iframe = container.querySelector('iframe');
                 if (iframe) {
-                    iframe.style.height = '300px';
-                    iframe.style.minHeight = '300px';
+                    iframe.style.height = '250px';
+                    iframe.style.minHeight = '250px';
                 }
             }, 1000);
         }
