@@ -83,7 +83,7 @@ CACHE = {
 # === CONFIGURATION ===
 WHALE_WATCHLIST = [
     'NVDA', 'TSLA', 'SPY', 'QQQ', 'IWM', 'AAPL', 'AMD', 'MSFT', 'AMZN', 
-    'GOOGL', 'META', 'NFLX', 'COIN', 'GME', 'PLTR', 'HOOD', 'ROKU'
+    'GOOGL', 'META', 'PLTR'
 ]
 
 # Track last reported volume to simulate "stream" feel
@@ -133,7 +133,7 @@ def refresh_single_whale(symbol):
                     
                     # FILTER: MINIMUM WHALE SIZE
                     min_whale_val = 500_000
-                    if symbol in ['SPY', 'QQQ', 'IWM']: min_whale_val = 1_500_000
+                    if symbol in ['SPY', 'QQQ', 'IWM']: min_whale_val = 2_500_000
                         
                     if notional < min_whale_val: continue
 
@@ -252,7 +252,8 @@ def refresh_heatmap_logic():
         "PLTR": {"size": "small", "sector": "TECH"},
         "COIN": {"size": "small", "sector": "CRYPTO"},
         "MSTR": {"size": "small", "sector": "CRYPTO"},
-        "RIOT": {"size": "small", "sector": "CRYPTO"}
+        "RIOT": {"size": "small", "sector": "CRYPTO"},
+        "BTC-USD": {"size": "mega", "sector": "CRYPTO"}
     }
     
     try:
@@ -702,7 +703,9 @@ def refresh_news_logic():
     RSS_FEEDS = [
         "https://www.investing.com/rss/news.rss",
         "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664",
-        "https://techcrunch.com/feed/"
+        "https://techcrunch.com/feed/",
+        "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+        "http://feeds.marketwatch.com/marketwatch/topstories/"
     ]
     
     all_news = []
@@ -743,6 +746,8 @@ def refresh_news_logic():
                     if "cnbc" in url: publisher = "CNBC"
                     elif "techcrunch" in url: publisher = "TechCrunch"
                     elif "investing.com" in url: publisher = "Investing.com"
+                    elif "wsj.com" in url or "dj.com" in url: publisher = "WSJ"
+                    elif "marketwatch" in url: publisher = "MarketWatch"
                     
                     all_news.append({
                         "title": entry.get('title', ''),
