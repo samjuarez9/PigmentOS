@@ -217,9 +217,7 @@ def refresh_single_whale(symbol):
             
             CACHE["whales"]["data"] = updated_data
             CACHE["whales"]["timestamp"] = time.time()
-            if new_whales:
 
-            
     except Exception as e:
         print(f"Whale Scan Failed ({symbol}): {e}")
 

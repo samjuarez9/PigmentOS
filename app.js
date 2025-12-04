@@ -1349,9 +1349,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 fetchGammaWall(); // Fetch immediately
 
-                // Start Auto-Refresh (Every 1 minute to match backend cache)
+                // Start Auto-Refresh (Every 5 minutes to match user request)
                 if (gammaInterval) clearInterval(gammaInterval);
-                gammaInterval = setInterval(fetchGammaWall, 60000);
+                gammaInterval = setInterval(() => {
+                    if (isMarketOpen()) {
+                        fetchGammaWall();
+                    }
+                }, 300000);
 
 
             } else {
