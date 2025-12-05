@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indicator Mockup</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+        body {
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .widget-row {
+            background: rgba(10, 10, 15, 0.9);
+            border: 1px solid #333;
+            padding: 15px 20px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            width: 400px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .title {
+            color: #fff;
+            font-size: 14px;
+            flex: 1;
+        }
+
+        .indicator {
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            padding: 4px 8px;
+            border-radius: 4px;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            animation: pulse 2s infinite;
+        }
+
+        /* STYLE 1: AMBER WARNING */
+        .indicator.resolving {
+            color: #FFCC00;
+            background: rgba(255, 204, 0, 0.15);
+            border: 1px solid rgba(255, 204, 0, 0.4);
+            box-shadow: 0 0 10px rgba(255, 204, 0, 0.1);
+        }
+
+        /* STYLE 2: FINALIZED (Greyed out) */
+        .indicator.final {
+            color: #888;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid #444;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 0.8;
+            }
+
+            50% {
+                opacity: 1;
+                text-shadow: 0 0 8px currentColor;
+            }
+
+            100% {
+                opacity: 0.8;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+        <!-- Example 1 -->
+        <div class="widget-row">
+            <div class="title">Bitcoin > $100k by Friday</div>
+            <div class="indicator resolving">⏳ RESOLVING</div>
+        </div>
+
+        <!-- Example 2 -->
+        <div class="widget-row">
+            <div class="title">Fed Cuts Rates in Dec?</div>
+            <div class="indicator resolving">⚠ ENDING SOON</div>
+        </div>
+    </div>
+
+</body>
+
+</html>

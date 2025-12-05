@@ -645,6 +645,10 @@ h1 {
     margin-bottom: 10px;
     position: relative;
     box-shadow: 0 0 10px rgba(0, 255, 255, 0.1);
+    border-radius: 12px;
+    /* Rounded Corners */
+    overflow: hidden;
+    /* Ensure rounded corners clip content */
 }
 
 .news-header {
@@ -818,6 +822,8 @@ h1 {
     position: relative;
     padding: 0;
     box-shadow: 0 0 10px rgba(0, 255, 255, 0.1);
+    border-radius: 12px;
+    /* Rounded Corners */
 }
 
 /* Right column widgets - no gap */
@@ -1056,7 +1062,8 @@ td {
     box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
     border: 2px solid var(--primary-color);
     background: #000000;
-    border-radius: 0;
+    border-radius: 12px;
+    /* Rounded Corners */
     font-family: var(--font-pixel);
     text-transform: uppercase;
     letter-spacing: 2px;

@@ -83,7 +83,7 @@ CACHE = {
 # === CONFIGURATION ===
 WHALE_WATCHLIST = [
     'NVDA', 'TSLA', 'SPY', 'QQQ', 'IWM', 'AAPL', 'AMD', 'MSFT', 'AMZN', 
-    'GOOGL', 'META', 'PLTR'
+    'GOOGL', 'GOOG', 'META', 'PLTR', 'SNDK', 'MU', 'NBIS', 'PANW', 'CRWD'
 ]
 
 # Track last reported volume to simulate "stream" feel
@@ -133,7 +133,7 @@ def refresh_single_whale(symbol):
                     
                     # FILTER: MINIMUM WHALE SIZE
                     min_whale_val = 500_000
-                    if symbol in ['SPY', 'QQQ', 'IWM']: min_whale_val = 2_500_000
+                    if symbol in ['SPY', 'QQQ', 'IWM']: min_whale_val = 3_000_000
                         
                     if notional < min_whale_val: continue
 
