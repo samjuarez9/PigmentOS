@@ -1637,7 +1637,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // 3. Strike/Type Column
         const colStrike = document.createElement('div');
         colStrike.className = 'col-strike';
-        colStrike.innerHTML = `<span class="${typeClass}">${flow.strike}${typeLabel}</span>`;
+
+        // Format Date (e.g. "2025-12-12" -> "12/12")
+        const dateStr = flow.expiry ? flow.expiry.slice(5) : '';
+
+        colStrike.innerHTML = `
+        <span class="${typeClass}">${flow.strike}${typeLabel}</span>
+        <span class="expiry-date">${dateStr}</span>
+    `;
 
         // 4. Tag Column (MEGA / FRESH / BULL / BEAR / HEDGE / ITM / OTM)
         const colTag = document.createElement('div');
