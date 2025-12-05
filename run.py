@@ -979,9 +979,13 @@ def api_gamma():
 def start_background_worker():
     def hydrate_on_startup():
 
-        # 1. Fetch Whales in Parallel
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            executor.map(refresh_single_whale, WHALE_WATCHLIST)
+        # 1. Fetch Whales Sequentially (Fix for Gevent/Threading Conflict)
+        # ThreadPoolExecutor causes KeyError in gevent-patched environments
+        for symbol in WHALE_WATCHLIST:
+            try:
+                refresh_single_whale(symbol)
+            except Exception as e:
+                print(f"Startup Whale Error ({symbol}): {e}")
         
         # 2. Fetch Gamma & Heatmap
         try: refresh_gamma_logic()
