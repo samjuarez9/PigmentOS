@@ -13,8 +13,8 @@ def debug_filter():
     print(f"Target 'Today' Date: {today_date}")
     
     # 3. Test the Stale Timestamp from the Curl Output
-    # Timestamp: 1764880323.0 (from the JSON response)
-    stale_ts = 1764880323.0
+    # Timestamp: 1764953735.0 (from the JSON response)
+    stale_ts = 1764953735.0
     
     # 4. Convert to Date
     trade_dt = datetime.fromtimestamp(stale_ts, tz_eastern)

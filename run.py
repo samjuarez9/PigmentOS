@@ -133,7 +133,7 @@ def refresh_single_whale(symbol):
                     
                     # FILTER: MINIMUM WHALE SIZE
                     min_whale_val = 500_000
-                    if symbol in ['SPY', 'QQQ', 'IWM']: min_whale_val = 3_000_000
+                    if symbol in ['SPY', 'QQQ', 'IWM']: min_whale_val = 5_000_000
                         
                     if notional < min_whale_val: continue
 
