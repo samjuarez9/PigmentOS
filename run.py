@@ -314,8 +314,21 @@ def api_whales():
     if CACHE["whales"]["timestamp"] == 0:
         return jsonify({"loading": True, "data": [], "stale": False, "timestamp": 0})
     
-    data = CACHE["whales"]["data"]
-    sliced = data[offset:offset+limit]
+    # FILTER: Ensure we only show TODAY'S trades (Server-side safety)
+    # The worker might be sleeping (Pre-market), holding yesterday's data.
+    # We filter it here to ensure the frontend sees a clean slate.
+    raw_data = CACHE["whales"]["data"]
+    tz_eastern = pytz.timezone('US/Eastern')
+    today_date = datetime.now(tz_eastern).date()
+    
+    clean_data = []
+    for whale in raw_data:
+        # 'timestamp' is unix epoch
+        trade_dt = datetime.fromtimestamp(whale['timestamp'], tz_eastern)
+        if trade_dt.date() == today_date:
+            clean_data.append(whale)
+            
+    sliced = clean_data[offset:offset+limit]
     
     return jsonify({
         "data": sliced,
