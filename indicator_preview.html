@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indicator Preview - RSI & Bollinger Bands</title>
+    <style>
+        body {
+            background: #0C0C18;
+            color: #00FF41;
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #1E90FF;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .indicator-section {
+            background: rgba(30, 144, 255, 0.05);
+            border: 2px solid #1E90FF;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            color: #FFD700;
+            margin-top: 0;
+        }
+
+        .chart-mockup {
+            background: #000;
+            border: 1px solid #1E90FF;
+            padding: 20px;
+            margin: 15px 0;
+            position: relative;
+            min-height: 200px;
+        }
+
+        .rsi-chart {
+            height: 150px;
+            border-left: 2px solid #666;
+            border-bottom: 2px solid #666;
+            position: relative;
+        }
+
+        .rsi-line {
+            position: absolute;
+            width: 100%;
+            border-bottom: 2px solid #9370DB;
+        }
+
+        .rsi-level {
+            position: absolute;
+            width: 100%;
+            border-top: 1px dashed;
+            font-size: 11px;
+            padding-left: 5px;
+        }
+
+        .overbought {
+            color: #FF3333;
+            border-color: #FF3333;
+            top: 20%;
+        }
+
+        .neutral {
+            color: #999;
+            border-color: #999;
+            top: 50%;
+        }
+
+        .oversold {
+            color: #00FF41;
+            border-color: #00FF41;
+            top: 80%;
+        }
+
+        .bb-chart {
+            height: 300px;
+            border-left: 2px solid #666;
+            border-bottom: 2px solid #666;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .bb-band {
+            position: absolute;
+            width: 100%;
+            border-top: 2px solid;
+        }
+
+        .bb-upper {
+            border-color: #1E90FF;
+            top: 15%;
+        }
+
+        .bb-middle {
+            border-color: #FFD700;
+            top: 50%;
+        }
+
+        .bb-lower {
+            border-color: #1E90FF;
+            top: 85%;
+        }
+
+        .bb-fill {
+            position: absolute;
+            width: 100%;
+            height: 70%;
+            top: 15%;
+            background: rgba(30, 144, 255, 0.1);
+        }
+
+        .candles {
+            position: absolute;
+            bottom: 10%;
+            left: 5%;
+            display: flex;
+            gap: 5px;
+        }
+
+        .candle {
+            width: 15px;
+            height: 40px;
+            background: #00FF41;
+        }
+
+        .candle.red {
+            background: #FF3333;
+        }
+
+        ul {
+            color: #FFF;
+            line-height: 1.8;
+        }
+
+        .combined-preview {
+            background: #000;
+            border: 2px solid #FFD700;
+            padding: 0;
+            margin-top: 20px;
+        }
+
+        .price-section {
+            height: 250px;
+            border-bottom: 1px solid #333;
+            position: relative;
+            padding: 20px;
+        }
+
+        .rsi-section {
+            height: 120px;
+            position: relative;
+            padding: 20px;
+        }
+
+        .label {
+            font-size: 10px;
+            color: #1E90FF;
+            margin-bottom: 5px;
+        }
+
+        code {
+            background: rgba(30, 144, 255, 0.2);
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #00FF41;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>📊 INDICATOR PREVIEW: RSI & BOLLINGER BANDS</h1>
+
+        <div class="indicator-section">
+            <h2>1️⃣ RSI (Relative Strength Index)</h2>
+            <p><strong>Purpose:</strong> Identifies overbought/oversold momentum conditions</p>
+            <div class="chart-mockup">
+                <div class="rsi-chart">
+                    <div class="rsi-level overbought">70 — OVERBOUGHT ⚠️</div>
+                    <div class="rsi-level neutral">50 — NEUTRAL</div>
+                    <div class="rsi-level oversold">30 — OVERSOLD ✅</div>
+                    <svg width="100%" height="100%" style="position: absolute; top: 0; left: 0;">
+                        <polyline points="0,75 50,65 100,45 150,55 200,35 250,25 300,45 350,65 400,85 450,95 500,75"
+                            stroke="#9370DB" stroke-width="3" fill="none" />
+                    </svg>
+                </div>
+            </div>
+            <ul>
+                <li><strong>Above 70:</strong> Market is overbought (potential reversal down)</li>
+                <li><strong>Below 30:</strong> Market is oversold (potential reversal up)</li>
+                <li><strong>Settings:</strong> 14-period (industry standard)</li>
+                <li><strong>Display:</strong> Separate panel below price chart</li>
+            </ul>
+        </div>
+
+        <div class="indicator-section">
+            <h2>2️⃣ Bollinger Bands</h2>
+            <p><strong>Purpose:</strong> Shows price volatility and identifies extremes</p>
+            <div class="chart-mockup">
+                <div class="bb-chart">
+                    <div class="bb-fill"></div>
+                    <div class="bb-band bb-upper" style="font-size: 11px; color: #1E90FF; padding-left: 10px;">
+                        Upper Band (+2σ)
+                    </div>
+                    <div class="bb-band bb-middle" style="font-size: 11px; color: #FFD700; padding-left: 10px;">
+                        Middle (20 SMA)
+                    </div>
+                    <div class="bb-band bb-lower" style="font-size: 11px; color: #1E90FF; padding-left: 10px;">
+                        Lower Band (-2σ)
+                    </div>
+                    <svg width="100%" height="100%" style="position: absolute; top: 0; left: 0;">
+                        <!-- Price candles as line -->
+                        <polyline
+                            points="50,150 100,140 150,160 200,155 250,145 300,135 350,125 400,150 450,165 500,170"
+                            stroke="#00FF41" stroke-width="2" fill="none" />
+                    </svg>
+                </div>
+            </div>
+            <ul>
+                <li><strong>Upper Band Touch:</strong> Price at high extreme (potentially overbought)</li>
+                <li><strong>Lower Band Touch:</strong> Price at low extreme (potentially oversold)</li>
+                <li><strong>Settings:</strong> 20-period, 2 standard deviations</li>
+                <li><strong>Display:</strong> Overlaid directly on price chart</li>
+            </ul>
+        </div>
+
+        <div class="indicator-section">
+            <h2>3️⃣ Combined View (What You'll See)</h2>
+            <p><strong>Both indicators working together on your Price Action widget</strong></p>
+            <div class="combined-preview">
+                <div class="price-section">
+                    <div class="label">PRICE CHART WITH BOLLINGER BANDS</div>
+                    <div style="position: relative; height: 200px;">
+                        <div class="bb-fill" style="height: 140px; top: 20px;"></div>
+                        <div class="bb-band"
+                            style="top: 30px; border-color: #1E90FF; font-size: 10px; padding-left: 10px;">Upper BB
+                        </div>
+                        <div class="bb-band"
+                            style="top: 100px; border-color: #FFD700; font-size: 10px; padding-left: 10px;">SMA</div>
+                        <div class="bb-band"
+                            style="top: 170px; border-color: #1E90FF; font-size: 10px; padding-left: 10px;">Lower BB
+                        </div>
+                        <svg width="100%" height="100%" style="position: absolute; top: 0; left: 0;">
+                            <polyline
+                                points="20,100 60,90 100,110 140,105 180,95 220,85 260,75 300,100 340,115 380,120 420,110 460,100"
+                                stroke="#00FF41" stroke-width="2" fill="none" />
+                        </svg>
+                    </div>
+                </div>
+                <div class="rsi-section">
+                    <div class="label">RSI INDICATOR PANEL</div>
+                    <div style="position: relative; height: 80px; border-top: 1px solid #333;">
+                        <div
+                            style="position: absolute; width: 100%; border-top: 1px dashed #FF3333; top: 15%; font-size: 9px; padding-left: 5px; color: #FF3333;">
+                            70</div>
+                        <div
+                            style="position: absolute; width: 100%; border-top: 1px dashed #999; top: 50%; font-size: 9px; padding-left: 5px; color: #999;">
+                            50</div>
+                        <div
+                            style="position: absolute; width: 100%; border-top: 1px dashed #00FF41; top: 85%; font-size: 9px; padding-left: 5px; color: #00FF41;">
+                            30</div>
+                        <svg width="100%" height="100%" style="position: absolute; top: 0; left: 0;">
+                            <polyline
+                                points="20,40 60,35 100,25 140,30 180,20 220,15 260,30 300,40 340,55 380,65 420,50 460,40"
+                                stroke="#9370DB" stroke-width="2" fill="none" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="indicator-section" style="border-color: #00FF41;">
+            <h2>✅ Implementation Details</h2>
+            <p>This will be added to your <code>app.js</code> file by updating the TradingView widget configuration:</p>
+            <pre style="background: #000; padding: 15px; border-radius: 5px; overflow-x: auto; color: #00FF41;">
+<span style="color: #999;">// Current:</span>
+"studies": [
+    "MASimple@tv-basicstudies"
+],
+
+<span style="color: #999;">// Updated:</span>
+"studies": [
+    "MASimple@tv-basicstudies",    <span style="color: #666;">// Your existing SMA</span>
+    "RSI@tv-basicstudies",         <span style="color: #666;">// ← NEW: RSI indicator</span>
+    "BB@tv-basicstudies"           <span style="color: #666;">// ← NEW: Bollinger Bands</span>
+],
+            </pre>
+            <p style="margin-top: 20px;"><strong>Ready to add these to your dashboard?</strong> They'll appear
+                automatically on all tickers in your Price Action widget.</p>
+        </div>
+    </div>
+</body>
+
+</html>

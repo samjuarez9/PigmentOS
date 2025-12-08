@@ -22,38 +22,40 @@ cd "$(dirname "$0")"
 # Check if server is already running
 echo -e "${YELLOW}[1/3]${NC} Checking server status..."
 if lsof -Pi :8001 -sTCP:LISTEN -t >/dev/null 2>&1; then
-    echo -e "${GREEN}✓${NC} Backend server already running on port 8001"
-else
-    echo -e "${YELLOW}⚠${NC} Backend server not running"
-    echo -e "${YELLOW}[2/3]${NC} Starting backend server..."
-    
-    # Start server in background and redirect output to log file
-    # Start server in background and redirect output to log file
-    PYTHON_CMD="python3"
-    if [ -f ".venv/bin/python" ]; then
-        PYTHON_CMD=".venv/bin/python"
-    fi
-    nohup $PYTHON_CMD run.py > server.log 2>&1 &
-    SERVER_PID=$!
-    
-    # Wait for server to start (max 5 seconds)
-    echo -n "     Waiting for server startup"
-    for i in {1..10}; do
-        if lsof -Pi :8001 -sTCP:LISTEN -t >/dev/null 2>&1; then
-            echo ""
-            echo -e "${GREEN}✓${NC} Server started successfully (PID: $SERVER_PID)"
-            break
-        fi
-        echo -n "."
-        sleep 0.5
-    done
-    
-    # Verify server is actually running
-    if ! lsof -Pi :8001 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    PID=$(lsof -Pi :8001 -sTCP:LISTEN -t)
+    echo -e "${YELLOW}⚠${NC} Port 8001 is busy (PID: $PID). Cleaning up..."
+    kill -9 $PID
+    sleep 1
+    echo -e "${GREEN}✓${NC} Cleanup complete."
+fi
+
+echo -e "${YELLOW}[2/3]${NC} Starting backend server..."
+
+# Start server in background and redirect output to log file
+PYTHON_CMD="python3"
+if [ -f ".venv/bin/python" ]; then
+    PYTHON_CMD=".venv/bin/python"
+fi
+nohup $PYTHON_CMD run.py > server.log 2>&1 &
+SERVER_PID=$!
+
+# Wait for server to start (max 5 seconds)
+echo -n "     Waiting for server startup"
+for i in {1..10}; do
+    if lsof -Pi :8001 -sTCP:LISTEN -t >/dev/null 2>&1; then
         echo ""
-        echo -e "${RED}✗${NC} Server failed to start. Check server.log for details."
-        exit 1
+        echo -e "${GREEN}✓${NC} Server started successfully (PID: $SERVER_PID)"
+        break
     fi
+    echo -n "."
+    sleep 0.5
+done
+
+# Verify server is actually running
+if ! lsof -Pi :8001 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo ""
+    echo -e "${RED}✗${NC} Server failed to start. Check server.log for details."
+    exit 1
 fi
 
 # Open dashboard in browser

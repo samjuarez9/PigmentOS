@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Net Flow Widget Demo</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #0a0a12;
+            --text-color: #e0e0e0;
+            --accent-green: #00ff9d;
+            --accent-red: #ff4d4d;
+            --grid-color: #1a1a2e;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-mono);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .widget-container {
+            width: 600px;
+            background: rgba(20, 20, 30, 0.6);
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .widget-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .widget-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .live-indicator {
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent-green);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent-green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: #888;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        .text-green {
+            color: var(--accent-green);
+            text-shadow: 0 0 10px rgba(0, 255, 157, 0.3);
+        }
+
+        .text-red {
+            color: var(--accent-red);
+            text-shadow: 0 0 10px rgba(255, 77, 77, 0.3);
+        }
+
+        canvas {
+            max-height: 250px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="widget-container">
+        <div class="widget-header">
+            <div class="widget-title">
+                <div class="live-indicator"></div>
+                SPY NET FLOW (0DTE + 1DTE)
+            </div>
+            <div style="font-size: 0.8rem; color: #666;">LIVE FEED</div>
+        </div>
+
+        <canvas id="netFlowChart"></canvas>
+
+        <div class="stats-row">
+            <div class="stat-item">
+                <span class="stat-label">Net Call Premium</span>
+                <span class="text-green" id="call-val">+$0.0M</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Net Put Premium</span>
+                <span class="text-red" id="put-val">-$0.0M</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Net Delta</span>
+                <span style="color: #fff;" id="net-val">$0.0M</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('netFlowChart').getContext('2d');
+
+        // Initial Data
+        const initialData = {
+            labels: [],
+            datasets: [
+                {
+                    type: 'line',
+                    label: 'Call Premium (Cum.)',
+                    data: [],
+                    borderColor: '#00ff9d',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    yAxisID: 'y',
+                    pointRadius: 0
+                },
+                {
+                    type: 'line',
+                    label: 'Put Premium (Cum.)',
+                    data: [],
+                    borderColor: '#ff4d4d',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    yAxisID: 'y',
+                    pointRadius: 0
+                },
+                {
+                    type: 'bar',
+                    label: 'Net Flow (5m)',
+                    data: [],
+                    backgroundColor: (context) => {
+                        const val = context.raw;
+                        return val >= 0 ? '#00ff9d' : '#ff4d4d';
+                    },
+                    yAxisID: 'y1',
+                    barThickness: 8
+                }
+            ]
+        };
+
+        const chart = new Chart(ctx, {
+            data: initialData,
+            options: {
+                responsive: true,
+                animation: { duration: 0 },
+                plugins: {
+                    legend: { display: true, labels: { color: '#888', font: { family: 'JetBrains Mono', size: 10 } } },
+                    tooltip: { mode: 'index', intersect: false }
+                },
+                scales: {
+                    x: {
+                        grid: { color: '#1a1a2e' },
+                        ticks: { color: '#666', maxTicksLimit: 6 }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        grid: { color: '#1a1a2e' },
+                        ticks: { color: '#666', callback: (val) => '$' + val + 'M' },
+                        title: { display: true, text: 'Total Premium', color: '#666' }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        grid: { drawOnChartArea: false }, // only want the grid lines for one axis to show up
+                        ticks: { color: '#666', callback: (val) => '$' + val + 'M' },
+                        title: { display: true, text: 'Net Flow (5m)', color: '#666' }
+                    }
+                },
+                interaction: {
+                    mode: 'nearest',
+                    axis: 'x',
+                    intersect: false
+                }
+            }
+        });
+
+        // Simulation Logic
+        let callTotal = 10;
+        let putTotal = 8;
+        let time = new Date();
+        time.setHours(9, 30, 0);
+
+        function formatMoney(val) {
+            return (val >= 0 ? '+' : '-') + '$' + Math.abs(val).toFixed(1) + 'M';
+        }
+
+        function updateChart() {
+            // Simulate random flow
+            const callFlow = (Math.random() * 2);
+            const putFlow = (Math.random() * 1.5);
+            const netFlow = callFlow - putFlow; // For the bar chart
+
+            callTotal += callFlow;
+            putTotal += putFlow;
+
+            // Add Time Label
+            const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            chart.data.labels.push(timeStr);
+
+            // Add Data
+            chart.data.datasets[0].data.push(callTotal); // Green Line
+            chart.data.datasets[1].data.push(putTotal);  // Red Line
+            chart.data.datasets[2].data.push(netFlow);   // Bar Chart
+
+            // Keep only last 30 points
+            if (chart.data.labels.length > 30) {
+                chart.data.labels.shift();
+                chart.data.datasets[0].data.shift();
+                chart.data.datasets[1].data.shift();
+                chart.data.datasets[2].data.shift();
+            }
+
+            chart.update();
+
+            // Update Stats
+            document.getElementById('call-val').textContent = formatMoney(callTotal);
+            document.getElementById('put-val').textContent = formatMoney(putTotal * -1);
+
+            const net = callTotal - putTotal;
+            const netEl = document.getElementById('net-val');
+            netEl.textContent = (net >= 0 ? '+' : '-') + '$' + Math.abs(net).toFixed(1) + 'M';
+            netEl.style.color = net >= 0 ? '#00ff9d' : '#ff4d4d';
+
+            // Increment Time (5 mins)
+            time.setMinutes(time.getMinutes() + 5);
+        }
+
+        // Seed some initial data
+        for (let i = 0; i < 20; i++) {
+            updateChart();
+        }
+
+        // Run simulation
+        setInterval(updateChart, 1000); // Fast forward speed
+
+    </script>
+</body>
+
+</html>

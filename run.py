@@ -78,6 +78,18 @@ CACHE = {
     "gamma_SPY": {"data": None, "timestamp": 0}
 }
 
+# Service Status Tracker
+SERVICE_STATUS = {
+    "POLY": {"status": "ONLINE", "last_updated": 0},
+    "YFIN": {"status": "ONLINE", "last_updated": 0},
+    "RSS": {"status": "ONLINE", "last_updated": 0},
+    "GAMMA": {"status": "ONLINE", "last_updated": 0}
+}
+
+@app.route('/api/status')
+def api_status():
+    return jsonify(SERVICE_STATUS)
+
 # --- HELPER FUNCTIONS ---
 
 # === CONFIGURATION ===
@@ -289,10 +301,12 @@ def refresh_heatmap_logic():
         if heatmap_data:
             CACHE["heatmap"]["data"] = heatmap_data
             CACHE["heatmap"]["timestamp"] = time.time()
+            SERVICE_STATUS["HEATMAP"] = {"status": "ONLINE", "last_updated": time.time()}
 
             
     except Exception as e:
         print(f"Heatmap Update Failed: {e}")
+        SERVICE_STATUS["HEATMAP"] = {"status": "OFFLINE", "last_updated": time.time()}
 
 # --- FLASK ROUTES ---
 
@@ -391,7 +405,7 @@ def api_polymarket():
                 "SCIENCE": ['space', 'nasa', 'spacex', 'mars', 'moon', 'cancer', 'climate', 'temperature', 'fda', 'medicine']
             }
 
-            BLACKLIST = ['nfl', 'nba', 'super bowl', 'sport', 'football', 'basketball', 'soccer', 'tennis', 'golf', 'searched', 'election', 'solana', 'microstrategy', 'mstr', 'zootopia', 'wicked', 'movie', 'film', 'box office', 'cinema']
+            BLACKLIST = ['nfl', 'nba', 'super bowl', 'sport', 'football', 'basketball', 'soccer', 'tennis', 'golf', 'searched', 'election', 'solana', 'microstrategy', 'mstr', 'zootopia', 'wicked', 'movie', 'film', 'box office', 'cinema', 'counterstrike', 'counter-strike', 'cs2']
             
             candidates = []
             seen_stems = {}
@@ -529,7 +543,7 @@ def api_polymarket():
             
             # Format for Frontend (remove raw fields)
             clean_markets = []
-            for c in final_list[:15]:
+            for c in final_list[:50]:
                 clean_markets.append({
                     "event": c['event'],
                     "category": c['category'],
@@ -547,11 +561,13 @@ def api_polymarket():
             CACHE["polymarket"]["data"] = clean_markets
             CACHE["polymarket"]["timestamp"] = current_time
             CACHE["polymarket"]["is_mock"] = False
+            SERVICE_STATUS["POLY"] = {"status": "ONLINE", "last_updated": time.time()}
         else:
             raise Exception("API Error")
             
     except Exception as e:
         print(f"Polymarket Error: {e}")
+        SERVICE_STATUS["POLY"] = {"status": "OFFLINE", "last_updated": time.time()}
         # Mock Fallback
         CACHE["polymarket"]["data"] = [
             {"event": "Will Bitcoin hit $100k in 2024?", "outcome_1_label": "Yes", "outcome_1_prob": 68, "outcome_2_label": "No", "outcome_2_prob": 32, "slug": "btc-100k", "delta": 0.06},
@@ -754,15 +770,29 @@ def refresh_news_logic():
                         pub_ts = int(calendar.timegm(entry.published_parsed))
                     
                     publisher = "Market Wire"
-                    if "cnbc" in url: publisher = "CNBC"
-                    elif "techcrunch" in url: publisher = "TechCrunch"
-                    elif "investing.com" in url: publisher = "Investing.com"
-                    elif "wsj.com" in url or "dj.com" in url: publisher = "WSJ"
-                    elif "marketwatch" in url: publisher = "MarketWatch"
+                    domain = "google.com" # Default fallback
+                    
+                    if "cnbc" in url: 
+                        publisher = "CNBC"
+                        domain = "cnbc.com"
+                    elif "techcrunch" in url: 
+                        publisher = "TechCrunch"
+                        domain = "techcrunch.com"
+                    elif "investing.com" in url: 
+                        publisher = "Investing.com"
+                        domain = "investing.com"
+                    elif "wsj.com" in url or "dj.com" in url: 
+                        publisher = "WSJ"
+                        domain = "wsj.com"
+                    elif "marketwatch" in url: 
+                        publisher = "MarketWatch"
+                        domain = "marketwatch.com"
+                    
                     
                     all_news.append({
                         "title": entry.get('title', ''),
                         "publisher": publisher,
+                        "domain": domain,
                         "link": entry.get('link', ''),
                         "time": pub_ts,
                         "ticker": "NEWS"
@@ -788,17 +818,13 @@ def refresh_news_logic():
 
 
 
-def refresh_gamma_logic():
+def refresh_gamma_logic(symbol="SPY"):
     global CACHE
 
-    
-    symbol = "SPY"
     try:
-
         ticker = yf.Ticker(symbol)
         
         # Get Current Price
-
         try:
             current_price = ticker.fast_info.last_price
         except:
@@ -806,43 +832,62 @@ def refresh_gamma_logic():
             
         if not current_price:
             print(f"Gamma Scan Failed: No price for {symbol}")
+            SERVICE_STATUS["GAMMA"] = {"status": "OFFLINE", "last_updated": time.time()}
             return
             
         # Get Nearest Expiration
-
         expirations = ticker.options
         if not expirations:
             print(f"Gamma Scan Failed: No options for {symbol}")
+            SERVICE_STATUS["GAMMA"] = {"status": "OFFLINE", "last_updated": time.time()}
             return
             
         # Use the first expiration (0DTE/Weekly)
         expiry = expirations[0]
 
-        
         # Fetch Chain
-
         opts = ticker.option_chain(expiry)
-
         calls = opts.calls
         puts = opts.puts
         
         # Aggregate Volume and Open Interest by Strike
         gamma_data = {}
         
-        # Helper to check if trade is from today
+        # Helper to check if trade is from today (or Friday if weekend)
+        from datetime import timedelta # Import locally
         tz_eastern = pytz.timezone('US/Eastern')
-        today_date = datetime.now(tz_eastern).date()
+        now_eastern = datetime.now(tz_eastern)
+        today_date = now_eastern.date()
+        weekday = today_date.weekday() # 0=Mon, 6=Sun
+        
+        # Weekend Logic: If Sat(5) or Sun(6), allow trades from last Friday
+        is_weekend = weekday >= 5
+        allowed_date = today_date
+        
+        if is_weekend:
+            # If Sat(5), Friday is today-1
+            # If Sun(6), Friday is today-2
+            days_back = 1 if weekday == 5 else 2
+            allowed_date = today_date - timedelta(days=days_back)
+            print(f"Gamma: Weekend Mode ({weekday}). Using data from {allowed_date}")
 
-        def is_today(ts):
+        def is_valid_trade_date(ts):
             if pd.isna(ts): return False
             if ts.tzinfo is None: ts = pytz.utc.localize(ts)
-            return ts.astimezone(tz_eastern).date() == today_date
+            trade_date = ts.astimezone(tz_eastern).date()
+            
+            if is_weekend:
+                # On weekend, accept Friday's data
+                return trade_date == allowed_date
+            else:
+                # On weekday, strict "today" check
+                return trade_date == today_date
 
         # Process Calls
         for _, row in calls.iterrows():
             strike = float(row['strike'])
-            # Only count volume if trade is from TODAY
-            vol = int(row['volume']) if (not pd.isna(row['volume']) and is_today(row['lastTradeDate'])) else 0
+            # Only count volume if trade is from VALID DATE
+            vol = int(row['volume']) if (not pd.isna(row['volume']) and is_valid_trade_date(row['lastTradeDate'])) else 0
             oi = int(row['openInterest']) if not pd.isna(row['openInterest']) else 0
             
             if strike not in gamma_data: gamma_data[strike] = {"call_vol": 0, "put_vol": 0, "call_oi": 0, "put_oi": 0}
@@ -852,8 +897,8 @@ def refresh_gamma_logic():
         # Process Puts
         for _, row in puts.iterrows():
             strike = float(row['strike'])
-            # Only count volume if trade is from TODAY
-            vol = int(row['volume']) if (not pd.isna(row['volume']) and is_today(row['lastTradeDate'])) else 0
+            # Only count volume if trade is from VALID DATE
+            vol = int(row['volume']) if (not pd.isna(row['volume']) and is_valid_trade_date(row['lastTradeDate'])) else 0
             oi = int(row['openInterest']) if not pd.isna(row['openInterest']) else 0
             
             if strike not in gamma_data: gamma_data[strike] = {"call_vol": 0, "put_vol": 0, "call_oi": 0, "put_oi": 0}
@@ -861,9 +906,9 @@ def refresh_gamma_logic():
             gamma_data[strike]["put_oi"] += oi
             
         # Convert to List for Frontend
-        # Filter for relevant range (e.g. +/- 10% of current price) to keep chart readable
-        lower_bound = current_price * 0.90
-        upper_bound = current_price * 1.10
+        # Filter for relevant range (e.g. +/- 20% of current price) to keep chart readable
+        lower_bound = current_price * 0.80
+        upper_bound = current_price * 1.20
         
         final_data = []
         for strike, data in gamma_data.items():
@@ -883,16 +928,42 @@ def refresh_gamma_logic():
             "symbol": symbol,
             "current_price": current_price,
             "expiry": expiry,
-            "strikes": final_data
+            "strikes": final_data,
+            "is_weekend_data": is_weekend # Flag for frontend
         }
         
         # Update Cache
         cache_key = f"gamma_{symbol}"
         CACHE[cache_key] = {"data": result, "timestamp": time.time()}
+        SERVICE_STATUS["GAMMA"] = {"status": "ONLINE", "last_updated": time.time()}
+        SERVICE_STATUS["YFIN"] = {"status": "ONLINE", "last_updated": time.time()} # Gamma implies YFIN is up
 
-        
     except Exception as e:
-        print(f"Gamma Scan Failed: {e}")
+        print(f"Gamma Scan Failed ({symbol}): {e}")
+        SERVICE_STATUS["GAMMA"] = {"status": "OFFLINE", "last_updated": time.time()}
+
+@app.route('/api/gamma')
+def api_gamma():
+    global CACHE
+    symbol = request.args.get('symbol', 'SPY').upper()
+    cache_key = f"gamma_{symbol}"
+    
+    # Serve directly from cache if fresh (< 5 mins)
+    if cache_key in CACHE and CACHE[cache_key]["data"]:
+        age = time.time() - CACHE[cache_key]["timestamp"]
+        if age < 300:
+            return jsonify(CACHE[cache_key]["data"])
+            
+    # If missing or stale, fetch immediately (On-Demand)
+    # Note: This might block for 1-2s, but ensures data availability
+    try:
+        refresh_gamma_logic(symbol)
+        if cache_key in CACHE and CACHE[cache_key]["data"]:
+            return jsonify(CACHE[cache_key]["data"])
+    except Exception as e:
+        print(f"On-Demand Gamma Fetch Error: {e}")
+        
+    return jsonify({"error": "Loading or Failed..."})
 
 @app.route('/api/ping')
 def api_ping():
@@ -964,17 +1035,7 @@ def api_heatmap():
         return jsonify({"loading": True, "data": []})
     return jsonify(CACHE["heatmap"]["data"])
 
-@app.route('/api/gamma')
-def api_gamma():
-    global CACHE
-    symbol = request.args.get('symbol', 'SPY').upper()
-    cache_key = f"gamma_{symbol}"
-    
-    # Serve directly from cache
-    if cache_key in CACHE and CACHE[cache_key]["data"]:
-        return jsonify(CACHE[cache_key]["data"])
-        
-    return jsonify({"error": "Loading..."})
+
 
 def start_background_worker():
     def hydrate_on_startup():

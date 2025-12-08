@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIGMENT OS // SECURE UPLINK</title>
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        /* === RESET & BASE === */
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --void-black: #050505;
+            --cyan-accent: #00D4FF;
+            --neon-green: #00FF41;
+            --glitch-purple: #9D4EDD;
+            --dark-gray: #0a0a0a;
+            --border-gray: #1a1a1a;
+        }
+
+        body {
+            font-family: 'VT323', monospace;
+            background: var(--void-black);
+            color: var(--neon-green);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* === ANIMATED BACKGROUND === */
+        .bg-grid {
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background-image:
+                linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            transform: perspective(500px) rotateX(60deg);
+            animation: gridMove 20s linear infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes gridMove {
+            0% {
+                transform: perspective(500px) rotateX(60deg) translateY(0);
+            }
+
+            100% {
+                transform: perspective(500px) rotateX(60deg) translateY(50px);
+            }
+        }
+
+        /* === AMBIENT GLOW === */
+        .ambient-glow {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, rgba(0, 212, 255, 0.03) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 1;
+            animation: pulseGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes pulseGlow {
+
+            0%,
+            100% {
+                opacity: 0.5;
+                transform: translate(-50%, -50%) scale(1);
+            }
+
+            50% {
+                opacity: 0.8;
+                transform: translate(-50%, -50%) scale(1.1);
+            }
+        }
+
+        /* === PARTICLES === */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            background: rgba(0, 255, 65, 0.2);
+            border-radius: 50%;
+            animation: floatUp linear infinite;
+        }
+
+        @keyframes floatUp {
+            0% {
+                transform: translateY(100vh) scale(0);
+                opacity: 0;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateY(-10vh) scale(1);
+                opacity: 0;
+            }
+        }
+
+        /* === CRT SCANLINES === */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(0deg,
+                    rgba(0, 0, 0, 0.15),
+                    rgba(0, 0, 0, 0.15) 1px,
+                    transparent 1px,
+                    transparent 2px);
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        /* === CRT VIGNETTE === */
+        .vignette {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse at center, transparent 0%, transparent 60%, rgba(0, 0, 0, 0.8) 100%);
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        /* === AUTHENTICATION NODE === */
+        .auth-node {
+            position: relative;
+            z-index: 10;
+            width: 520px;
+            /* Widened from 460px */
+            background: rgba(10, 10, 10, 0.95);
+            /* Slightly lighter black */
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            /* Subtle gray border */
+            box-shadow:
+                0 0 40px rgba(0, 0, 0, 0.8),
+                /* Deep shadow */
+                inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+            /* Inner highlight */
+            /* Refined Animation: TV Power On + Glitch Snap */
+            animation:
+                powerOn 0.6s cubic-bezier(0.23, 1, 0.32, 1) forwards,
+                glitchSnap 0.8s ease-out forwards;
+            transform-origin: center;
+            backdrop-filter: blur(10px);
+            opacity: 0;
+            /* Start invisible for animation */
+        }
+
+        /* 1. TV Power On: Horizontal Line -> Vertical Expand */
+        @keyframes powerOn {
+            0% {
+                transform: scaleY(0.002) scaleX(0);
+                opacity: 0;
+                filter: brightness(5);
+                /* Bright flash */
+            }
+
+            30% {
+                transform: scaleY(0.002) scaleX(1);
+                opacity: 1;
+                filter: brightness(3);
+            }
+
+            60% {
+                transform: scaleY(1) scaleX(1);
+                filter: brightness(1.5);
+            }
+
+            100% {
+                transform: scaleY(1) scaleX(1);
+                opacity: 1;
+                filter: brightness(1);
+            }
+        }
+
+        /* 2. Glitch Snap: RGB Split during expansion */
+        @keyframes glitchSnap {
+            0% {
+                text-shadow: 5px 0 rgba(255, 0, 0, 0.5), -5px 0 rgba(0, 255, 255, 0.5);
+            }
+
+            50% {
+                text-shadow: 3px 0 rgba(255, 0, 0, 0.3), -3px 0 rgba(0, 255, 255, 0.3);
+            }
+
+            100% {
+                text-shadow: 0 0 transparent;
+            }
+        }
+
+        /* === HEADER === */
+        .auth-header {
+            padding: 40px 30px 30px;
+            /* Increased padding */
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.02), transparent);
+        }
+
+        .brand-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .brand-text {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+        }
+
+        .pigment-word {
+            font-family: 'Press Start 2P', cursive;
+            font-weight: 700;
+            font-size: 42px;
+            /* Increased from 32px */
+            letter-spacing: -2px;
+            /* Tighter tracking */
+            /* Holographic Chrome */
+            background: linear-gradient(110deg, #00FFFF 0%, #00FFFF 40%, #FFFFFF 48%, #FFFFFF 52%, #FF00FF 60%, #FF00FF 100%);
+            background-size: 250% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: chromeShine 4s linear infinite;
+            filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.4));
+        }
+
+        @keyframes chromeShine {
+            0% {
+                background-position: 100% 0;
+            }
+
+            100% {
+                background-position: -150% 0;
+            }
+        }
+
+        .os-word {
+            font-family: 'Press Start 2P', cursive;
+            font-weight: 400;
+            font-size: 42px;
+            /* Increased */
+            color: #FFFFFF;
+            letter-spacing: -2px;
+        }
+
+        .brand-subtitle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            opacity: 0.7;
+            transition: opacity 0.3s ease;
+        }
+
+        .brand-subtitle:hover {
+            opacity: 1;
+        }
+
+        .subtitle-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .polymarket-badge {
+            display: flex;
+            align-items: center;
+        }
+
+        .poly-logo-img {
+            height: 24px;
+            /* Increased from 14px */
+            width: auto;
+            display: block;
+            filter: none;
+            /* Removed grayscale */
+            transition: transform 0.3s ease;
+        }
+
+        .brand-subtitle:hover .poly-logo-img {
+            transform: scale(1.05);
+        }
+
+        .typewriter-line {
+            font-family: 'VT323', monospace;
+            font-size: 16px;
+            color: var(--neon-green);
+            opacity: 0.6;
+            height: 20px;
+            margin-top: 10px;
+            letter-spacing: 1px;
+        }
+
+        .typewriter-line::after {
+            content: '_';
+            /* Changed block to underscore for cleaner look */
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            50% {
+                opacity: 1;
+            }
+
+            51%,
+            100% {
+                opacity: 0;
+            }
+        }
+
+        /* === FORM === */
+        .auth-form {
+            padding: 40px 50px;
+            /* More breathing room */
+        }
+
+        .input-group {
+            margin-bottom: 32px;
+            position: relative;
+        }
+
+        .input-label {
+            display: block;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: #666;
+            /* Neutral gray */
+            margin-bottom: 8px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .terminal-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+            /* Subtle white line */
+            padding: 10px 0;
+            font-family: 'JetBrains Mono', monospace;
+            /* Switched to JetBrains for cleaner look */
+            font-size: 18px;
+            color: #e0e0e0;
+            /* Off-white text */
+            caret-color: var(--cyan-accent);
+            /* Keep accent only on cursor */
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .terminal-input:focus {
+            border-bottom-color: #fff;
+            /* White on focus */
+            box-shadow: 0 10px 20px -10px rgba(0, 0, 0, 0.5);
+        }
+
+        .terminal-input::placeholder {
+            color: rgba(255, 255, 255, 0.1);
+            font-family: 'VT323', monospace;
+            font-size: 20px;
+        }
+
+        /* === PASSWORD MASK === */
+        .terminal-input[type="password"] {
+            letter-spacing: 6px;
+            font-family: 'VT323', monospace;
+        }
+
+        /* === BUTTON === */
+        .execute-btn {
+            width: 100%;
+            padding: 18px;
+            margin-top: 10px;
+            background: #fff;
+            /* Solid white button */
+            border: none;
+            color: #000;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+        }
+
+        .execute-btn:hover {
+            background: #e0e0e0;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+            letter-spacing: 4px;
+        }
+
+        .execute-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* === FOOTER STATUS === */
+        .auth-footer {
+            padding: 15px 30px;
+            border-top: 1px solid rgba(26, 26, 26, 0.5);
+            display: flex;
+            justify-content: space-between;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.3);
+            letter-spacing: 1px;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--neon-green);
+            border-radius: 50%;
+            animation: pulse-dot 2s infinite;
+        }
+
+        @keyframes pulse-dot {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        /* === SYSTEM STATUS (Bottom Right) === */
+        .system-status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: rgba(0, 255, 65, 0.4);
+            letter-spacing: 1px;
+            text-align: right;
+            z-index: 10;
+        }
+
+        .system-status span {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        /* === DECORATIVE CORNER === */
+        .corner-decor {
+            position: fixed;
+            width: 60px;
+            height: 60px;
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            z-index: 5;
+        }
+
+        .corner-decor.top-left {
+            top: 20px;
+            left: 20px;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        .corner-decor.top-right {
+            top: 20px;
+            right: 20px;
+            border-left: none;
+            border-bottom: none;
+        }
+
+        .corner-decor.bottom-left {
+            bottom: 20px;
+            left: 20px;
+            border-right: none;
+            border-top: none;
+        }
+
+        .corner-decor.bottom-right {
+            bottom: 20px;
+            right: 20px;
+            border-left: none;
+            border-top: none;
+        }
+
+        /* === GLITCH EFFECT ON HOVER === */
+        .auth-node:hover .brand-logo .pigment {
+            animation: glitch 0.3s ease;
+        }
+
+        @keyframes glitch {
+            0% {
+                transform: translate(0);
+            }
+
+            20% {
+                transform: translate(-2px, 2px);
+            }
+
+            40% {
+                transform: translate(-2px, -2px);
+            }
+
+            60% {
+                transform: translate(2px, 2px);
+            }
+
+            80% {
+                transform: translate(2px, -2px);
+            }
+
+            100% {
+                transform: translate(0);
+            }
+        }
+
+        /* === ERROR STATE === */
+        .terminal-input.error {
+            border-bottom-color: #ff3333;
+            animation: shake 0.5s ease;
+        }
+
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            20%,
+            60% {
+                transform: translateX(-5px);
+            }
+
+            40%,
+            80% {
+                transform: translateX(5px);
+            }
+        }
+
+        /* === ANIMATION 1: QUANTUM TUNNEL === */
+        .quantum-implode {
+            animation: implode 0.4s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+        }
+
+        @keyframes implode {
+            0% {
+                transform: scale(1);
+                filter: brightness(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+                filter: brightness(2);
+            }
+
+            100% {
+                transform: scale(0);
+                filter: brightness(10);
+                opacity: 0;
+            }
+        }
+
+        .quantum-warp {
+            animation: warpSpeed 2s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+        }
+
+        @keyframes warpSpeed {
+            0% {
+                transform: perspective(500px) rotateX(60deg) translateY(0) scale(1);
+            }
+
+            100% {
+                transform: perspective(500px) rotateX(60deg) translateY(2000px) scale(5);
+                opacity: 0;
+            }
+        }
+
+        /* === ANIMATION 2: CRT POWER CYCLE === */
+        .crt-off {
+            animation: turnOff 0.6s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+        }
+
+        @keyframes turnOff {
+            0% {
+                transform: scale(1, 1);
+                filter: brightness(1);
+            }
+
+            40% {
+                transform: scale(1, 0.002);
+                filter: brightness(5);
+            }
+
+            80% {
+                transform: scale(0, 0.002);
+                filter: brightness(10);
+            }
+
+            100% {
+                transform: scale(0, 0);
+                opacity: 0;
+            }
+        }
+
+        .boot-text {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            font-family: 'VT323', monospace;
+            font-size: 18px;
+            color: var(--neon-green);
+            z-index: 2000;
+            display: none;
+        }
+
+        /* === ANIMATION 3: SYSTEM OVERRIDE === */
+        .access-granted {
+            border-color: var(--neon-green) !important;
+            box-shadow: 0 0 50px var(--neon-green), inset 0 0 20px var(--neon-green) !important;
+        }
+
+        .matrix-dissolve {
+            animation: dissolve 1s ease-in forwards;
+        }
+
+        @keyframes dissolve {
+            0% {
+                opacity: 1;
+                transform: translateY(0);
+                clip-path: inset(0 0 0 0);
+            }
+
+            100% {
+                opacity: 0;
+                transform: translateY(50px);
+                clip-path: inset(0 0 100% 0);
+            }
+        }
+
+        /* Demo Controls */
+        .demo-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 9999;
+        }
+
+        .demo-btn {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #333;
+            color: #888;
+            padding: 8px 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .demo-btn:hover {
+            border-color: var(--cyan-accent);
+            color: var(--cyan-accent);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Background Elements -->
+    <div class="bg-grid"></div>
+    <div class="ambient-glow"></div>
+    <div class="particles" id="particles-container"></div>
+
+    <!-- CRT Effects -->
+    <div class="scanlines"></div>
+    <div class="vignette"></div>
+
+    <!-- Corner Decorations -->
+    <div class="corner-decor top-left"></div>
+    <div class="corner-decor top-right"></div>
+    <div class="corner-decor bottom-left"></div>
+    <div class="corner-decor bottom-right"></div>
+
+    <!-- Authentication Node -->
+    <div class="auth-node">
+        <div class="auth-header">
+            <div class="brand-container">
+                <div class="brand-text">
+                    <span class="pigment-word">PIGMENT</span>
+                    <span class="os-word">OS</span>
+                </div>
+                <div class="brand-subtitle"><span class="subtitle-text">Powered by</span>
+                    <div class="polymarket-badge"><img src="assets/polymarket_logo.png" alt="Polymarket"
+                            class="poly-logo-img"></div>
+                </div>
+            </div>
+            <div class="typewriter-line" id="typewriter"></div>
+        </div>
+        <form class="auth-form" id="login-form">
+            <div class="input-group">
+                <label class="input-label">PHONE NUMBER:</label>
+                <input type="tel" class="terminal-input" id="phone-number" placeholder="555 123 4567" value="+1 "
+                    autocomplete="tel" spellcheck="false" pattern="[+]?[0-9\s]*">
+            </div>
+
+            <button type="submit" class="execute-btn">[ REQUEST ACCESS CODE ]</button>
+        </form>
+        <div class="auth-footer">
+            <div class="status-item"><span class="status-dot"></span><span>UPLINK ACTIVE</span></div>
+            <div class="status-item"><span>NODE: ALPHA-7</span></div>
+        </div>
+    </div>
+
+    <!-- Boot Text for CRT Animation -->
+    <div class="boot-text" id="boot-sequence"></div>
+
+    <!-- Demo Controls -->
+    <div class="demo-controls">
+        <button class="demo-btn" onclick="triggerAnim(1)">1. QUANTUM</button>
+        <button class="demo-btn" onclick="triggerAnim(2)">2. CRT</button>
+        <button class="demo-btn" onclick="triggerAnim(3)">3. OVERRIDE</button>
+        <button class="demo-btn" onclick="triggerAnim(4)">4. SPRING</button>
+    </div>
+
+    <script> // Typewriter Effect
+        const typewriterText = "> ESTABLISHING SECURE UPLINK...";
+        const typewriterEl = document.getElementById('typewriter');
+        let charIndex = 0;
+
+        function typeWriter() {
+            if (charIndex < typewriterText.length) {
+                typewriterEl.textContent = typewriterText.substring(0, charIndex + 1);
+                charIndex++;
+                setTimeout(typeWriter, 50 + Math.random() * 50);
+            }
+        }
+
+        // Start typewriter after unfold animation
+        setTimeout(typeWriter, 800);
+
+        // Phone Number Auto-Formatter (US-only, minimal style)
+        const phoneInput = document.getElementById('phone-number');
+        if (phoneInput) {
+            // Set cursor position after "+1 " on focus
+            phoneInput.addEventListener('focus', (e) => {
+                if (e.target.value === '+1 ') {
+                    setTimeout(() => {
+                        e.target.setSelectionRange(3, 3); // Position after "+1 "
+                    }, 0);
+                }
+            });
+
+            phoneInput.addEventListener('input', (e) => {
+                let value = e.target.value.replace(/[^\d]/g, ''); // Extract only digits
+
+                // Always keep "1" as country code
+                if (!value.startsWith('1')) {
+                    value = '1' + value;
+                }
+
+                // Remove leading 1, format the rest
+                const localNumber = value.substring(1);
+
+                // Format as: +1 555 123 4567 (minimal spacing)
+                if (localNumber.length === 0) {
+                    e.target.value = '+1 ';
+                } else if (localNumber.length <= 3) {
+                    e.target.value = '+1 ' + localNumber;
+                } else if (localNumber.length <= 6) {
+                    e.target.value = '+1 ' + localNumber.substring(0, 3) + ' ' + localNumber.substring(3);
+                } else {
+                    e.target.value = '+1 ' + localNumber.substring(0, 3) + ' ' +
+                        localNumber.substring(3, 6) + ' ' + localNumber.substring(6, 10);
+                }
+            });
+
+            // Prevent deletion of "+1 "
+            phoneInput.addEventListener('keydown', (e) => {
+                const cursorPos = e.target.selectionStart;
+                if ((e.key === 'Backspace' || e.key === 'Delete') && cursorPos <= 3) {
+                    e.preventDefault();
+                }
+            });
+        }
+
+        // Generate Particles
+        const particlesContainer = document.getElementById('particles-container');
+
+        for (let i = 0; i < 20; i++) {
+            const p = document.createElement('div');
+            p.classList.add('particle');
+            p.style.left = Math.random() * 100 + '%';
+            p.style.width = Math.random() * 3 + 'px';
+            p.style.height = p.style.width;
+            p.style.animationDuration = Math.random() * 10 + 10 + 's';
+            p.style.animationDelay = Math.random() * 5 + 's';
+            particlesContainer.appendChild(p);
+        }
+
+        // Animation Trigger Logic
+        function triggerAnim(type) {
+            const node = document.querySelector('.auth-node');
+            const grid = document.querySelector('.bg-grid');
+            const btn = document.querySelector('.execute-btn');
+
+            // Reset
+            node.style.animation = 'none';
+            node.offsetHeight;
+            /* trigger reflow */
+            node.style.opacity = '1';
+
+            if (type === 1) {
+                // Quantum Tunnel
+                btn.textContent = '[ WARP ENGAGED ]';
+                node.classList.add('quantum-implode');
+                grid.classList.add('quantum-warp');
+                setTimeout(() => window.location.href = 'index.html', 800);
+            }
+
+            else if (type === 2) {
+                // CRT Power Cycle
+                btn.textContent = '[ SYSTEM REBOOT ]';
+                node.classList.add('crt-off');
+
+                setTimeout(() => {
+                    const boot = document.getElementById('boot-sequence');
+                    boot.style.display = 'block';
+                    const lines = ['> MOUNTING KERNEL...',
+                        '> DECRYPTING FEEDS...',
+                        '> UPLINK ESTABLISHED'
+                    ];
+                    let i = 0;
+
+                    const interval = setInterval(() => {
+                        boot.innerHTML += lines[i] + '<br>';
+                        i++;
+
+                        if (i >= lines.length) {
+                            clearInterval(interval);
+                            setTimeout(() => window.location.href = 'index.html', 500);
+                        }
+                    }
+
+                        , 300);
+                }
+
+                    , 600);
+            }
+
+            else if (type === 3) {
+                // System Override
+                btn.textContent = '[ ACCESS GRANTED ]';
+                btn.style.borderColor = '#00FF41';
+                btn.style.color = '#00FF41';
+                node.classList.add('access-granted');
+
+                setTimeout(() => {
+                    node.classList.add('matrix-dissolve');
+                    setTimeout(() => window.location.href = 'index.html', 1000);
+                }
+
+                    , 500);
+            }
+            else if (type === 4) {
+                // Collapse & Spring
+                btn.textContent = '[ INITIALIZING HUD ]';
+                node.classList.add('collapse-center');
+
+                // Create pulse flash at center
+                const flash = document.createElement('div');
+                flash.classList.add('pulse-flash');
+                document.body.appendChild(flash);
+
+                setTimeout(() => window.location.href = 'index.html?anim=spring', 800);
+            }
+        }
+
+        // Form submission (default to Spring animation)
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const phoneInput = document.getElementById('phone-number');
+
+            // Extract digits only (should be 11: "1" + 10-digit number)
+            const digitsOnly = phoneInput.value.replace(/\D/g, '');
+
+            // Validate: Must be exactly 11 digits (1 + area + number)
+            if (digitsOnly.length !== 11 || !digitsOnly.startsWith('1')) {
+                phoneInput.classList.add('error');
+                setTimeout(() => {
+                    phoneInput.classList.remove('error');
+                }, 500);
+                return;
+            }
+
+            // TODO: Firebase Phone Auth will go here
+            // For now, just trigger Spring animation
+            triggerAnim(4);
+        });
+    </script>
+</body>
+
+</html>
+```

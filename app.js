@@ -4,15 +4,26 @@
 document.addEventListener('DOMContentLoaded', () => {
     console.log('✅ JavaScript is loading and DOMContentLoaded fired!');
 
-    // === Cyber Watchdog Connection Monitor ===
-    function measureLatency() {
+    // === GLOBAL CONFIGURATION ===
+    const IS_FILE_PROTOCOL = window.location.protocol === 'file:';
+    const API_BASE_URL = IS_FILE_PROTOCOL ? 'http://localhost:8001' : '';
+
+    // === CHECK FOR SPRING ANIMATION ===
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('anim') === 'spring') {
+        document.querySelector('.terminal-container').classList.add('spring-entrance');
+    }
+
+    // === CYBER WATCHDOG (Connection Monitor) ===& Status Grid ===
+    function updateSystemStatus() {
         const start = Date.now();
-        fetch('/api/ping')
+
+        // 1. Check Latency (Ping)
+        fetch(`${API_BASE_URL}/api/ping`)
             .then(response => {
                 if (response.ok) {
                     const latency = Date.now() - start;
                     const latencyEl = document.getElementById('latency-value');
-                    const uplinkEl = document.getElementById('uplink-status');
                     const dotEl = document.querySelector('.status-dot');
 
                     if (latencyEl) {
@@ -20,11 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (latency < 100) latencyEl.style.color = 'var(--primary-color)';
                         else if (latency < 300) latencyEl.style.color = 'var(--warning-color)';
                         else latencyEl.style.color = '#ff3333';
-                    }
-
-                    if (uplinkEl) {
-                        uplinkEl.textContent = 'ESTABLISHED';
-                        uplinkEl.style.color = 'var(--primary-color)';
                     }
 
                     if (dotEl) {
@@ -36,32 +42,71 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             })
             .catch(() => {
-                const uplinkEl = document.getElementById('uplink-status');
                 const dotEl = document.querySelector('.status-dot');
-
-                if (uplinkEl) {
-                    uplinkEl.textContent = 'OFFLINE';
-                    uplinkEl.style.color = '#ff3333';
-                }
-
                 if (dotEl) {
                     dotEl.classList.remove('pulse-green');
                     dotEl.classList.add('pulse-red');
                 }
             });
+
+        // 2. Check Service Status
+        fetch(`${API_BASE_URL}/api/status`)
+            .then(res => res.json())
+            .then(data => {
+                const statusPoly = document.getElementById('status-poly');
+                const statusYfin = document.getElementById('status-yfin');
+                const statusRss = document.getElementById('status-rss');
+                const statusGamma = document.getElementById('status-gamma');
+                const impactDisplay = document.getElementById('impact-display');
+                const statusText = document.getElementById('system-status-text');
+
+                let affectedServices = [];
+
+                // Helper to update status item
+                const updateItem = (el, statusKey, name) => {
+                    if (!el) return;
+                    const service = data[statusKey];
+                    if (service && service.status === 'OFFLINE') {
+                        el.classList.add('offline');
+                        affectedServices.push(name);
+                    } else {
+                        el.classList.remove('offline');
+                    }
+                };
+
+                updateItem(statusPoly, 'POLY', 'POLYMARKET');
+                updateItem(statusYfin, 'YFIN', 'YAHOO FIN');
+                updateItem(statusRss, 'RSS', 'INTEL FEED');
+                updateItem(statusGamma, 'GAMMA', 'GAMMA WALL');
+                updateItem(statusGamma, 'HEATMAP', 'MARKET MAP'); // Map Heatmap to Gamma/YFIN visually or add new item? 
+                // Note: Heatmap uses YFIN data mostly, so YFIN status covers it, but we track it separately in backend.
+                // For now, we only visualize the 4 main ones in the grid.
+
+                // Update Impact Text
+                if (impactDisplay && statusText) {
+                    if (affectedServices.length > 0) {
+                        statusText.textContent = `FAILURE: ${affectedServices[0]}`;
+                        statusText.classList.add('critical');
+                        statusText.style.color = '#FF3333';
+                    } else {
+                        statusText.textContent = 'OPTIMAL';
+                        statusText.classList.remove('critical');
+                        statusText.style.color = '#00FF41';
+                    }
+                }
+            })
+            .catch(err => console.error("Status Fetch Error:", err));
     }
 
     function startWatchdog() {
-        measureLatency(); // Initial check
-        setInterval(measureLatency, 5000); // Check every 5 seconds
+        updateSystemStatus(); // Initial check
+        setInterval(updateSystemStatus, 5000); // Check every 5 seconds
     }
 
     // Start the Watchdog
     startWatchdog();
 
     // Configuration
-    const IS_FILE_PROTOCOL = window.location.protocol === 'file:';
-    const API_BASE_URL = IS_FILE_PROTOCOL ? 'http://localhost:8001' : '';
     const threatBox = document.getElementById('threat-box');
     const threatLevelSpan = document.getElementById('threat-level');
     const optionsBody = document.getElementById('options-body');
@@ -76,22 +121,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentTicker = savedTicker || 'QQQ';
 
     // Initialize Ticker Dropdown
-    const tickerSelect = document.getElementById('ticker-select');
-    if (tickerSelect) {
-        tickerSelect.value = currentTicker;
-        tickerSelect.addEventListener('change', (e) => {
-            currentTicker = e.target.value;
-            localStorage.setItem('pigment_current_ticker', currentTicker); // Save to storage
-
-            // Update Widgets
-            // Note: safeExecute is not defined in the provided snippet, assuming it's defined elsewhere or will be added.
-            // For now, direct calls are used.
-            createTradingViewWidget(currentTicker);
-            const whaleWidget = document.getElementById('unusual-whales');
-            if (whaleWidget && typeof whaleWidget.updateTicker === 'function') {
-                whaleWidget.updateTicker(currentTicker);
-            }
-        });
+    // Logic moved to line 192 to consolidate
+    if (currentTicker) {
+        createTradingViewWidget(currentTicker);
     }
     const gaugeLabel = document.querySelector('.gauge-label');
     const chartHeader = document.querySelector('#live-price-action h2');
@@ -126,7 +158,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 "gridColor": "rgba(30, 144, 255, 0.1)", // Subtle Deep Sky Blue grid
                 "hide_top_toolbar": true,
                 "studies": [
-                    "MASimple@tv-basicstudies"
+                    "MASimple@tv-basicstudies",    // Simple Moving Average
+                    "RSI@tv-basicstudies",         // RSI (14-period) - Overbought/Oversold
+                    "BB@tv-basicstudies"           // Bollinger Bands (20,2) - Volatility
                 ],
                 "container_id": "chart-container"
             });
@@ -188,55 +222,26 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     // Custom Dropdown Logic
-    const dropdownContainer = document.getElementById('ticker-dropdown');
-    const dropdownSelected = document.getElementById('dropdown-selected');
-    const dropdownOptions = document.getElementById('dropdown-options');
-    const selectedTickerText = document.getElementById('selected-ticker-text');
-
-    // Populate Dropdown Options
-    if (dropdownOptions && WATCHLIST_TICKERS) {
+    // Populate Ticker Select
+    const tickerSelect = document.getElementById('ticker-select');
+    if (tickerSelect && WATCHLIST_TICKERS) {
         WATCHLIST_TICKERS.forEach(ticker => {
-            const option = document.createElement('div');
-            option.className = 'dropdown-option';
+            const option = document.createElement('option');
+            option.value = ticker;
             option.textContent = ticker;
-            option.dataset.value = ticker;
+            if (ticker === currentTicker) option.selected = true;
+            tickerSelect.appendChild(option);
+        });
 
-            option.addEventListener('click', () => {
-                // Update selection
-                if (selectedTickerText) {
-                    selectedTickerText.textContent = ticker;
-                }
-                currentTicker = ticker;
+        tickerSelect.addEventListener('change', (e) => {
+            currentTicker = e.target.value;
+            localStorage.setItem('pigment_current_ticker', currentTicker);
+            createTradingViewWidget(currentTicker);
 
-                // Update Chart
-                createTradingViewWidget(ticker);
-
-                // Close dropdown
-                if (dropdownContainer) {
-                    dropdownContainer.classList.remove('open');
-                }
-            });
-
-            dropdownOptions.appendChild(option);
+            // Update Insider Ticker if needed
+            // (Assuming insider widget logic is separate or needs update)
         });
     }
-
-    // Toggle Dropdown on Click
-    if (dropdownSelected) {
-        dropdownSelected.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (dropdownContainer) {
-                dropdownContainer.classList.toggle('open');
-            }
-        });
-    }
-
-    // Close dropdown when clicking outside
-    document.addEventListener('click', (e) => {
-        if (dropdownContainer && !dropdownContainer.contains(e.target)) {
-            dropdownContainer.classList.remove('open');
-        }
-    });
 
     // Helper to clear container
     function clear(element) {
@@ -309,15 +314,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const item = document.createElement('div');
             item.className = 'polymarket-item';
 
-            // Delta Badge (Percent Change)
-            let deltaBadge = '';
-            if (market.delta !== 0) {
-                const deltaPercent = Math.abs(market.delta * 100).toFixed(0); // e.g. 15
-                const arrow = market.delta > 0 ? '↗' : '↘';
-                const colorClass = market.delta > 0 ? 'delta-up' : 'delta-down';
-                deltaBadge = `<span class="${colorClass}">${arrow} ${deltaPercent}%</span>`;
-            }
-
             // Calculate width for confidence gauge
             const prob1 = market.outcome_1_prob || 0;
             const width1 = prob1; // Direct percentage
@@ -328,12 +324,28 @@ document.addEventListener('DOMContentLoaded', () => {
             // Truncate long labels
             if (label1.length > 12) label1 = label1.substring(0, 12) + '..';
 
+            // Delta Badge (Percent Change)
+            let deltaBadge = '';
+            if (market.delta !== 0) {
+                const deltaPercent = Math.abs(market.delta * 100).toFixed(0); // e.g. 15
+                const arrow = market.delta > 0 ? '↗' : '↘';
+                const colorClass = market.delta > 0 ? 'delta-up' : 'delta-down';
+                deltaBadge = `<span class="${colorClass}">${arrow} ${deltaPercent}%</span>`;
+            }
+
+            // Resolution Indicator (If >98%)
+            let resolvingBadge = '';
+            if (market.outcome_1_prob >= 98 || market.outcome_2_prob >= 98) {
+                resolvingBadge = `<span class="polymarket-resolving-badge">RESOLVING ⏳</span>`;
+            }
+
             // Calculate width for split bar
             const width2 = 100 - width1;
 
             item.innerHTML = `
                 <div class="polymarket-header">
                     <a href="https://polymarket.com/event/${market.slug}" target="_blank" class="polymarket-event">${market.event}</a>
+                    ${resolvingBadge}
                 </div>
                 <div class="polymarket-odds-row">
                     <div class="polymarket-odds">
@@ -563,6 +575,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Toggle for next update
         showGainers = !showGainers;
+    }
+
+    function selectTicker(ticker) {
+        if (ticker === currentTicker) return;
+
+        currentTicker = ticker;
+        localStorage.setItem('pigment_current_ticker', currentTicker);
+
+        // Update Dropdown
+        const tickerSelect = document.getElementById('ticker-select'); // If using native select
+        if (tickerSelect) tickerSelect.value = currentTicker;
+
+        const selectedText = document.getElementById('selected-ticker-text'); // Custom dropdown
+        if (selectedText) selectedText.textContent = currentTicker;
+
+        // Update Chart
+        createTradingViewWidget(currentTicker);
+
+        // Update Active State in Ticker
+        const items = document.querySelectorAll('.clickable-ticker');
+        items.forEach(item => {
+            if (item.textContent.trim() === ticker) {
+                item.classList.add('active-ticker');
+            } else {
+                item.classList.remove('active-ticker');
+            }
+        });
     }
 
     // Start Slideshow
@@ -1333,6 +1372,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Auto-refresh interval variable
     let gammaInterval = null;
+    let currentGammaTicker = 'SPY';
 
     if (whaleViewBtn) {
         whaleViewBtn.addEventListener('click', () => {
@@ -1343,17 +1383,55 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Switch to Chart
                 if (gammaFeedContainer) gammaFeedContainer.style.display = 'none';
                 if (whaleChartView) whaleChartView.style.display = 'block';
-                if (whaleWidgetTitle) whaleWidgetTitle.textContent = 'GAMMA WALL (SPY) 👾';
+
+                // Inject Ticker Selector
+                whaleWidgetTitle.innerHTML = ''; // Clear title
+
+                const titleText = document.createElement('span');
+                titleText.textContent = 'GAMMA WALL';
+                titleText.style.marginRight = '10px';
+                whaleWidgetTitle.appendChild(titleText);
+
+                const selector = document.createElement('select');
+                selector.className = 'retro-selector'; // Use unified class
+                // Inline styles removed in favor of CSS class
+
+                // Populate with Shortened List (Mag 7 + Favorites)
+                const GAMMA_TICKERS = [
+                    'SPY', 'QQQ',
+                    'NVDA', 'TSLA', 'AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META',
+                    'AMD', 'PLTR', 'MU'
+                ];
+
+
+
+                GAMMA_TICKERS.forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = t;
+                    opt.textContent = t;
+                    if (t === currentGammaTicker) opt.selected = true;
+                    selector.appendChild(opt);
+                });
+
+                // Debounced fetch to respect rate limits
+                const debouncedFetch = debounce(fetchGammaWall, 300);
+                selector.addEventListener('change', (e) => {
+                    currentGammaTicker = e.target.value;
+                    debouncedFetch(currentGammaTicker);
+                });
+
+                whaleWidgetTitle.appendChild(selector);
+
                 whaleViewBtn.textContent = 'LIST';
                 whaleViewBtn.classList.add('active');
 
-                fetchGammaWall(); // Fetch immediately
+                fetchGammaWall(currentGammaTicker); // Fetch immediately
 
-                // Start Auto-Refresh (Every 5 minutes to match user request)
+                // Start Auto-Refresh (Every 5 minutes)
                 if (gammaInterval) clearInterval(gammaInterval);
                 gammaInterval = setInterval(() => {
                     if (isMarketOpen()) {
-                        fetchGammaWall();
+                        fetchGammaWall(currentGammaTicker);
                     }
                 }, 300000);
 
@@ -1362,7 +1440,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Switch to List
                 if (gammaFeedContainer) gammaFeedContainer.style.display = 'block';
                 if (whaleChartView) whaleChartView.style.display = 'none';
-                if (whaleWidgetTitle) whaleWidgetTitle.textContent = 'UNUSUAL WHALES 🐳';
+
+                // Restore Title
+                whaleWidgetTitle.textContent = 'UNUSUAL WHALES 🐳';
+
                 whaleViewBtn.textContent = 'VIEW';
                 whaleViewBtn.classList.remove('active');
 
@@ -1374,35 +1455,66 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    async function fetchGammaWall() {
-
+    async function fetchGammaWall(ticker = 'SPY') {
+        // Check localStorage cache first (TTL 2 minutes)
         try {
-            const res = await fetch('/api/gamma?symbol=SPY');
-            const data = await res.json();
+            // Inject Intel Minimalist Loader
+            if (gammaChartBars) {
+                gammaChartBars.innerHTML = `
+                <div class="intel-loader">
+                    <div class="intel-row">> TARGET: ${ticker}</div>
+                    <div class="intel-row">> STATUS: ACQUIRING DATA<span class="blink-cursor">█</span></div>
+                </div>
+            `;
+            }
 
+            const cached = getGammaCache(ticker);
+            if (cached) {
+                renderGammaChart(cached);
+                return;
+            }
+
+            const res = await fetch(`/api/gamma?symbol=${ticker}`);
+            const data = await res.json();
 
             if (data.error) {
                 console.error("Gamma Error:", data.error);
+                if (gammaChartBars) {
+                    gammaChartBars.innerHTML = `
+                    <div class="intel-loader" style="color: #FF3333;">
+                        <div class="intel-row">> TARGET: ${ticker}</div>
+                        <div class="intel-row">> STATUS: CONNECTION FAILED</div>
+                        <div class="intel-row">> ERROR: ${data.error}</div>
+                    </div>
+                `;
+                }
                 return;
             }
+
+            // Cache Success
+            setGammaCache(ticker, data);
 
             renderGammaChart(data);
         } catch (e) {
             console.error("Gamma Fetch Failed:", e);
+            if (gammaChartBars) {
+                gammaChartBars.innerHTML = `
+                <div class="intel-loader" style="color: #FF3333;">
+                    <div class="intel-row">> TARGET: ${ticker}</div>
+                    <div class="intel-row">> STATUS: SYSTEM FAILURE</div>
+                </div>
+            `;
+            }
         }
     }
 
     function renderGammaChart(data) {
         if (!gammaChartBars) {
-            // Try to get it again if null
             gammaChartBars = document.getElementById('gamma-chart-bars');
         }
-        if (!gammaChartBars) {
-            console.error("Gamma Chart Bars container not found!");
-            return;
-        }
+        if (!gammaChartBars) return;
 
-        // Create Tooltip Element if not exists
+        // Create Tooltip
         let tooltip = document.getElementById('gamma-tooltip');
         if (!tooltip) {
             tooltip = document.createElement('div');
@@ -1412,158 +1524,126 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.appendChild(tooltip);
         }
 
+        // Spot Price Line Removed per user request
+
         // Update Header
         const title = document.querySelector('.gamma-title');
-        if (title) title.textContent = `GAMMA WALL (${data.symbol}) 👾`;
+        if (title) {
+            let html = `GAMMA WALL (${data.symbol}) 👾`;
+            if (data.is_weekend_data) {
+                html += ` <span class="weekend-badge">FRI DATA</span>`;
+            }
+            title.innerHTML = html;
+        }
 
-        // Find Max Volume for scaling
         let maxVol = 0;
-        let maxOI = 0; // Keep maxOI for tooltip, but not for bar scaling
-
         data.strikes.forEach(s => {
             if (s.call_vol > maxVol) maxVol = s.call_vol;
             if (s.put_vol > maxVol) maxVol = s.put_vol;
-            if (s.call_oi > maxOI) maxOI = s.call_oi;
-            if (s.put_oi > maxOI) maxOI = s.put_oi;
         });
-
-        // Prevent division by zero
         if (maxVol === 0) maxVol = 1;
 
-        // Render Rows (Update existing or create new)
         const existingRows = new Map();
         Array.from(gammaChartBars.children).forEach(row => {
             const strike = parseFloat(row.dataset.strike);
             if (!isNaN(strike)) existingRows.set(strike, row);
         });
 
-        // Sort strikes to ensure order
-        data.strikes.sort((a, b) => b.strike - a.strike); // High to low? Or low to high? 
-        // Usually vertical charts are high price at top? Or low at top?
-        // Let's check previous behavior. Usually low to high (ascending) for standard charts, 
-        // but option chains often have high at top.
-        // The previous code didn't sort, it assumed data.strikes was sorted. 
-        // Let's assume data.strikes comes sorted from backend (it does).
+        // Sort High -> Low
+        data.strikes.sort((a, b) => b.strike - a.strike);
+
+        // Find ATM Strike for Blue Highlight
+        let closestStrike = null;
+        let minDiff = Infinity;
+        data.strikes.forEach(s => {
+            const diff = Math.abs(s.strike - data.current_price);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestStrike = s.strike;
+            }
+        });
 
         data.strikes.forEach(strikeData => {
             let row = existingRows.get(strikeData.strike);
-
-            // Calculate Widths
             const putWidth = (strikeData.put_vol / maxVol) * 100;
             const callWidth = (strikeData.call_vol / maxVol) * 100;
 
+            // Is this the "Zero Gamma" (ATM) row?
+            const isZeroGamma = strikeData.strike === closestStrike;
+
             if (row) {
-                // Update Existing Row
+                // Update
                 const putBar = row.querySelector('.gamma-bar-put');
                 const callBar = row.querySelector('.gamma-bar-call');
 
-                if (putBar) {
-                    putBar.style.width = `${putWidth}%`;
-                    // Update tooltip listeners
-                    putBar.onmouseenter = (e) => showTooltip(e, strikeData, 'PUT', tooltip);
-                    putBar.onmousemove = (e) => moveTooltip(e, tooltip);
-                    putBar.onmouseleave = () => hideTooltip(tooltip);
-                }
-                if (callBar) {
-                    callBar.style.width = `${callWidth}%`;
-                    // Update tooltip listeners
-                    callBar.onmouseenter = (e) => showTooltip(e, strikeData, 'CALL', tooltip);
-                    callBar.onmousemove = (e) => moveTooltip(e, tooltip);
-                    callBar.onmouseleave = () => hideTooltip(tooltip);
-                }
+                if (putBar) putBar.style.width = `${putWidth}%`;
+                if (callBar) callBar.style.width = `${callWidth}%`;
 
-                // Check if it's ATM
-                const strikeLabel = row.querySelector('.gamma-strike');
-                if (data.current_price >= strikeData.strike * 0.999 && data.current_price <= strikeData.strike * 1.001) {
-                    if (strikeLabel) {
-                        strikeLabel.style.color = '#FFFFFF';
-                        strikeLabel.style.fontWeight = 'bold';
-                        strikeLabel.style.border = '1px solid #FFF';
+                // Apply Blue Style
+                if (isZeroGamma) {
+                    row.classList.add('zero-gamma-row');
+                    // Add label if not exists
+                    if (!row.querySelector('.zero-gamma-label')) {
+                        const label = document.createElement('div');
+                        label.className = 'zero-gamma-label';
+                        label.textContent = "FLIP";
+                        row.appendChild(label);
                     }
-                    row.id = 'current-price-row';
                 } else {
-                    if (strikeLabel) {
-                        strikeLabel.style.color = '#888';
-                        strikeLabel.style.fontWeight = 'normal';
-                        strikeLabel.style.border = 'none';
-                    }
-                    if (row.id === 'current-price-row') row.removeAttribute('id');
+                    row.classList.remove('zero-gamma-row');
+                    const label = row.querySelector('.zero-gamma-label');
+                    if (label) label.remove();
                 }
 
                 existingRows.delete(strikeData.strike);
             } else {
-                // Create New Row
+                // Create New
                 row = document.createElement('div');
                 row.className = 'gamma-row';
                 row.dataset.strike = strikeData.strike;
+                if (isZeroGamma) {
+                    row.classList.add('zero-gamma-row');
+                    const label = document.createElement('div');
+                    label.className = 'zero-gamma-label';
+                    label.textContent = "FLIP";
+                    row.appendChild(label);
+                }
 
-                // Put Side
-                const putSide = document.createElement('div');
-                putSide.className = 'gamma-put-side';
+                row.innerHTML = `
+                    <div class="gamma-put-side">
+                        <div class="gamma-bar-put" style="width: ${putWidth}%"></div>
+                    </div>
+                    <div class="gamma-strike">${strikeData.strike.toFixed(1)}</div>
+                    <div class="gamma-call-side">
+                        <div class="gamma-bar-call" style="width: ${callWidth}%"></div>
+                    </div>
+                `;
 
-                // Volume Bar (Foreground)
-                const putBar = document.createElement('div');
-                putBar.className = 'gamma-bar-put';
-                putBar.style.width = `${putWidth}%`;
-
+                // Re-attach event listeners (simplified)
+                const putBar = row.querySelector('.gamma-bar-put');
+                const callBar = row.querySelector('.gamma-bar-call');
                 putBar.onmouseenter = (e) => showTooltip(e, strikeData, 'PUT', tooltip);
                 putBar.onmousemove = (e) => moveTooltip(e, tooltip);
                 putBar.onmouseleave = () => hideTooltip(tooltip);
-
-                putSide.appendChild(putBar);
-
-                // Strike Label
-                const strikeLabel = document.createElement('div');
-                strikeLabel.className = 'gamma-strike';
-                strikeLabel.textContent = strikeData.strike.toFixed(1);
-
-                if (data.current_price >= strikeData.strike * 0.999 && data.current_price <= strikeData.strike * 1.001) {
-                    strikeLabel.style.color = '#FFFFFF';
-                    strikeLabel.style.fontWeight = 'bold';
-                    strikeLabel.style.border = '1px solid #FFF';
-                    row.id = 'current-price-row';
-                }
-
-                // Call Side
-                const callSide = document.createElement('div');
-                callSide.className = 'gamma-call-side';
-
-                // Volume Bar (Foreground)
-                const callBar = document.createElement('div');
-                callBar.className = 'gamma-bar-call';
-                callBar.style.width = `${callWidth}%`;
-
                 callBar.onmouseenter = (e) => showTooltip(e, strikeData, 'CALL', tooltip);
                 callBar.onmousemove = (e) => moveTooltip(e, tooltip);
                 callBar.onmouseleave = () => hideTooltip(tooltip);
 
-                callSide.appendChild(callBar);
-
-                row.appendChild(putSide);
-                row.appendChild(strikeLabel);
-                row.appendChild(callSide);
-
-                // Insert in correct order? 
-                // Since we iterate data.strikes (sorted), appending to end works if we clear first.
-                // But here we are updating. 
-                // For simplicity, let's just append. If order is wrong, we might need to re-sort DOM.
-                // But usually strikes don't change order.
                 gammaChartBars.appendChild(row);
             }
         });
 
-        // Remove stale rows
         existingRows.forEach((row) => row.remove());
 
-        // Auto-scroll ONLY on first load
+        // Auto-scroll on first load
         if (!gammaChartBars.dataset.scrolled) {
             setTimeout(() => {
-                const currentRow = document.getElementById('current-price-row');
+                const currentRow = document.querySelector('.zero-gamma-row');
                 if (currentRow) {
                     currentRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     gammaChartBars.dataset.scrolled = "true";
                 }
-            }, 100);
+            }, 500);
         }
     }
 
@@ -1862,8 +1942,16 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (pub.includes('investing')) sourceColor = '#FFA500';
             else if (pub.includes('yahoo')) sourceColor = '#720e9e';
 
+            // Logo Logic (Minimalistic)
+            let logoHtml = '';
+            if (item.domain) {
+                const logoUrl = `https://www.google.com/s2/favicons?domain=${item.domain}&sz=64`;
+                logoHtml = `<img src="${logoUrl}" class="news-source-logo" alt="${item.publisher}" onerror="this.style.display='none'">`;
+            }
+
             div.innerHTML = `
     <div class="news-meta">
+                    ${logoHtml}
                     <span class="news-source-tag" style="color: ${sourceColor}">${item.publisher || 'WIRE'}</span>
                     <span class="news-time">${timeStr}</span>
                 </div>
@@ -1983,6 +2071,67 @@ document.addEventListener('DOMContentLoaded', () => {
             // Optional: Update UI to show "OFFLINE" for this specific widget?
         }
     }
+
+    // === UTILITY: Debounce Function ===
+    function debounce(func, delay) {
+        let timeout;
+        return function (...args) {
+            const context = this;
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(context, args), delay);
+        };
+    }
+
+    // === UTILITY: Simple Cache Function ===
+    function cache(func, ttl = 300000) { // Default TTL 5 minutes (300,000 ms)
+        const cacheStore = new Map();
+        return async function (...args) {
+            const key = JSON.stringify(args);
+            const now = Date.now();
+            // Simple in-memory cache not used for Gamma, we keep localStorage helpers below
+
+            if (cacheStore.has(key)) {
+                const { value, timestamp } = cacheStore.get(key);
+                if (now - timestamp < ttl) {
+                    // console.log(`Cache hit for key: ${key}`);
+                    return value;
+                } else {
+                    // console.log(`Cache expired for key: ${key}`);
+                    cacheStore.delete(key); // Invalidate expired cache
+                }
+            }
+
+            // console.log(`Cache miss for key: ${key}, fetching...`);
+            const result = await func.apply(this, args);
+            cacheStore.set(key, { value: result, timestamp: now });
+            return result;
+        };
+    }
+
+    // Helper: LocalStorage cache for Gamma Wall (TTL 2 minutes)
+    const GAMMA_CACHE_TTL = 2 * 60 * 1000;
+    function getGammaCache(ticker) {
+        const key = `gamma_cache_${ticker}`;
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        try {
+            const parsed = JSON.parse(raw);
+            if (Date.now() - parsed.timestamp < GAMMA_CACHE_TTL) {
+                return parsed.data;
+            }
+            localStorage.removeItem(key);
+            return null;
+        } catch {
+            return null;
+        }
+    }
+    function setGammaCache(ticker, data) {
+        const key = `gamma_cache_${ticker}`;
+        const payload = { timestamp: Date.now(), data };
+        localStorage.setItem(key, JSON.stringify(payload));
+    }
+
+
 
     // Initial Fetch & Interval
     safeExecute('News Feed', fetchNews);

@@ -7,7 +7,7 @@
     <title>PIGMENT OS</title>
     <meta name="description" content="Real-time Financial Intelligence Dashboard">
     <link rel="icon" type="image/png" href="assets/favicon.png">
-    <link rel="stylesheet" href="styles.css?v=3.13">
+    <link rel="stylesheet" href="styles.css?v=3.15">
     <link href="https://fonts.googleapis.com/css2?family=VT323&family=JetBrains+Mono:wght@400;700&display=swap"
         rel="stylesheet">
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
@@ -107,7 +107,7 @@
                     </div>
                     <div class="widget-content chart-container" id="whale-chart-view" style="display: none;">
                         <!-- Gamma Wall Chart -->
-                        <div class="gamma-chart-wrapper">
+                        <div class="gamma-chart-wrapper crt-effect">
                             <!-- Header removed, moved to main widget title -->
                             <div id="gamma-chart-bars"></div>
                             <div class="gamma-axis-label">
@@ -168,15 +168,9 @@
                         <div class="header-left-group">
                             <h2>PRICE ACTION</h2>
                             <!-- Custom Ticker Dropdown (Next to title) -->
-                            <div class="custom-dropdown" id="ticker-dropdown">
-                                <div class="dropdown-selected" id="dropdown-selected">
-                                    <span id="selected-ticker-text">NVDA</span>
-                                    <span class="dropdown-arrow">▼</span>
-                                </div>
-                                <div class="dropdown-options" id="dropdown-options">
-                                    <!-- Options populated by JS -->
-                                </div>
-                            </div>
+                            <select id="ticker-select" class="retro-selector">
+                                <!-- Options populated by JS -->
+                            </select>
                         </div>
                         <div class="status-container" id="status-chart">
                             <span class="status-dot">●</span>
@@ -273,29 +267,32 @@
         </div>
     </div>
 
-    <script src="mockData.js"></script>
     <!-- Cyber Watchdog Connection Monitor -->
     <div id="connection-monitor" class="watchdog-panel">
         <div class="watchdog-header">
             <span class="status-dot pulse-green"></span> SYSTEM_DIAGNOSTICS
         </div>
         <div class="watchdog-content">
-            <div class="metric-row">
-                <span class="label">UPLINK:</span>
-                <span class="value" id="uplink-status">ESTABLISHED</span>
+            <!-- Status Grid -->
+            <div class="status-grid">
+                <div class="status-item" id="status-poly">POLY</div>
+                <div class="status-item" id="status-yfin">YFIN</div>
+                <div class="status-item" id="status-rss">RSS</div>
+                <div class="status-item" id="status-gamma">GAMMA</div>
+            </div>
+            <!-- Impact Display -->
+            <div class="impact-row" id="impact-display">
+                <span class="label">STATUS:</span>
+                <span class="value" id="system-status-text">OPTIMAL</span>
             </div>
             <div class="metric-row">
                 <span class="label">LATENCY:</span>
                 <span class="value" id="latency-value">--ms</span>
             </div>
-            <div class="metric-row">
-                <span class="label">SEC_LEVEL:</span>
-                <span class="value">MAXIMUM</span>
-            </div>
         </div>
     </div>
 
-    <script src="app.js?v=3.13"></script>
+    <script src="app.js?v=3.17"></script>
 </body>
 
 </html>
