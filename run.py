@@ -128,14 +128,26 @@ def refresh_single_whale(symbol):
         
         for expiry in target_expirations:
             try:
+                # FILTER: 0DTE for Indices (SPY, QQQ, IWM)
+                # 0DTE is mostly noise/hedging. We want strategic positioning.
+                if symbol in ['SPY', 'QQQ', 'IWM']:
+                    expiry_date = datetime.strptime(expiry, "%Y-%m-%d").date()
+                    # Use Eastern time for market date
+                    today_date = datetime.now(pytz.timezone('US/Eastern')).date()
+                    if expiry_date <= today_date:
+                        continue
+
                 opts = ticker.option_chain(expiry)
                 calls = opts.calls; calls['type'] = 'CALL'
                 puts = opts.puts; puts['type'] = 'PUT'
                 chain = pd.concat([calls, puts])
                 
-                # UNUSUAL CRITERIA
+                # UNUSUAL CRITERIA - Vol/OI ratio varies by symbol type
+                # For indices: 4x ratio to filter noise
+                # For stocks: 3x ratio
+                vol_oi_multiplier = 4 if symbol in ['SPY', 'QQQ', 'IWM'] else 3
                 unusual = chain[
-                    (chain['volume'] > (chain['openInterest'] * 3)) & 
+                    (chain['volume'] > (chain['openInterest'] * vol_oi_multiplier)) & 
                     (chain['volume'] > 500) & 
                     (chain['lastPrice'] > 0.10)
                 ]
@@ -160,6 +172,13 @@ def refresh_single_whale(symbol):
                     # FORMATTING
                     strike = float(row['strike'])
                     is_call = row['type'] == 'CALL'
+                    
+                    # FILTER: MONEYNESS (Industry Standard - within 10% of current price)
+                    # Only show ATM and near-the-money options
+                    price_diff_pct = abs(strike - current_price) / current_price
+                    if price_diff_pct > 0.10:  # More than 10% away from current price
+                        continue
+                    
                     moneyness = "ITM" if (is_call and current_price > strike) or (not is_call and current_price < strike) else "OTM"
                     
                     # Format Premium
@@ -405,7 +424,7 @@ def api_polymarket():
                 "SCIENCE": ['space', 'nasa', 'spacex', 'mars', 'moon', 'cancer', 'climate', 'temperature', 'fda', 'medicine']
             }
 
-            BLACKLIST = ['nfl', 'nba', 'super bowl', 'sport', 'football', 'basketball', 'soccer', 'tennis', 'golf', 'searched', 'election', 'solana', 'microstrategy', 'mstr', 'zootopia', 'wicked', 'movie', 'film', 'box office', 'cinema', 'counterstrike', 'counter-strike', 'cs2']
+            BLACKLIST = ['nfl', 'nba', 'super bowl', 'sport', 'football', 'basketball', 'soccer', 'tennis', 'golf', 'searched', 'election', 'solana', 'microstrategy', 'mstr', 'zootopia', 'wicked', 'movie', 'film', 'box office', 'cinema', 'counterstrike', 'counter-strike', 'cs2', 'satoshi']
             
             candidates = []
             seen_stems = {}
@@ -436,7 +455,13 @@ def api_polymarket():
                 # 1. Blacklist Check
                 if any(bad in title_lower for bad in BLACKLIST): continue
                 
-                # 2. Determine Category
+                # 2. Filter out markets with specific times of day (e.g., "11AM ET", "7PM ET")
+                # This regex matches patterns like: 11AM, 11:30AM, 7PM, 3:45PM (with optional ET/EST/PST)
+                time_pattern = r'\b\d{1,2}(:\d{2})?\s*(AM|PM|am|pm)\s*(ET|EST|PST|CST)?\b'
+                if re.search(time_pattern, title):
+                    continue  # Skip markets with time-of-day mentions
+                
+                # 3. Determine Category
                 category = "OTHER"
                 for cat, keys in KEYWORDS.items():
                     if any(re.search(r'\b' + re.escape(k) + r'\b', title_lower) for k in keys):
@@ -444,8 +469,24 @@ def api_polymarket():
                         break
                 
                 if category == "OTHER": continue
+                
+                # 4. Filter out multi-range markets (temperature, views, prices, etc.)
+                # These markets have 3+ outcomes and don't display well in binary format
+                multi_range_patterns = [
+                    r'temperature',
+                    r'how many',
+                    r'# of views',
+                    r'number of',
+                    r'what price',
+                    r'how much',
+                    r'what will.*close at',
+                    r'highest.*on',
+                    r'lowest.*on'
+                ]
+                if any(re.search(pattern, title_lower) for pattern in multi_range_patterns):
+                    continue
 
-                # 3. Market Data Extraction
+                # 5. Market Data Extraction
                 markets = event.get('markets', [])
                 if not markets: continue
                 

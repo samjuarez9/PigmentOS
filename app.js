@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 "style": "1", // Candle style
                 "locale": "en",
                 "enable_publishing": false,
-                "backgroundColor": "#0C0C18", // Deep Cosmos Background
+                "backgroundColor": "#000000", // Pure Black to match PCR
                 "gridColor": "rgba(30, 144, 255, 0.1)", // Subtle Deep Sky Blue grid
                 "hide_top_toolbar": true,
                 "studies": [
@@ -299,6 +299,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fetched from API
 
 
+    // Polymarket Position Tracking (for flash animations)
+    let previousPolyPositions = new Map(); // Tracks {slug: position_index}
+
     // Render Polymarket Odds
     function renderPolymarket(data) {
 
@@ -310,7 +313,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         container.innerHTML = ''; // Clear previous
 
-        data.forEach(market => {
+        // Track current positions to detect moves
+        const currentPositions = new Map();
+
+        data.forEach((market, index) => {
             const item = document.createElement('div');
             item.className = 'polymarket-item';
 
@@ -320,6 +326,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Determine label - Dynamic from Backend
             let label1 = market.outcome_1_label || 'YES';
+            let label2 = market.outcome_2_label || 'NO';
+
+            // Detect multi-choice markets and adjust labels
+            const multiChoicePatterns = [
+                /^Which company/i,
+                /^Who will/i,
+                /^What price/i,
+                /^Which /i,
+                /^Who /i
+            ];
+
+            const isMultiChoice = multiChoicePatterns.some(pattern => pattern.test(market.event)) &&
+                label2.toLowerCase() === 'no';
+
+            // If multi-choice, replace "No" with "Others"
+            if (isMultiChoice) {
+                label2 = 'Others';
+            }
+
+            // Add multi-choice indicator to event text
+            let eventText = market.event;
+            if (isMultiChoice) {
+                eventText += ' ⋯';
+            }
 
             // Truncate long labels
             if (label1.length > 12) label1 = label1.substring(0, 12) + '..';
@@ -342,9 +372,33 @@ document.addEventListener('DOMContentLoaded', () => {
             // Calculate width for split bar
             const width2 = 100 - width1;
 
+            // **Position Tracking & Flash Animation**
+            const slug = market.slug;
+            const previousPosition = previousPolyPositions.get(slug);
+            currentPositions.set(slug, index);
+
+            // Detect if market is new or has moved position
+            let shouldFlash = false;
+            if (previousPosition === undefined) {
+                // New market
+                shouldFlash = true;
+            } else if (previousPosition !== index) {
+                // Position changed
+                shouldFlash = true;
+            }
+
+            // Apply flash animation class
+            if (shouldFlash) {
+                item.classList.add('flash-row');
+                // Remove animation class after it completes (1 second)
+                setTimeout(() => {
+                    item.classList.remove('flash-row');
+                }, 1000);
+            }
+
             item.innerHTML = `
                 <div class="polymarket-header">
-                    <a href="https://polymarket.com/event/${market.slug}" target="_blank" class="polymarket-event">${market.event}</a>
+                    <a href="https://polymarket.com/event/${market.slug}" target="_blank" class="polymarket-event">${eventText}</a>
                     ${resolvingBadge}
                 </div>
                 <div class="polymarket-odds-row">
@@ -366,6 +420,9 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             container.appendChild(item);
         });
+
+        // Update position tracking for next render
+        previousPolyPositions = currentPositions;
 
     }
 
@@ -1832,6 +1889,7 @@ document.addEventListener('DOMContentLoaded', () => {
             "interval": "5",  // 5-minute candles for visual movement
             "timezone": "America/New_York",
             "theme": "dark",
+            "backgroundColor": "#000000", // Pure Black
             "style": "10", // Baseline chart type
             "locale": "en",
             "toolbar_bg": "#f1f3f6",
