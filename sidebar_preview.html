@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SYSTEM MANUAL // AGENTIC CORE</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=VT323&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --neon-green: #00FF41;
+            --neon-cyan: #00F3FF;
+            --neon-pink: #FF00FF;
+            --neon-yellow: #FFD700;
+            --bg-dark: #020202;
+            --glass-panel: rgba(10, 15, 10, 0.95);
+            --grid-line: rgba(0, 255, 65, 0.1);
+            --font-tech: 'Rajdhani', sans-serif;
+            --font-pixel: 'VT323', monospace;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: #fff;
+            font-family: var(--font-tech);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+            /* Cyber Grid */
+            background-image:
+                linear-gradient(var(--grid-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+
+        /* === TRIGGER NODE === */
+        .sys-trigger {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            width: 50px;
+            height: 50px;
+            background: #000;
+            border: 2px solid var(--neon-green);
+            cursor: pointer;
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 10px var(--neon-green);
+            transition: all 0.3s ease;
+            clip-path: polygon(10% 0, 100% 0, 100% 90%, 90% 100%, 0 100%, 0 10%);
+        }
+
+        .sys-trigger::before {
+            content: 'SYS';
+            font-family: var(--font-pixel);
+            font-size: 20px;
+            color: var(--neon-green);
+            animation: pulse 2s infinite;
+        }
+
+        .sys-trigger:hover {
+            background: var(--neon-green);
+            box-shadow: 0 0 20px var(--neon-green);
+        }
+
+        .sys-trigger:hover::before {
+            color: #000;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        /* === SIDEBAR CONTAINER === */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 500px;
+            /* Wider for more content */
+            height: 100vh;
+            background: var(--glass-panel);
+            border-left: 2px solid var(--neon-green);
+            transform: translateX(100%);
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -10px 0 40px rgba(0, 255, 65, 0.1);
+        }
+
+        .sidebar.open {
+            transform: translateX(0);
+        }
+
+        /* HEADER */
+        .sidebar-header {
+            padding: 30px;
+            border-bottom: 1px solid var(--neon-green);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(90deg, rgba(0, 255, 65, 0.1), transparent);
+        }
+
+        .sidebar-title {
+            font-family: var(--font-pixel);
+            font-size: 32px;
+            color: var(--neon-green);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 5px var(--neon-green);
+        }
+
+        .close-btn {
+            background: transparent;
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            font-family: var(--font-pixel);
+            font-size: 18px;
+            padding: 5px 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .close-btn:hover {
+            background: var(--neon-green);
+            color: #000;
+        }
+
+        /* CONTENT AREA */
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* === TECH CARDS === */
+        .card {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #333;
+            padding: 2px;
+            /* For inner border effect */
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            border-color: #555;
+        }
+
+        /* Active State Styling */
+        .card.active {
+            border-color: var(--active-color, var(--neon-green));
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+
+        .card-inner {
+            background: rgba(20, 20, 20, 0.8);
+            padding: 20px;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Header Layout */
+        .card-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .card-title {
+            font-family: var(--font-tech);
+            font-size: 20px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #fff;
+            transition: color 0.3s;
+        }
+
+        .card.active .card-title {
+            color: var(--active-color, var(--neon-green));
+        }
+
+        .card-status {
+            font-family: var(--font-pixel);
+            font-size: 14px;
+            color: #666;
+        }
+
+        .card.active .card-status {
+            color: var(--active-color, var(--neon-green));
+        }
+
+        /* === DIGITIZE ANIMATION === */
+        .card-body {
+            display: none;
+            /* Hidden by default */
+            font-size: 15px;
+            line-height: 1.6;
+            color: #ccc;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px dashed #444;
+            position: relative;
+        }
+
+        .card.active .card-body {
+            display: block;
+            animation: digitize 0.6s steps(15, end) forwards;
+        }
+
+        @keyframes digitize {
+            0% {
+                opacity: 0;
+                clip-path: inset(0 100% 0 0);
+                transform: translateX(-10px);
+            }
+
+            100% {
+                opacity: 1;
+                clip-path: inset(0 0 0 0);
+                transform: translateX(0);
+            }
+        }
+
+        /* Scanline Effect on Text */
+        .card.active .card-body::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(transparent 50%, rgba(0, 0, 0, 0.5) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            opacity: 0.3;
+        }
+
+        /* Color Variants */
+        .card-signal {
+            --active-color: var(--neon-green);
+        }
+
+        .card-gamma {
+            --active-color: var(--neon-cyan);
+        }
+
+        .card-whale {
+            --active-color: var(--neon-pink);
+        }
+
+        .card-fear {
+            --active-color: var(--neon-yellow);
+        }
+
+        /* Highlighting Key Terms */
+        strong {
+            color: #fff;
+            font-weight: 700;
+        }
+
+        .stat-block {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+            font-family: var(--font-pixel);
+            font-size: 14px;
+        }
+
+        .stat {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 8px;
+            border-radius: 2px;
+            color: var(--active-color);
+        }
+
+        /* Scrollbar */
+        .content-area::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .content-area::-webkit-scrollbar-track {
+            background: #000;
+        }
+
+        .content-area::-webkit-scrollbar-thumb {
+            background: var(--neon-green);
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Trigger -->
+    <div class="sys-trigger" onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">>> SYSTEM_CORE</div>
+            <button class="close-btn" onclick="toggleSidebar()">[CLOSE]</button>
+        </div>
+
+        <div class="content-area">
+
+            <!-- Card 1: THE SIGNAL -->
+            <div class="card card-signal active" onclick="toggleCard(this)">
+                <div class="card-inner">
+                    <div class="card-head">
+                        <span class="card-title">Autonomous Surveillance</span>
+                        <span class="card-status">ONLINE</span>
+                    </div>
+                    <div class="card-body">
+                        PigmentOS is not a dashboard; it is an <strong>autonomous surveillance engine</strong>. It
+                        continuously scans global liquidity pools, identifying structural imbalances before they
+                        manifest in price.
+                        <br><br>
+                        Our proprietary algorithms filter noise to isolate <strong>pure institutional intent</strong>,
+                        stripping away retail sentiment to reveal the raw order flow driving the market.
+                        <div class="stat-block">
+                            <span class="stat">LATENCY: 12ms</span>
+                            <span class="stat">UPTIME: 99.9%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2: GAMMA WALL -->
+            <div class="card card-gamma" onclick="toggleCard(this)">
+                <div class="card-inner">
+                    <div class="card-head">
+                        <span class="card-title">Gamma Protocol</span>
+                        <span class="card-status">CALCULATING</span>
+                    </div>
+                    <div class="card-body">
+                        Real-time <strong>Dealer Hedging Analysis</strong>. We calculate the aggregate Gamma Exposure
+                        (GEX) across all option strikes to pinpoint "sticky" price levels.
+                        <br><br>
+                        When dealers are <strong>Short Gamma</strong>, volatility expands as they chase price. When
+                        <strong>Long Gamma</strong>, volatility contracts. PigmentOS visualizes this invisible
+                        battlefield to predict pivot points.
+                        <div class="stat-block">
+                            <span class="stat">MODEL: BLACK-SCHOLES</span>
+                            <span class="stat">DEPTH: L3 DATA</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3: WHALE RADAR -->
+            <div class="card card-whale" onclick="toggleCard(this)">
+                <div class="card-inner">
+                    <div class="card-head">
+                        <span class="card-title">Whale Tracking</span>
+                        <span class="card-status">FILTERING</span>
+                    </div>
+                    <div class="card-body">
+                        Algorithmic detection of <strong>High-Conviction Order Flow</strong>. We don't just show trades;
+                        we analyze intent.
+                        <br><br>
+                        Our engine filters for "Unusual" activity—outsized premiums (>$5M), aggressive OTM positioning,
+                        and <strong>0DTE speculation</strong>—flagging only the flows that have the statistical power to
+                        move markets.
+                        <div class="stat-block">
+                            <span class="stat">FILTER: >4σ SIGMA</span>
+                            <span class="stat">TARGET: SMART MONEY</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4: FEAR INDEX -->
+            <div class="card card-fear" onclick="toggleCard(this)">
+                <div class="card-inner">
+                    <div class="card-head">
+                        <span class="card-title">Sentiment Engine</span>
+                        <span class="card-status">MONITORING</span>
+                    </div>
+                    <div class="card-body">
+                        A multi-factor psychological model. By synthesizing <strong>VIX Term Structure</strong>,
+                        Put/Call Ratios, and safe-haven capital flows, we quantify the market's emotional state.
+                        <br><br>
+                        This isn't a survey; it's a direct read on the <strong>fear and greed</strong> driving capital
+                        allocation in real-time.
+                        <div class="stat-block">
+                            <span class="stat">INPUTS: 12</span>
+                            <span class="stat">FREQ: REAL-TIME</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        function toggleCard(card) {
+            // Close others (optional, but cleaner for this effect)
+            document.querySelectorAll('.card').forEach(c => {
+                if (c !== card) c.classList.remove('active');
+            });
+            card.classList.toggle('active');
+        }
+
+        // Open sidebar by default for preview
+        setTimeout(() => toggleSidebar(), 500);
+    </script>
+
+</body>
+
+</html>

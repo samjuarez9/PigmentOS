@@ -919,10 +919,15 @@ h1 {
 }
 
 /* Live State - Neon Green */
+#status-tfi .status-dot {
+    display: none;
+    /* Hide dot for TFI widget */
+}
+
 .status-container.status-live .status-dot {
     color: #00FF00;
     /* Pure Green */
-    animation: blink 1s steps(1) infinite;
+    animation: status-blink 1.5s ease-in-out infinite;
     font-size: 8px;
     /* Tiny dot */
 }
@@ -930,7 +935,22 @@ h1 {
 .status-container.status-live .status-text {
     color: #00FF00;
     /* Pure Green */
-    text-shadow: 0 0 4px rgba(0, 255, 0, 0.6);
+    text-shadow: 0 0 8px rgba(0, 255, 0, 0.9);
+    animation: status-blink 1.5s ease-in-out infinite;
+}
+
+@keyframes status-blink {
+
+    0%,
+    49%,
+    100% {
+        opacity: 1;
+    }
+
+    50%,
+    99% {
+        opacity: 0.3;
+    }
 }
 
 @keyframes blink {
@@ -1115,6 +1135,7 @@ td {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    position: relative;
 }
 
 .tfi-display {
@@ -1131,6 +1152,8 @@ td {
     color: #CCC;
     letter-spacing: 2px;
     transition: all 0.3s ease;
+    position: relative;
+    z-index: 1;
 }
 
 .tfi-rating {
@@ -1159,12 +1182,12 @@ td {
     0%,
     100% {
         opacity: 0.8;
-        text-shadow: 0 0 10px #FF0000;
+        text-shadow: 0 0 20px #FF0000, 0 0 40px #FF0000;
     }
 
     50% {
         opacity: 1;
-        text-shadow: 0 0 25px #FF0000, 0 0 35px #FF0000;
+        text-shadow: 0 0 30px #FF0000, 0 0 60px #FF0000, 0 0 90px #FF0000;
     }
 }
 
@@ -1294,6 +1317,8 @@ td {
 .tfi-bar-chart {
     display: flex;
     gap: 4px;
+    position: relative;
+    z-index: 2;
     height: 20px;
     width: 100%;
 }
@@ -1303,6 +1328,8 @@ td {
     background: rgba(255, 255, 255, 0.1);
     border-radius: 2px;
     transition: all 0.3s ease;
+    position: relative;
+    z-index: 10;
 }
 
 /* Active States - LED Glow */
@@ -2965,6 +2992,76 @@ td {
 }
 
 /* Type Indicators in Strike Column */
+.diag-latency {
+    color: #5DADE2;
+    font-size: 9px;
+    margin-left: auto;
+}
+
+/* Fixed X Button below Diagnostics */
+.x-fixed-btn {
+    position: fixed;
+    top: 50px;
+    /* Below the 20px top + ~25px height of diag bar */
+    left: 20px;
+    background: rgba(157, 78, 221, 0.2);
+    /* Purple tint */
+    border: 1px solid #9D4EDD;
+    /* Purple border */
+    color: #FFFFFF;
+    padding: 4px 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    z-index: 900;
+    transition: all 0.2s ease;
+    letter-spacing: 1px;
+    box-shadow: 0 0 10px rgba(157, 78, 221, 0.2);
+}
+
+.x-fixed-btn:hover {
+    background: #9D4EDD;
+    /* Solid purple on hover */
+    border-color: #9D4EDD;
+    color: #FFFFFF;
+    box-shadow: 0 0 15px rgba(157, 78, 221, 0.6);
+}
+
+/* Fixed Discord Button next to X */
+.discord-fixed-btn {
+    position: fixed;
+    top: 50px;
+    left: 100px;
+    /* Offset to sit next to X button */
+    background: rgba(255, 165, 0, 0.2);
+    /* Orange tint */
+    border: 1px solid #FFA500;
+    /* Orange border */
+    color: #FFFFFF;
+    padding: 4px 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    z-index: 900;
+    transition: all 0.2s ease;
+    letter-spacing: 1px;
+    box-shadow: 0 0 10px rgba(255, 165, 0, 0.2);
+}
+
+.discord-fixed-btn:hover {
+    background: #FFA500;
+    /* Solid orange on hover */
+    border-color: #FFA500;
+    color: #FFFFFF;
+    box-shadow: 0 0 15px rgba(255, 165, 0, 0.6);
+}
+
 .delta-up {
     color: #00ff00;
     font-size: 14px;
@@ -3407,14 +3504,6 @@ td {
 /* === MOBILE OPTIMIZATIONS === */
 @media screen and (max-width: 768px) {
 
-    /* Fix Chart Distortion */
-    #chart-container,
-    #pcr-chart-container {
-        height: 250px !important;
-        /* Force taller height on mobile */
-        min-height: 250px !important;
-    }
-
     /* Adjust widget content padding */
     .widget-content {
         padding: 5px;
@@ -3461,6 +3550,28 @@ td {
         /* Shrink-wrap content */
         max-height: none;
         flex: none;
+    }
+
+    /* Price Action Widget - Exception for proper chart display */
+    #live-price-action {
+        flex: 1;
+        min-height: 400px;
+        /* Ensure enough space for chart */
+        height: auto;
+    }
+
+    #live-price-action .widget-content {
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    #chart-container {
+        flex: 1;
+        min-height: 350px !important;
+        /* Taller chart on mobile */
+        height: 100% !important;
     }
 
     /* Header Adjustments */
@@ -3544,107 +3655,76 @@ td {
 }
 
 /* === Cyber Watchdog Connection Monitor === */
-.watchdog-panel {
+/* === SYSTEM DIAGNOSTICS - CONCEPT 2: INLINE BAR === */
+.diag-inline {
     position: fixed;
     top: 20px;
     left: 20px;
-    width: auto;
-    background: transparent;
-    border: none;
-    font-family: 'VT323', monospace;
-    color: #FF3333;
-    z-index: 900;
-    box-shadow: none;
-    font-size: 13px;
-    pointer-events: none;
-    user-select: none;
-}
-
-.watchdog-header {
-    background: transparent;
-    padding: 0;
-    border-bottom: none;
-    font-weight: bold;
+    background: rgba(0, 0, 0, 0.8);
+    border-left: 2px solid #00FF41;
+    padding: 4px 8px;
     display: flex;
     align-items: center;
     gap: 8px;
-    letter-spacing: 1px;
-    font-size: 12px;
-    color: #FFFFFF;
-
-    margin-bottom: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    z-index: 900;
+    user-select: none;
 }
 
-.status-dot {
-    width: 6px;
-    /* Smaller dot */
-    height: 6px;
-    background-color: var(--primary-color);
+.inline-status {
+    color: #00FF41;
+    font-weight: 600;
+}
+
+.inline-divider {
+    width: 1px;
+    height: 10px;
+    background: #333;
+}
+
+.inline-services {
+    display: flex;
+    gap: 6px;
+    color: #999;
+}
+
+.inline-services span {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.dot {
+    width: 3px;
+    height: 3px;
     border-radius: 50%;
     display: inline-block;
 }
 
-.pulse-green {
-    animation: pulse-green 2s infinite;
+.dot.green {
+    background: #00FF41;
+    box-shadow: 0 0 3px rgba(0, 255, 65, 0.4);
 }
 
-.pulse-red {
-    background-color: #ff3333;
-    animation: pulse-red 1s infinite;
-    box-shadow: 0 0 5px #ff3333;
+.dot.yellow {
+    background: #FFD700;
+    box-shadow: 0 0 3px rgba(255, 215, 0, 0.4);
 }
 
-.watchdog-content {
-    padding: 0;
+.dot.red {
+    background: #FF3333;
+    box-shadow: 0 0 3px rgba(255, 51, 51, 0.4);
 }
 
-.metric-row {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 2px;
+.dot.gray {
+    background: #444;
 }
 
-.metric-row .label {
-    color: #FF3333;
-    opacity: 1;
-
-}
-
-.metric-row .value {
-    font-weight: bold;
-    color: #FFFFFF;
-
-}
-
-@keyframes pulse-green {
-    0% {
-        opacity: 1;
-        box-shadow: 0 0 0 0 rgba(0, 255, 65, 0.7);
-    }
-
-    70% {
-        opacity: 1;
-        box-shadow: 0 0 0 6px rgba(0, 255, 65, 0);
-    }
-
-    100% {
-        opacity: 1;
-        box-shadow: 0 0 0 0 rgba(0, 255, 65, 0);
-    }
-}
-
-@keyframes pulse-red {
-    0% {
-        opacity: 1;
-    }
-
-    50% {
-        opacity: 0.5;
-    }
-
-    100% {
-        opacity: 1;
-    }
+.inline-metric {
+    color: #5DADE2;
+    font-size: 9px;
 }
 
 /* --- SECTOR HEATMAP (TREEMAP STYLE) --- */

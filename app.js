@@ -1413,103 +1413,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // === GAMMA WALL LOGIC ===
-    // === GAMMA WALL LOGIC ===
     // Define globally so renderGammaChart can access it
-    let gammaChartBars = null;
-
-    // Remove DOMContentLoaded wrapper since script is at bottom of body
-    let isGammaView = false;
-    const whaleViewBtn = document.getElementById('whale-view-btn');
-    const whaleWidgetTitle = document.getElementById('whale-widget-title');
-    const gammaFeedContainer = document.getElementById('flow-feed-container');
-    const whaleChartView = document.getElementById('whale-chart-view');
-    gammaChartBars = document.getElementById('gamma-chart-bars');
-
-
-
-    // Auto-refresh interval variable
-    let gammaInterval = null;
+    let gammaChartBars = document.getElementById('gamma-chart-bars');
     let currentGammaTicker = 'SPY';
 
-    if (whaleViewBtn) {
-        whaleViewBtn.addEventListener('click', () => {
-            isGammaView = !isGammaView;
+    // Initialize Gamma Wall
+    function initGammaWall() {
+        const gammaSelector = document.getElementById('gamma-ticker-select');
+        if (gammaSelector) {
+            gammaSelector.value = currentGammaTicker;
+            gammaSelector.addEventListener('change', (e) => {
+                currentGammaTicker = e.target.value;
+                fetchGammaWall(currentGammaTicker);
+            });
+        }
 
+        // Initial Fetch
+        fetchGammaWall(currentGammaTicker);
 
-            if (isGammaView) {
-                // Switch to Chart
-                if (gammaFeedContainer) gammaFeedContainer.style.display = 'none';
-                if (whaleChartView) whaleChartView.style.display = 'block';
-
-                // Inject Ticker Selector
-                whaleWidgetTitle.innerHTML = ''; // Clear title
-
-                const titleText = document.createElement('span');
-                titleText.textContent = 'GAMMA WALL';
-                titleText.style.marginRight = '10px';
-                whaleWidgetTitle.appendChild(titleText);
-
-                const selector = document.createElement('select');
-                selector.className = 'retro-selector'; // Use unified class
-                // Inline styles removed in favor of CSS class
-
-                // Populate with Shortened List (Mag 7 + Favorites)
-                const GAMMA_TICKERS = [
-                    'SPY', 'QQQ',
-                    'NVDA', 'TSLA', 'AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META',
-                    'AMD', 'PLTR', 'MU'
-                ];
-
-
-
-                GAMMA_TICKERS.forEach(t => {
-                    const opt = document.createElement('option');
-                    opt.value = t;
-                    opt.textContent = t;
-                    if (t === currentGammaTicker) opt.selected = true;
-                    selector.appendChild(opt);
-                });
-
-                // Debounced fetch to respect rate limits
-                const debouncedFetch = debounce(fetchGammaWall, 300);
-                selector.addEventListener('change', (e) => {
-                    currentGammaTicker = e.target.value;
-                    debouncedFetch(currentGammaTicker);
-                });
-
-                whaleWidgetTitle.appendChild(selector);
-
-                whaleViewBtn.textContent = 'LIST';
-                whaleViewBtn.classList.add('active');
-
-                fetchGammaWall(currentGammaTicker); // Fetch immediately
-
-                // Start Auto-Refresh (Every 5 minutes)
-                if (gammaInterval) clearInterval(gammaInterval);
-                gammaInterval = setInterval(() => {
-                    if (isMarketOpen()) {
-                        fetchGammaWall(currentGammaTicker);
-                    }
-                }, 300000);
-
-
-            } else {
-                // Switch to List
-                if (gammaFeedContainer) gammaFeedContainer.style.display = 'block';
-                if (whaleChartView) whaleChartView.style.display = 'none';
-
-                // Restore Title
-                whaleWidgetTitle.textContent = 'UNUSUAL WHALES 🐳';
-
-                whaleViewBtn.textContent = 'VIEW';
-                whaleViewBtn.classList.remove('active');
-
-                // Stop Auto-Refresh
-                if (gammaInterval) clearInterval(gammaInterval);
-                gammaInterval = null;
-
-            }
-        });
+        // Refresh every 5 minutes
+        setInterval(() => fetchGammaWall(currentGammaTicker), 300000);
     }
 
     async function fetchGammaWall(ticker = 'SPY') {
@@ -1570,6 +1493,9 @@ document.addEventListener('DOMContentLoaded', () => {
             gammaChartBars = document.getElementById('gamma-chart-bars');
         }
         if (!gammaChartBars) return;
+
+        // Clear loading message
+        gammaChartBars.innerHTML = '';
 
         // Create Tooltip
         let tooltip = document.getElementById('gamma-tooltip');
@@ -1866,74 +1792,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { source: "@MOMENTUM", time: "18m ago", text: "⚡ AAPL breaking multi-year highs.", isCritical: true },
     ];
 
-    // === PCR Chart - Real TradingView Widget ===
-    // === PCR Chart - Real TradingView Widget ===
-    // === PCR Chart - Real TradingView Widget ===
-    function initPCRChart() {
-        const container = document.getElementById('pcr-chart-container');
-        if (!container) return;
-
-        container.innerHTML = ''; // Clear previous
-
-        // Check if TradingView is loaded
-        if (typeof TradingView === 'undefined') {
-
-            setTimeout(initPCRChart, 1000);
-            return;
-        }
-
-        // Create TradingView widget for P/C Ratio with 5min interval and baseline
-        new TradingView.widget({
-            "autosize": true,
-            "symbol": "USI:PCCE",  // CBOE Equity Put/Call Ratio
-            "interval": "5",  // 5-minute candles for visual movement
-            "timezone": "America/New_York",
-            "theme": "dark",
-            "backgroundColor": "#000000", // Pure Black
-            "style": "10", // Baseline chart type
-            "locale": "en",
-            "toolbar_bg": "#f1f3f6",
-            "enable_publishing": false,
-            "hide_top_toolbar": true,
-            "hide_legend": true,
-            "save_image": false,
-            "container_id": "pcr-chart-container",
-            "studies": [],
-            "overrides": {
-                "mainSeriesProperties.style": 10, // Baseline style
-                "mainSeriesProperties.showPriceLine": false,
-                // Baseline configuration
-                "mainSeriesProperties.baselineStyle.baseLevelPercentage": 50,
-                "mainSeriesProperties.baselineStyle.topFillColor1": "rgba(0, 255, 65, 0.28)",
-                "mainSeriesProperties.baselineStyle.topFillColor2": "rgba(0, 255, 65, 0.05)",
-                "mainSeriesProperties.baselineStyle.bottomFillColor1": "rgba(255, 0, 0, 0.28)",
-                "mainSeriesProperties.baselineStyle.bottomFillColor2": "rgba(255, 0, 0, 0.05)",
-                "mainSeriesProperties.baselineStyle.topLineColor": "#00FF41",
-                "mainSeriesProperties.baselineStyle.bottomLineColor": "#FF0000",
-                "mainSeriesProperties.baselineStyle.topLineWidth": 2,
-                "mainSeriesProperties.baselineStyle.bottomLineWidth": 2,
-                "mainSeriesProperties.baselineStyle.baselineColor": "rgba(200, 200, 200, 0.4)",
-            }
-        });
-
-        // MOBILE FIX: Force resize after load to prevent squished graph
-        if (window.innerWidth <= 768) {
-            setTimeout(() => {
-                const iframe = container.querySelector('iframe');
-                if (iframe) {
-                    iframe.style.height = '250px';
-                    iframe.style.minHeight = '250px';
-                }
-            }, 1000);
-        }
-
-        updateStatus('status-pcr', true);
-    }
-
-
-    // === News Feed Logic ===
-    let seenNews = new Set();
-    let newsTickerInterval = null;
+    // PCR Chart Logic Removed (Replaced by Gamma Wall)
     let isNewsHovered = false;
     let lastTopNewsSignature = ''; // Track the newest item
 
@@ -2195,7 +2054,7 @@ document.addEventListener('DOMContentLoaded', () => {
     safeExecute('News Feed', fetchNews);
     setInterval(() => safeExecute('News Feed Update', fetchNews), 60000); // Every 1 minute
 
-    safeExecute('PCR Chart', initPCRChart);
+    safeExecute('Gamma Wall', initGammaWall);
 
     // Initialize TradingView Widget
     safeExecute('TradingView Main', () => createTradingViewWidget(currentTicker));

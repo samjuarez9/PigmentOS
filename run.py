@@ -772,8 +772,7 @@ def refresh_news_logic():
         "https://www.investing.com/rss/news.rss",
         "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664",
         "https://techcrunch.com/feed/",
-        "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
-        "http://feeds.marketwatch.com/marketwatch/topstories/"
+        "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"
     ]
     
     all_news = []
@@ -825,9 +824,6 @@ def refresh_news_logic():
                     elif "wsj.com" in url or "dj.com" in url: 
                         publisher = "WSJ"
                         domain = "wsj.com"
-                    elif "marketwatch" in url: 
-                        publisher = "MarketWatch"
-                        domain = "marketwatch.com"
                     
                     
                     all_news.append({
