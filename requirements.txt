@@ -10,3 +10,4 @@ feedparser
 lxml
 gevent
 stripe
+firebase-admin

@@ -48,8 +48,29 @@ CORS(app)
 
 # Stripe Configuration
 import stripe
-from stripe_config import STRIPE_SECRET_KEY, STRIPE_PRICE_ID, TRIAL_DAYS
+from stripe_config import STRIPE_SECRET_KEY, STRIPE_PRICE_ID, TRIAL_DAYS, STRIPE_WEBHOOK_SECRET, FIREBASE_CREDENTIALS_B64
 stripe.api_key = STRIPE_SECRET_KEY
+
+# Firebase Admin SDK Initialization
+import firebase_admin
+from firebase_admin import credentials, firestore
+import base64
+
+firestore_db = None  # Will be initialized if credentials are available
+
+if FIREBASE_CREDENTIALS_B64:
+    try:
+        creds_json = base64.b64decode(FIREBASE_CREDENTIALS_B64).decode('utf-8')
+        creds_dict = json.loads(creds_json)
+        cred = credentials.Certificate(creds_dict)
+        firebase_admin.initialize_app(cred)
+        firestore_db = firestore.client()
+        print("✅ Firebase Admin SDK initialized successfully")
+    except Exception as e:
+        print(f"⚠️ Firebase Admin SDK initialization failed: {e}")
+else:
+    print("⚠️ FIREBASE_CREDENTIALS_B64 not set - Firestore updates will be disabled")
+
 
 
 @app.route('/preview')
@@ -418,6 +439,112 @@ def subscription_status():
     except Exception as e:
         print(f"Subscription status error: {e}")
         return jsonify({'error': str(e)}), 400
+
+@app.route('/api/stripe-webhook', methods=['POST'])
+def stripe_webhook():
+    """Handle Stripe webhook events to update Firestore subscription status"""
+    payload = request.get_data(as_text=True)
+    sig_header = request.headers.get('Stripe-Signature')
+    
+    # Verify webhook signature (skip in development if no secret configured)
+    if STRIPE_WEBHOOK_SECRET:
+        try:
+            event = stripe.Webhook.construct_event(
+                payload, sig_header, STRIPE_WEBHOOK_SECRET
+            )
+        except ValueError as e:
+            print(f"Webhook Error: Invalid payload - {e}")
+            return jsonify({'error': 'Invalid payload'}), 400
+        except stripe.error.SignatureVerificationError as e:
+            print(f"Webhook Error: Invalid signature - {e}")
+            return jsonify({'error': 'Invalid signature'}), 400
+    else:
+        # Development mode - parse without verification
+        event = json.loads(payload)
+        print("⚠️ Webhook signature verification skipped (no secret configured)")
+    
+    event_type = event.get('type')
+    print(f"📨 Stripe Webhook received: {event_type}")
+    
+    # Handle the event
+    if event_type == 'checkout.session.completed':
+        session = event['data']['object']
+        customer_email = session.get('customer_email')
+        subscription_id = session.get('subscription')
+        
+        if customer_email and firestore_db:
+            try:
+                # Find user by email in Firestore
+                users_ref = firestore_db.collection('users')
+                query = users_ref.where('email', '==', customer_email).limit(1)
+                docs = query.stream()
+                
+                for doc in docs:
+                    # Update subscription status
+                    doc.reference.update({
+                        'subscriptionStatus': 'active',
+                        'stripeSubscriptionId': subscription_id,
+                        'subscriptionUpdatedAt': firestore.SERVER_TIMESTAMP
+                    })
+                    print(f"✅ Updated Firestore for {customer_email}: subscriptionStatus = active")
+                    break
+            except Exception as e:
+                print(f"❌ Firestore update failed: {e}")
+        else:
+            print(f"⚠️ Cannot update Firestore: email={customer_email}, db={firestore_db is not None}")
+    
+    elif event_type == 'customer.subscription.deleted':
+        subscription = event['data']['object']
+        customer_id = subscription.get('customer')
+        
+        # Look up customer email from Stripe
+        try:
+            customer = stripe.Customer.retrieve(customer_id)
+            customer_email = customer.get('email')
+            
+            if customer_email and firestore_db:
+                users_ref = firestore_db.collection('users')
+                query = users_ref.where('email', '==', customer_email).limit(1)
+                docs = query.stream()
+                
+                for doc in docs:
+                    doc.reference.update({
+                        'subscriptionStatus': 'expired',
+                        'subscriptionUpdatedAt': firestore.SERVER_TIMESTAMP
+                    })
+                    print(f"✅ Updated Firestore for {customer_email}: subscriptionStatus = expired")
+                    break
+        except Exception as e:
+            print(f"❌ Subscription deletion handling failed: {e}")
+    
+    elif event_type == 'customer.subscription.updated':
+        subscription = event['data']['object']
+        status = subscription.get('status')  # 'active', 'past_due', 'canceled', etc.
+        customer_id = subscription.get('customer')
+        
+        try:
+            customer = stripe.Customer.retrieve(customer_id)
+            customer_email = customer.get('email')
+            
+            if customer_email and firestore_db:
+                # Map Stripe status to our status
+                firestore_status = 'active' if status == 'active' else 'expired'
+                
+                users_ref = firestore_db.collection('users')
+                query = users_ref.where('email', '==', customer_email).limit(1)
+                docs = query.stream()
+                
+                for doc in docs:
+                    doc.reference.update({
+                        'subscriptionStatus': firestore_status,
+                        'subscriptionUpdatedAt': firestore.SERVER_TIMESTAMP
+                    })
+                    print(f"✅ Updated Firestore for {customer_email}: subscriptionStatus = {firestore_status}")
+                    break
+        except Exception as e:
+            print(f"❌ Subscription update handling failed: {e}")
+    
+    return jsonify({'status': 'success'}), 200
 
 @app.route('/api/whales')
 def api_whales():
