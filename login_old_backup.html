@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIXELATED HOME SYSTEM</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            background-image: url('assets/login_bg.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Press Start 2P', cursive;
+            overflow: hidden;
+        }
+
+        /* Overlay to darken background slightly for readability if needed */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            pointer-events: none;
+        }
+
+        /* Container for the interaction area (centered on the screen) */
+        .interaction-zone {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            margin-top: 15vh;
+            /* Adjust based on where the "screen" is in the image */
+        }
+
+        /* "Press Start" Text */
+        .press-start {
+            font-size: 24px;
+            color: #00FF41;
+            /* Neon Green */
+            text-shadow: 4px 4px #000;
+            animation: blink 1s infinite;
+            cursor: pointer;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 4px solid #00FF41;
+            border-radius: 8px;
+            display: inline-block;
+            transition: transform 0.1s;
+        }
+
+        .press-start:active {
+            transform: scale(0.95);
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0;
+            }
+        }
+
+        /* Login Form (Hidden initially) */
+        .login-form-container {
+            display: none;
+            background: #000;
+            border: 4px solid #FFF;
+            padding: 30px;
+            width: 400px;
+            box-shadow: 10px 10px 0px #333;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .pixel-input {
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 20px;
+            background: #222;
+            border: 2px solid #555;
+            color: #FFF;
+            font-family: 'VT323', monospace;
+            font-size: 24px;
+            outline: none;
+            text-align: center;
+            letter-spacing: 2px;
+        }
+
+        .pixel-input:focus {
+            border-color: #00FF41;
+            background: #111;
+        }
+
+        .pixel-btn {
+            width: 100%;
+            padding: 15px;
+            background: #00FF41;
+            border: none;
+            color: #000;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #008F11;
+            transition: all 0.1s;
+        }
+
+        .pixel-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #008F11;
+        }
+
+        .back-btn {
+            margin-top: 15px;
+            background: transparent;
+            color: #888;
+            border: none;
+            font-size: 10px;
+            cursor: pointer;
+        }
+
+        .back-btn:hover {
+            color: #FFF;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="overlay"></div>
+
+    <div class="interaction-zone">
+        <!-- Step 1: Press Start -->
+        <div id="start-screen">
+            <div class="press-start" onclick="showLogin()">PRESS START TO ENTER</div>
+        </div>
+
+        <!-- Step 2: Login Form -->
+        <div id="login-screen" class="login-form-container">
+            <h2 style="color: #FFF; margin-bottom: 20px; font-size: 16px;">INSERT COIN (PHONE)</h2>
+            <form onsubmit="handleLogin(event)">
+                <input type="tel" id="phone" class="pixel-input" placeholder="555-0199" autocomplete="off">
+                <button type="submit" class="pixel-btn">START GAME</button>
+            </form>
+            <button class="back-btn" onclick="hideLogin()">[ BACK ]</button>
+        </div>
+    </div>
+
+    <script>
+        function showLogin() {
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('login-screen').style.display = 'block';
+            document.getElementById('phone').focus();
+        }
+
+        function hideLogin() {
+            document.getElementById('start-screen').style.display = 'block';
+            document.getElementById('login-screen').style.display = 'none';
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const btn = document.querySelector('.pixel-btn');
+            btn.textContent = "LOADING...";
+
+            // Simulate loading
+            setTimeout(() => {
+                window.location.href = 'index.html?anim=spring';
+            }, 1000);
+        }
+    </script>
+
+</body>
+
+</html>

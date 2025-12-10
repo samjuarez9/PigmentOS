@@ -46,6 +46,12 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
+# Stripe Configuration
+import stripe
+from stripe_config import STRIPE_SECRET_KEY, STRIPE_PRICE_ID, TRIAL_DAYS
+stripe.api_key = STRIPE_SECRET_KEY
+
+
 @app.route('/preview')
 def preview_page():
     return send_from_directory('.', 'preview.html')
@@ -336,6 +342,82 @@ def index():
 @app.route('/<path:path>')
 def serve_static(path):
     return send_from_directory('.', path)
+
+# --- STRIPE SUBSCRIPTION ENDPOINTS ---
+
+@app.route('/api/create-checkout-session', methods=['POST'])
+def create_checkout_session():
+    try:
+        data = request.get_json()
+        user_email = data.get('email')
+        
+        checkout_session = stripe.checkout.Session.create(
+            customer_email=user_email,
+            payment_method_types=['card'],
+            line_items=[{
+                'price': STRIPE_PRICE_ID,
+                'quantity': 1,
+            }],
+            mode='subscription',
+            success_url='https://pigmentos.onrender.com/index.html?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url='https://pigmentos.onrender.com/upgrade.html',
+        )
+        
+        return jsonify({'sessionId': checkout_session.id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/subscription-status', methods=['POST'])
+def subscription_status():
+    """Check if user has active subscription or valid trial"""
+    try:
+        data = request.get_json()
+        user_email = data.get('email')
+        trial_start_date = data.get('trial_start_date')  # ISO format string from Firebase
+        
+        if not trial_start_date:
+            # New user, trial just started
+            return jsonify({
+                'status': 'trialing',
+                'days_remaining': TRIAL_DAYS,
+                'has_access': True
+            })
+        
+        # Calculate trial expiration
+        from datetime import datetime, timedelta
+        trial_start = datetime.fromisoformat(trial_start_date.replace('Z', '+00:00'))
+        trial_end = trial_start + timedelta(days=TRIAL_DAYS)
+        now = datetime.now(trial_start.tzinfo)
+        days_remaining = (trial_end - now).days
+        
+        if days_remaining > 0:
+            # Trial still active
+            return jsonify({
+                'status': 'trialing',
+                'days_remaining': days_remaining,
+                'has_access': True
+            })
+        
+        # Trial expired - check for active subscription
+        customers = stripe.Customer.list(email=user_email, limit=1)
+        if customers.data:
+            customer = customers.data[0]
+            subscriptions = stripe.Subscription.list(customer=customer.id, status='active', limit=1)
+            if subscriptions.data:
+                return jsonify({
+                    'status': 'active',
+                    'has_access': True
+                })
+        
+        # No active subscription
+        return jsonify({
+            'status': 'expired',
+            'has_access': False
+        })
+        
+    except Exception as e:
+        print(f"Subscription status error: {e}")
+        return jsonify({'error': str(e)}), 400
 
 @app.route('/api/whales')
 def api_whales():
@@ -714,8 +796,8 @@ def api_movers():
         # Growth Tech & SaaS
         "SNOW", "DDOG", "NET", "CRWD", "ZS", "SHOP", "ROKU", "UPST",
         
-        # FinTech & Payments
-        "SQ", "PYPL", "AFRM",
+        # FinTech & Payments (Removed SQ due to API errors)
+        "PYPL", "AFRM",
         
         # Consumer & Entertainment
         "NFLX", "DIS", "UBER", "DASH", "ABNB", "PTON", "NKE", "SBUX",
@@ -733,19 +815,32 @@ def api_movers():
     try:
         movers = []
         tickers_obj = yf.Tickers(" ".join(MOVERS_TICKERS))
-        for symbol in MOVERS_TICKERS:
+        
+        def fetch_ticker_data(symbol):
             try:
+                # Add small jitter to prevent thundering herd on API
+                time.sleep(random.uniform(0.01, 0.1)) 
+                
                 t = tickers_obj.tickers[symbol]
+                # Use fast_info for speed
                 last = t.fast_info.last_price
                 prev = t.fast_info.previous_close
                 if last and prev:
                     change = ((last - prev) / prev) * 100
-                    movers.append({
+                    return {
                         "symbol": symbol,
                         "change": round(change, 2),
                         "type": "gain" if change >= 0 else "loss"
-                    })
-            except: continue
+                    }
+            except:
+                return None
+            return None
+
+        # Parallelize fetching but keep it safe (4 workers is conservative but faster than 1)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            results = list(executor.map(fetch_ticker_data, MOVERS_TICKERS))
+            
+        movers = [r for r in results if r is not None]
             
         movers.sort(key=lambda x: x['change'], reverse=True)
         CACHE["movers"]["data"] = movers

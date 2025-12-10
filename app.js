@@ -566,7 +566,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // === MARKET MOVERS TAPE (Slideshow Logic) ===
-    let moversData = [];
+    let moversData = generateMoversData(); // Initialize with static data for immediate display
     let showGainers = true;
     let moversInterval = null;
 
@@ -663,7 +663,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Start Slideshow
     function startMoversSlideshow() {
-        fetchMoversData(); // Initial fetch
+        updateMoversTape(); // Show initial static data immediately
+        fetchMoversData(); // Initial fetch (will update with real data when ready)
 
         // Update data every 60s
         setInterval(fetchMoversData, 60000);

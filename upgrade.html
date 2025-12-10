@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upgrade to Pro - PigmentOS</title>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: #0a0a0a;
+            color: #CCC;
+            font-family: 'VT323', monospace;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .upgrade-container {
+            max-width: 600px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border: 2px solid #9D4EDD;
+            box-shadow: 0 0 30px rgba(157, 78, 221, 0.5);
+            padding: 40px;
+            text-align: center;
+            border-radius: 4px;
+        }
+
+        h1 {
+            color: #00FFFF;
+            font-size: 48px;
+            margin: 0 0 10px 0;
+            text-transform: uppercase;
+        }
+
+        .subtitle {
+            color: #9D4EDD;
+            font-size: 24px;
+            margin-bottom: 30px;
+        }
+
+        .trial-message {
+            font-size: 20px;
+            color: #FFF;
+            margin-bottom: 40px;
+            line-height: 1.5;
+        }
+
+        .price {
+            font-size: 64px;
+            color: #00FF41;
+            margin: 20px 0;
+        }
+
+        .price-label {
+            font-size: 20px;
+            color: #AAA;
+            margin-bottom: 40px;
+        }
+
+        .features {
+            text-align: left;
+            margin: 30px 0;
+            padding: 0 40px;
+        }
+
+        .feature {
+            font-size: 18px;
+            color: #FFF;
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .feature::before {
+            content: "✓";
+            color: #00FF41;
+            font-size: 24px;
+            margin-right: 10px;
+        }
+
+        .subscribe-btn {
+            background: #9D4EDD;
+            color: #FFF;
+            border: 2px solid #FFF;
+            padding: 15px 40px;
+            font-family: 'VT323', monospace;
+            font-size: 28px;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 4px 4px 0px #000;
+            transition: all 0.2s;
+        }
+
+        .subscribe-btn:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 6px 6px 0px #000;
+            background: #C77DFF;
+        }
+
+        .subscribe-btn:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px #000;
+        }
+
+        .logout-link {
+            margin-top: 30px;
+            font-size: 16px;
+        }
+
+        .logout-link a {
+            color: #888;
+            text-decoration: none;
+        }
+
+        .logout-link a:hover {
+            color: #AAA;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="upgrade-container">
+        <h1>⚡ Trial Expired</h1>
+        <div class="subtitle">Upgrade to continue trading</div>
+
+        <div class="trial-message">
+            Your 14-day free trial has ended.<br>
+            Subscribe to PigmentOS Pro to continue accessing real-time market data.
+        </div>
+
+        <div class="price">$15</div>
+        <div class="price-label">per month • cancel anytime</div>
+
+        <div class="features">
+            <div class="feature">Real-time stock & options data</div>
+            <div class="feature">Unusual Whales options flow</div>
+            <div class="feature">VIX & Fear/Greed indicators</div>
+            <div class="feature">Polymarket prediction markets</div>
+            <div class="feature">Live news aggregation</div>
+            <div class="feature">Gamma wall analysis</div>
+        </div>
+
+        <button class="subscribe-btn" onclick="subscribe()">Subscribe Now</button>
+
+        <div class="logout-link">
+            <a href="/login.html">← Logout</a>
+        </div>
+    </div>
+
+    <script src="https://js.stripe.com/v3/"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCEtjs3kYaB7usZjplg797NYtM4MFIdm7g",
+            authDomain: "pigmentos-49d50.firebaseapp.com",
+            projectId: "pigmentos-49d50",
+            storageBucket: "pigmentos-49d50.firebasestorage.app",
+            messagingSenderId: "52957674554",
+            appId: "1:52957674554:web:2a3b295c23978980a6c903",
+            measurementId: "G-RDE19D05G2"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        const stripe = Stripe('pk_test_51ScWFaGu1xj4bsEyDAy1Num3pboKugumy71pJDldH7WcT07NOQqw81WhaRgVH93zofCtzDvXHboqTyKW3CpjM7iQ00YwhDB8Sh');
+
+        window.subscribe = async function () {
+            const user = auth.currentUser;
+            if (!user) {
+                alert('Please log in first');
+                window.location.href = '/login.html';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/create-checkout-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: user.email })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+
+                // Redirect to Stripe Checkout
+                const result = await stripe.redirectToCheckout({
+                    sessionId: data.sessionId
+                });
+
+                if (result.error) {
+                    alert(result.error.message);
+                }
+            } catch (error) {
+                console.error('Subscription error:', error);
+                alert('Failed to start subscription process');
+            }
+        };
+    </script>
+</body>
+
+</html>
