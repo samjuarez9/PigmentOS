@@ -853,23 +853,23 @@ def api_fear_greed():
         return jsonify(CACHE["cnn_fear_greed"]["data"])
         
     try:
-        # 1. VIX Component (Volatility) - 50% Weight
+        # 1. VIX Component (Volatility) - 70% Weight
         vix = yf.Ticker("^VIX")
         try:
             vix_val = vix.fast_info['last_price']
         except:
             vix_val = vix.history(period="1d")['Close'].iloc[-1]
             
-        # VIX Score: Hyper-Sensitive Calibration
-        # The user wants "Extreme Fear" (Score ~22) at VIX ~16.8.
-        # We map VIX 12 -> 100 (Greed)
-        # We map VIX 16 -> 0 (Extreme Fear)
-        # Formula: 100 - (VIX - 12) * 25
-        vix_score = 100 - ((vix_val - 12) * 25)
+        # VIX Score: Industry-Standard Calibration
+        # VIX 12 -> 100 (Extreme Greed)
+        # VIX 20 -> 50 (Neutral)
+        # VIX 30 -> 25 (Fear)
+        # VIX 40 -> 0 (Extreme Fear)
+        # Formula: Linear interpolation from VIX 12-40 to Score 100-0
+        vix_score = 100 - ((vix_val - 12) * (100 / 28))  # 28 = 40-12
         vix_score = max(0, min(100, vix_score))
 
         # 2. Momentum Component (SPY vs 5d MA) - 30% Weight
-        # Reduced weight because price can be sticky/bullish even in fear.
         spy = yf.Ticker("SPY")
         hist = spy.history(period="10d")
         current_price = hist['Close'].iloc[-1]
@@ -877,8 +877,8 @@ def api_fear_greed():
         
         pct_diff = (current_price - ma_5) / ma_5
         
-        # Map -1% to +1% range to 0-100 score
-        mom_score = 50 + (pct_diff * 5000)
+        # Map -2% to +2% range to 0-100 score
+        mom_score = 50 + (pct_diff * 2500)
         mom_score = max(0, min(100, mom_score))
 
         # 3. Composite Score (70% VIX, 30% Momentum)
@@ -901,6 +901,7 @@ def api_fear_greed():
     except Exception as e:
         print(f"Fear/Greed Error: {e}")
         return jsonify({"value": 50, "rating": "Neutral"})
+
 
 @app.route('/api/movers')
 def api_movers():
