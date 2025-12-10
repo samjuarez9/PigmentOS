@@ -4199,60 +4199,63 @@ td {
 
 .sign-out-btn:hover {
     background: rgba(255, 51, 51, 0.4);
+    box-shadow: 0 0 15px rgba(255, 51, 51, 0.6);
+    color: #FFF;
+}
 
-    /* VIP Animation */
-    .vip-overlay {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        text-align: center;
-        pointer-events: none;
-        z-index: 999999;
-        animation: vip-fade-out 3s forwards;
-        animation-delay: 1s;
+/* VIP Animation */
+.vip-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+    z-index: 999999;
+    animation: vip-fade-out 3s forwards;
+    animation-delay: 1s;
+}
+
+.vip-text {
+    font-family: 'Press Start 2P', cursive;
+    /* Fallback to retro font if available, or monospace */
+    font-size: 40px;
+    color: #FFD700;
+    /* Gold */
+    text-shadow: 4px 4px 0px #000, -2px -2px 0 #FFA500;
+    margin-bottom: 20px;
+    animation: vip-bounce 0.5s infinite alternate;
+}
+
+.vip-subtext {
+    font-family: 'VT323', monospace;
+    font-size: 24px;
+    color: #FFF;
+    text-shadow: 2px 2px 0 #000;
+    letter-spacing: 4px;
+}
+
+@keyframes vip-bounce {
+    from {
+        transform: translateY(0);
     }
 
-    .vip-text {
-        font-family: 'Press Start 2P', cursive;
-        /* Fallback to retro font if available, or monospace */
-        font-size: 40px;
-        color: #FFD700;
-        /* Gold */
-        text-shadow: 4px 4px 0px #000, -2px -2px 0 #FFA500;
-        margin-bottom: 20px;
-        animation: vip-bounce 0.5s infinite alternate;
+    to {
+        transform: translateY(-10px);
+    }
+}
+
+@keyframes vip-fade-out {
+    0% {
+        opacity: 1;
     }
 
-    .vip-subtext {
-        font-family: 'VT323', monospace;
-        font-size: 24px;
-        color: #FFF;
-        text-shadow: 2px 2px 0 #000;
-        letter-spacing: 4px;
+    80% {
+        opacity: 1;
     }
 
-    @keyframes vip-bounce {
-        from {
-            transform: translateY(0);
-        }
-
-        to {
-            transform: translateY(-10px);
-        }
+    100% {
+        opacity: 0;
+        visibility: hidden;
     }
-
-    @keyframes vip-fade-out {
-        0% {
-            opacity: 1;
-        }
-
-        80% {
-            opacity: 1;
-        }
-
-        100% {
-            opacity: 0;
-            visibility: hidden;
-        }
-    }
+}

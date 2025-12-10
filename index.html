@@ -412,6 +412,7 @@
         }
 
         function showVipAnimation() {
+            console.log('👑 TRIGGERING VIP ANIMATION 👑');
             const overlay = document.createElement('div');
             overlay.className = 'vip-overlay';
             overlay.innerHTML = `
@@ -419,10 +420,12 @@
                 <div class="vip-subtext">WELCOME BACK</div>
             `;
             document.body.appendChild(overlay);
+            console.log('VIP Overlay added to body');
 
             // Play a retro sound if desired (optional, keeping it visual for now)
             setTimeout(() => {
                 overlay.remove();
+                console.log('VIP Overlay removed');
             }, 4000);
         }
     </script>
