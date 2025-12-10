@@ -4217,14 +4217,16 @@ td {
 }
 
 .vip-text {
-    font-family: 'Press Start 2P', cursive;
-    /* Fallback to retro font if available, or monospace */
-    font-size: 40px;
+    font-family: 'VT323', monospace;
+    /* 16-bit retro font matching the app aesthetic */
+    font-size: 48px;
     color: #FFD700;
     /* Gold */
     text-shadow: 4px 4px 0px #000, -2px -2px 0 #FFA500;
     margin-bottom: 20px;
     animation: vip-bounce 0.5s infinite alternate;
+    letter-spacing: 6px;
+    text-transform: uppercase;
 }
 
 .vip-subtext {

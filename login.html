@@ -791,6 +791,66 @@
         .login-btn:hover {
             background: #B0B0B0;
         }
+
+        /* === MOBILE RESPONSIVE === */
+        @media (max-width: 768px) {
+            .monitor-screen {
+                margin-left: 0;
+                width: 90%;
+                max-width: 340px;
+            }
+
+            .top-header {
+                top: 3%;
+            }
+
+            .pigment-word,
+            .os-word {
+                font-size: 48px;
+                letter-spacing: 3px;
+            }
+
+            .pixel-input {
+                width: 150px;
+            }
+
+            .pixel-label {
+                width: 70px;
+                font-size: 16px;
+            }
+
+            .btn-row {
+                padding-left: 80px;
+            }
+        }
+
+        @media (max-width: 480px) {
+
+            .pigment-word,
+            .os-word {
+                font-size: 36px;
+                letter-spacing: 2px;
+            }
+
+            .pixel-input {
+                width: 130px;
+            }
+
+            .pixel-label {
+                width: 60px;
+                font-size: 14px;
+            }
+
+            .btn-row {
+                padding-left: 70px;
+                gap: 10px;
+            }
+
+            .pixel-btn {
+                padding: 6px 14px;
+                font-size: 16px;
+            }
+        }
     </style>
 </head>
 
@@ -1041,8 +1101,8 @@
                 console.log("Email sign-in successful");
                 redirectToDashboard();
             } catch (error) {
-                if (error.code === 'auth/user-not-found') {
-                    // User doesn't exist, create account
+                if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+                    // User doesn't exist (or wrong password), try to create account
                     try {
                         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                         console.log("Account created successfully");
