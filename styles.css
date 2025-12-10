@@ -4177,3 +4177,28 @@ td {
         transform: translate(0);
     }
 }
+
+/* Sign Out Button - Fixed below X/Discord */
+.sign-out-btn {
+    position: fixed;
+    top: 80px;
+    left: 20px;
+    background: rgba(255, 51, 51, 0.2);
+    border: 1px solid #FF3333;
+    color: #FF3333;
+    padding: 4px 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    z-index: 900;
+    letter-spacing: 1px;
+    box-shadow: 0 0 10px rgba(255, 51, 51, 0.2);
+}
+
+.sign-out-btn:hover {
+    background: rgba(255, 51, 51, 0.4);
+    box-shadow: 0 0 15px rgba(255, 51, 51, 0.6);
+    color: #FFF;
+}

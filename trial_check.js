@@ -2,7 +2,7 @@
 // Add this script to index.html to track trial status
 
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 
 // Firebase config (already in your index.html, this is a reference)
@@ -33,15 +33,7 @@ onAuthStateChanged(auth, async (user) => {
         const userDoc = await getDoc(doc(db, "users", user.uid));
 
         if (!userDoc.exists()) {
-            // User data doesn't exist - create it now
-            console.log("Creating user data for trial tracking");
-            await setDoc(doc(db, "users", user.uid), {
-                email: user.email,
-                trialStartDate: serverTimestamp(),
-                subscriptionStatus: "trialing"
-            });
-            // Show banner for new trial
-            showTrialBanner(14);
+            console.log("No user data found, allowing access");
             return;
         }
 
@@ -80,25 +72,25 @@ function showTrialBanner(daysRemaining) {
     const banner = document.createElement('div');
     banner.id = 'trial-banner';
     banner.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        background: linear-gradient(90deg, #9D4EDD, #7B2CBF);
-        color: white;
-        text-align: center;
-        padding: 10px;
-        font-family: 'VT323', monospace;
-        font-size: 18px;
-        z-index: 10000;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-    `;
+position: fixed;
+top: 0;
+left: 0;
+width: 100 %;
+background: linear - gradient(90deg, #9D4EDD, #7B2CBF);
+color: white;
+text - align: center;
+padding: 10px;
+font - family: 'VT323', monospace;
+font - size: 18px;
+z - index: 10000;
+box - shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+`;
 
     banner.innerHTML = `
-        🎁 Free Trial: ${daysRemaining} days remaining 
-        <a href="/upgrade.html" style="color: #00FFFF; text-decoration: underline; margin-left: 20px;">
-            Upgrade Now →
-        </a>
+        🎁 Free Trial: ${daysRemaining} days remaining
+    < a href = "/upgrade.html" style = "color: #00FFFF; text-decoration: underline; margin-left: 20px;" >
+        Upgrade Now →
+        </a >
     `;
 
     document.body.prepend(banner);

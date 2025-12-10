@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="styles.css?v=3.15">
     <link href="https://fonts.googleapis.com/css2?family=VT323&family=JetBrains+Mono:wght@400;700&display=swap"
         rel="stylesheet">
+
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
 </head>
@@ -36,7 +37,6 @@
 
             <!-- LIVE Indicator placeholder (will be on right) -->
             <div class="header-right">
-
 
                 <!-- Global Market Sessions -->
                 <div id="market-sessions">
@@ -310,12 +310,15 @@
         <span>JOIN</span>
     </a>
 
+    <!-- Sign Out Button - Fixed below X/Discord -->
+    <button id="sign-out-btn" class="sign-out-btn">SIGN OUT</button>
+
     <script src="app.js?v=3.17"></script>
 
-    <!-- Trial Tracking -->
+    <!-- Trial Tracking & Auth -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -331,17 +334,28 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
+        // Sign Out Logic
+        const signOutBtn = document.getElementById('sign-out-btn');
+        if (signOutBtn) {
+            signOutBtn.addEventListener('click', () => {
+                signOut(auth).then(() => {
+                    window.location.href = '/login.html';
+                }).catch((error) => {
+                    console.error('Sign Out Error', error);
+                });
+            });
+        }
+
         onAuthStateChanged(auth, async (user) => {
             if (!user) {
-                // Not logged in - but don't redirect immediately, Firebase might still be loading
-                console.log('No user detected yet');
+                window.location.href = '/login.html';
                 return;
             }
 
-            // Admin bypass - owner doesn't need trial
+            // Admin/Owner Bypass
             const adminEmails = ['sam.juarez092678@gmail.com'];
             if (adminEmails.includes(user.email)) {
-                console.log('Admin user - bypassing trial check');
+                console.log('Admin user logged in - bypassing trial check');
                 return;
             }
 
@@ -394,10 +408,7 @@
             banner.style.cssText = 'position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; background: linear-gradient(90deg, #9D4EDD, #7B2CBF) !important; color: white !important; text-align: center !important; padding: 10px !important; font-family: VT323, monospace !important; font-size: 18px !important; z-index: 999999 !important; box-shadow: 0 2px 10px rgba(0,0,0,0.3) !important; display: block !important;';
             document.body.prepend(banner);
             document.body.style.paddingTop = '40px';
-            console.log('Trial banner added!');
         }
     </script>
-</body>
 
 </html>
-```

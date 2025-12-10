@@ -1041,7 +1041,7 @@
                 console.log("Email sign-in successful");
                 redirectToDashboard();
             } catch (error) {
-                if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+                if (error.code === 'auth/user-not-found') {
                     // User doesn't exist, create account
                     try {
                         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
