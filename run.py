@@ -910,61 +910,47 @@ def api_vix():
 
 @app.route('/api/cnn-fear-greed')
 def api_fear_greed():
+    """Fetch Crypto Fear & Greed Index from Alternative.me"""
     global CACHE
     current_time = time.time()
     
+    # Cache for 5 minutes (API updates once daily, so this is plenty)
     if current_time - CACHE["cnn_fear_greed"]["timestamp"] < 300:
         return jsonify(CACHE["cnn_fear_greed"]["data"])
         
     try:
-        # 1. VIX Component (Volatility) - 70% Weight
-        vix = yf.Ticker("^VIX")
-        try:
-            vix_val = vix.fast_info['last_price']
-        except:
-            vix_val = vix.history(period="1d")['Close'].iloc[-1]
-            
-        # VIX Score: Industry-Standard Calibration
-        # VIX 12 -> 100 (Extreme Greed)
-        # VIX 20 -> 50 (Neutral)
-        # VIX 30 -> 25 (Fear)
-        # VIX 40 -> 0 (Extreme Fear)
-        # Formula: Linear interpolation from VIX 12-40 to Score 100-0
-        vix_score = 100 - ((vix_val - 12) * (100 / 28))  # 28 = 40-12
-        vix_score = max(0, min(100, vix_score))
-
-        # 2. Momentum Component (SPY vs 5d MA) - 30% Weight
-        spy = yf.Ticker("SPY")
-        hist = spy.history(period="10d")
-        current_price = hist['Close'].iloc[-1]
-        ma_5 = hist['Close'].tail(5).mean()
+        # Fetch from Alternative.me Crypto Fear & Greed Index
+        url = "https://api.alternative.me/fng/"
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
         
-        pct_diff = (current_price - ma_5) / ma_5
+        api_data = resp.json()
+        fng_data = api_data.get("data", [{}])[0]
         
-        # Map -2% to +2% range to 0-100 score
-        mom_score = 50 + (pct_diff * 2500)
-        mom_score = max(0, min(100, mom_score))
-
-        # 3. Composite Score (70% VIX, 30% Momentum)
-        final_score = (vix_score * 0.7) + (mom_score * 0.3)
+        value = int(fng_data.get("value", 50))
+        classification = fng_data.get("value_classification", "Neutral")
         
-        if final_score >= 75: rating = "Extreme Greed"
-        elif final_score >= 55: rating = "Greed"
-        elif final_score >= 45: rating = "Neutral"
-        elif final_score >= 25: rating = "Fear"
+        # Map to our rating format
+        if value >= 75: rating = "Extreme Greed"
+        elif value >= 55: rating = "Greed"
+        elif value >= 45: rating = "Neutral"
+        elif value >= 25: rating = "Fear"
         else: rating = "Extreme Fear"
         
         data = {
-            "value": round(final_score), 
+            "value": value, 
             "rating": rating, 
-            "vix_reference": round(vix_val, 2),
-            "momentum_reference": f"{round(pct_diff * 100, 2)}%"
+            "source": "Crypto F&G",
+            "classification": classification
         }
         CACHE["cnn_fear_greed"] = {"data": data, "timestamp": current_time}
         return jsonify(data)
     except Exception as e:
-        print(f"Fear/Greed Error: {e}")
-        return jsonify({"value": 50, "rating": "Neutral"})
+        print(f"Crypto Fear/Greed Error: {e}")
+        # Return cached data if available, else fallback
+        if CACHE["cnn_fear_greed"]["data"]:
+            return jsonify(CACHE["cnn_fear_greed"]["data"])
+        return jsonify({"value": 50, "rating": "Neutral", "source": "Fallback"})
 
 
 @app.route('/api/movers')

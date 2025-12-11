@@ -2909,6 +2909,47 @@ td {
     }
 }
 
+/* Probability Change Flash Animations */
+.prob-flash-up {
+    animation: probFlashUp 1s ease-out;
+}
+
+.prob-flash-down {
+    animation: probFlashDown 1s ease-out;
+}
+
+@keyframes probFlashUp {
+    0% {
+        text-shadow: 0 0 10px #00ff41, 0 0 20px #00ff41;
+        color: #00ff41;
+    }
+
+    50% {
+        text-shadow: 0 0 5px #00ff41;
+    }
+
+    100% {
+        text-shadow: none;
+        color: inherit;
+    }
+}
+
+@keyframes probFlashDown {
+    0% {
+        text-shadow: 0 0 10px #ff4444, 0 0 20px #ff4444;
+        color: #ff4444;
+    }
+
+    50% {
+        text-shadow: 0 0 5px #ff4444;
+    }
+
+    100% {
+        text-shadow: none;
+        color: inherit;
+    }
+}
+
 /* === UNUSUAL WHALES REDESIGN === */
 #flow-feed-container {
     display: flex;
@@ -4044,22 +4085,79 @@ td {
     opacity: 0.9;
 }
 
-/* Color Coding - Solid Colors for Treemap */
-.heatmap-item.positive {
+/* Color Coding - Intensity Based (FinViz style) */
+/* Positive - Green intensity levels */
+.heatmap-item.positive.intensity-1 {
+    background: #0a3d1d;
+    border: 1px solid #1a6b35;
+}
+
+.heatmap-item.positive.intensity-2 {
     background: #0d5228;
-    /* Dark Green */
     border: 1px solid #1e8e3e;
 }
 
-.heatmap-item.negative {
+.heatmap-item.positive.intensity-3 {
+    background: #117a33;
+    border: 1px solid #2eb851;
+}
+
+.heatmap-item.positive.intensity-4 {
+    background: #15a043;
+    border: 1px solid #3ce06a;
+    box-shadow: 0 0 8px rgba(60, 224, 106, 0.3);
+}
+
+/* Negative - Red intensity levels */
+.heatmap-item.negative.intensity-1 {
+    background: #4a1111;
+    border: 1px solid #8b2222;
+}
+
+.heatmap-item.negative.intensity-2 {
     background: #661111;
-    /* Dark Red */
     border: 1px solid #cc2222;
+}
+
+.heatmap-item.negative.intensity-3 {
+    background: #8b1515;
+    border: 1px solid #e03030;
+}
+
+.heatmap-item.negative.intensity-4 {
+    background: #b01a1a;
+    border: 1px solid #ff4444;
+    box-shadow: 0 0 8px rgba(255, 68, 68, 0.3);
 }
 
 .heatmap-item.neutral {
     background: #333333;
     border: 1px solid #555;
+}
+
+/* Flash animation on data update */
+.heatmap-item.heatmap-flash {
+    animation: heatmapFlash 0.6s ease-out forwards;
+}
+
+@keyframes heatmapFlash {
+    0% {
+        filter: brightness(1.8);
+        transform: scale(1.02);
+    }
+
+    100% {
+        filter: brightness(1);
+        transform: scale(1);
+    }
+}
+
+/* Timestamp styling */
+.heatmap-ts {
+    font-size: 9px;
+    color: #666;
+    margin-left: 8px;
+    font-family: 'JetBrains Mono', monospace;
 }
 
 .heatmap-item.loading {

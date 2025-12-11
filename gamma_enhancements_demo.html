@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gamma Wall Enhancement Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0a;
+            color: #fff;
+            font-family: 'JetBrains Mono', monospace;
+            padding: 30px;
+            min-height: 100vh;
+        }
+
+        h1 {
+            font-family: 'VT323', monospace;
+            color: #00FF9D;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        h2 {
+            font-family: 'VT323', monospace;
+            color: #888;
+            margin: 40px 0 20px;
+            font-size: 20px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .demo-section {
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        /* === DOMINANCE BADGE DEMO === */
+        .widget-header-demo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .widget-title {
+            font-family: 'VT323', monospace;
+            font-size: 18px;
+            color: #fff;
+        }
+
+        .dominance-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+
+        .dominance-badge.bullish {
+            background: rgba(0, 255, 65, 0.15);
+            color: #00FF41;
+            border: 1px solid rgba(0, 255, 65, 0.4);
+        }
+
+        .dominance-badge.bearish {
+            background: rgba(255, 0, 153, 0.15);
+            color: #FF0099;
+            border: 1px solid rgba(255, 0, 153, 0.4);
+        }
+
+        .dominance-badge.neutral {
+            background: rgba(255, 255, 255, 0.1);
+            color: #888;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* === GAMMA WALL BARS WITH LABELS === */
+        .gamma-demo {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .gamma-row {
+            display: flex;
+            align-items: center;
+            height: 20px;
+            position: relative;
+        }
+
+        .gamma-row.atm-row {
+            border: 1px solid rgba(0, 204, 255, 0.5);
+            border-radius: 4px;
+            background: rgba(0, 204, 255, 0.05);
+        }
+
+        .gamma-row.unusual-row {
+            border: 1px solid rgba(255, 51, 102, 0.8);
+            border-radius: 4px;
+            box-shadow: 0 0 8px rgba(255, 51, 102, 0.4);
+            animation: pulse 2.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 6px rgba(255, 51, 102, 0.3);
+            }
+
+            50% {
+                box-shadow: 0 0 12px rgba(255, 51, 102, 0.5);
+            }
+        }
+
+        .gamma-put-side,
+        .gamma-call-side {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            height: 100%;
+            position: relative;
+        }
+
+        .gamma-put-side {
+            justify-content: flex-end;
+            padding-right: 8px;
+        }
+
+        .gamma-call-side {
+            justify-content: flex-start;
+            padding-left: 8px;
+        }
+
+        .gamma-strike {
+            width: 60px;
+            text-align: center;
+            color: #888;
+            font-size: 11px;
+            font-weight: bold;
+            border-left: 1px solid #333;
+            border-right: 1px solid #333;
+        }
+
+        .atm-row .gamma-strike {
+            color: #00CCFF;
+            text-shadow: 0 0 8px #00CCFF;
+        }
+
+        .gamma-bar {
+            height: 12px;
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .gamma-bar-put {
+            background: #FF0099;
+            opacity: 0.8;
+        }
+
+        .gamma-bar-call {
+            background: #00FF41;
+            opacity: 0.8;
+        }
+
+        /* === VOLUME LABELS === */
+        .vol-label {
+            font-size: 9px;
+            font-family: 'JetBrains Mono', monospace;
+            color: #fff;
+            padding: 0 4px;
+            white-space: nowrap;
+            opacity: 0.9;
+        }
+
+        .vol-label.put-label {
+            margin-right: 4px;
+            color: #FF66B2;
+        }
+
+        .vol-label.call-label {
+            margin-left: 4px;
+            color: #66FF99;
+        }
+
+        /* Only show on larger bars */
+        .small-bar .vol-label {
+            display: none;
+        }
+
+        .flip-label {
+            position: absolute;
+            right: 70px;
+            font-size: 10px;
+            color: #00CCFF;
+            font-weight: bold;
+        }
+
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 20px;
+        }
+
+        .comparison-box {
+            background: #0a0a0a;
+            border: 1px solid #222;
+            border-radius: 6px;
+            padding: 15px;
+        }
+
+        .comparison-box h3 {
+            font-family: 'VT323', monospace;
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .note {
+            color: #666;
+            font-size: 12px;
+            margin-top: 15px;
+            font-style: italic;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🎮 GAMMA WALL ENHANCEMENT DEMO</h1>
+
+    <!-- DOMINANCE BADGE SECTION -->
+    <h2>1️⃣ CALL/PUT DOMINANCE BADGE</h2>
+    <div class="demo-section">
+        <p style="color: #888; margin-bottom: 20px; font-size: 12px;">Shows overall directional lean at a glance —
+            displayed in the widget header.</p>
+
+        <div class="widget-header-demo">
+            <span class="widget-title">GAMMA WALL (SPY) 👾</span>
+            <span class="dominance-badge bullish">📈 CALLS +67%</span>
+        </div>
+
+        <div class="widget-header-demo">
+            <span class="widget-title">GAMMA WALL (NVDA) 👾</span>
+            <span class="dominance-badge bearish">📉 PUTS +42%</span>
+        </div>
+
+        <div class="widget-header-demo">
+            <span class="widget-title">GAMMA WALL (AAPL) 👾</span>
+            <span class="dominance-badge neutral">⚖️ NEUTRAL</span>
+        </div>
+
+        <p class="note">Badge color matches sentiment: green = call heavy, pink = put heavy, gray = balanced.</p>
+    </div>
+
+    <!-- VOLUME LABELS SECTION -->
+    <h2>2️⃣ VOLUME LABELS ON BARS</h2>
+    <div class="demo-section">
+        <div class="comparison">
+            <div class="comparison-box">
+                <h3>❌ Current (Hover Required)</h3>
+                <div class="gamma-demo">
+                    <div class="gamma-row">
+                        <div class="gamma-put-side">
+                            <div class="gamma-bar gamma-bar-put" style="width: 30%;"></div>
+                        </div>
+                        <div class="gamma-strike">608.0</div>
+                        <div class="gamma-call-side">
+                            <div class="gamma-bar gamma-bar-call" style="width: 85%;"></div>
+                        </div>
+                    </div>
+                    <div class="gamma-row atm-row">
+                        <div class="gamma-put-side">
+                            <div class="gamma-bar gamma-bar-put" style="width: 45%;"></div>
+                        </div>
+                        <div class="gamma-strike">607.0</div>
+                        <div class="gamma-call-side">
+                            <div class="gamma-bar gamma-bar-call" style="width: 50%;"></div>
+                        </div>
+                        <span class="flip-label">FLIP</span>
+                    </div>
+                    <div class="gamma-row unusual-row">
+                        <div class="gamma-put-side">
+                            <div class="gamma-bar gamma-bar-put" style="width: 95%;"></div>
+                        </div>
+                        <div class="gamma-strike">606.0</div>
+                        <div class="gamma-call-side">
+                            <div class="gamma-bar gamma-bar-call" style="width: 25%;"></div>
+                        </div>
+                    </div>
+                    <div class="gamma-row">
+                        <div class="gamma-put-side">
+                            <div class="gamma-bar gamma-bar-put" style="width: 20%;"></div>
+                        </div>
+                        <div class="gamma-strike">605.0</div>
+                        <div class="gamma-call-side">
+                            <div class="gamma-bar gamma-bar-call" style="width: 40%;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="comparison-box">
+                <h3>✅ With Volume Labels</h3>
+                <div class="gamma-demo">
+                    <div class="gamma-row">
+                        <div class="gamma-put-side">
+                            <span class="vol-label put-label">8.2K</span>
+                            <div class="gamma-bar gamma-bar-put" style="width: 30%;"></div>
+                        </div>
+                        <div class="gamma-strike">608.0</div>
+                        <div class="gamma-call-side">
+                            <div class="gamma-bar gamma-bar-call" style="width: 85%;"></div>
+                            <span class="vol-label call-label">42K</span>
+                        </div>
+                    </div>
+                    <div class="gamma-row atm-row">
+                        <div class="gamma-put-side">
+                            <span class="vol-label put-label">12K</span>
+                            <div class="gamma-bar gamma-bar-put" style="width: 45%;"></div>
+                        </div>
+                        <div class="gamma-strike">607.0</div>
+                        <div class="gamma-call-side">
+                            <div class="gamma-bar gamma-bar-call" style="width: 50%;"></div>
+                            <span class="vol-label call-label">18K</span>
+                        </div>
+                        <span class="flip-label">FLIP</span>
+                    </div>
+                    <div class="gamma-row unusual-row">
+                        <div class="gamma-put-side">
+                            <span class="vol-label put-label" style="font-weight: bold;">67K</span>
+                            <div class="gamma-bar gamma-bar-put" style="width: 95%;"></div>
+                        </div>
+                        <div class="gamma-strike">606.0</div>
+                        <div class="gamma-call-side">
+                            <div class="gamma-bar gamma-bar-call" style="width: 25%;"></div>
+                            <span class="vol-label call-label">5.1K</span>
+                        </div>
+                    </div>
+                    <div class="gamma-row small-bar">
+                        <div class="gamma-put-side">
+                            <span class="vol-label put-label">2.3K</span>
+                            <div class="gamma-bar gamma-bar-put" style="width: 20%;"></div>
+                        </div>
+                        <div class="gamma-strike">605.0</div>
+                        <div class="gamma-call-side">
+                            <div class="gamma-bar gamma-bar-call" style="width: 40%;"></div>
+                            <span class="vol-label call-label">9.8K</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <p class="note">Volume labels appear next to bars. Only shows on bars above minimum threshold to avoid clutter.
+            The 606.0 strike has the red pulsing "unusual" border.</p>
+    </div>
+
+    <p style="color: #444; margin-top: 40px; font-size: 11px;">Demo file — not connected to live data</p>
+</body>
+
+</html>

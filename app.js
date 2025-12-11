@@ -328,6 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Polymarket Position Tracking (for flash animations)
     let previousPolyPositions = new Map(); // Tracks {slug: position_index}
+    let previousPolyProbs = new Map(); // Tracks {slug: probability} for odds flash
 
     // Render Polymarket Odds
     function renderPolymarket(data) {
@@ -414,6 +415,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 shouldFlash = true;
             }
 
+            // **Probability Change Detection**
+            const previousProb = previousPolyProbs.get(slug);
+            let probFlashClass = '';
+            if (previousProb !== undefined && previousProb !== prob1) {
+                // Probability changed - flash the odds
+                probFlashClass = prob1 > previousProb ? 'prob-flash-up' : 'prob-flash-down';
+            }
+
             // Apply flash animation class
             if (shouldFlash) {
                 item.classList.add('flash-row');
@@ -430,7 +439,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="polymarket-odds-row">
                     <div class="polymarket-odds">
-                        <span class="polymarket-odds-text polymarket-odds-yes">${prob1}% ${label1}${deltaBadge}</span>
+                        <span class="polymarket-odds-text polymarket-odds-yes ${probFlashClass}">${prob1}% ${label1}${deltaBadge}</span>
                     </div>
                     <div class="poly-stats-mini">
                         <span>VOL: ${market.volume}</span>
@@ -446,6 +455,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
             container.appendChild(item);
+
+            // Track probability for next comparison
+            previousPolyProbs.set(slug, prob1);
         });
 
         // Update position tracking for next render
@@ -741,6 +753,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSectorView = 'ALL';
     const SECTOR_VIEWS = ['ALL', 'INDICES', 'TECH', 'CONSUMER', 'CRYPTO'];
 
+    let heatmapHasLoaded = false;
+
     async function fetchHeatmapData(retryCount = 0) {
         try {
             const response = await fetch(`${API_BASE_URL}/api/heatmap`);
@@ -756,7 +770,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const data = result.data || result;
-            renderMarketMap(data);
+            renderMarketMap(data, heatmapHasLoaded); // Pass isUpdate flag
+            heatmapHasLoaded = true; // Subsequent calls are updates
             updateStatus('status-sectors', true);
 
             const headerTitle = document.querySelector('#market-map .widget-title');
@@ -784,7 +799,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
-    function renderMarketMap(data) {
+    function renderMarketMap(data, isUpdate = false) {
         const grid = document.getElementById('heatmap-grid');
         if (!grid) return;
 
@@ -800,8 +815,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const sizePriority = { 'mega': 4, 'large': 3, 'medium': 2, 'small': 1 };
         filteredData.sort((a, b) => sizePriority[b.size] - sizePriority[a.size]);
 
-        filteredData.forEach(item => {
+        filteredData.forEach((item, index) => {
             const div = document.createElement('div');
+
+            // Color intensity based on magnitude of change
+            const absChange = Math.abs(item.change);
+            let intensityClass = 'intensity-1'; // Default low
+            if (absChange >= 3) intensityClass = 'intensity-4'; // Strong move
+            else if (absChange >= 2) intensityClass = 'intensity-3';
+            else if (absChange >= 1) intensityClass = 'intensity-2';
 
             let colorClass = 'neutral';
             if (item.change > 0) colorClass = 'positive';
@@ -810,13 +832,48 @@ document.addEventListener('DOMContentLoaded', () => {
             // Add size class
             const sizeClass = `size-${item.size || 'small'}`;
 
-            div.className = `heatmap-item ${colorClass} ${sizeClass}`;
+            // Flash class for updates
+            const flashClass = isUpdate ? 'heatmap-flash' : '';
+
+            div.className = `heatmap-item ${colorClass} ${sizeClass} ${intensityClass} ${flashClass}`;
+
+            // Tooltip with more details
+            const priceStr = item.price ? `$${item.price.toFixed(2)}` : '';
+            div.title = `${item.symbol}: ${item.change > 0 ? '+' : ''}${item.change}% ${priceStr}`;
+
             div.innerHTML = `
                 <span class="sector-symbol">${item.symbol}</span>
                 <span class="sector-change">${item.change > 0 ? '+' : ''}${item.change}%</span>
             `;
+
+            // Stagger flash animation
+            if (isUpdate) {
+                div.style.animationDelay = `${index * 50}ms`;
+            }
+
             grid.appendChild(div);
         });
+
+        // Update timestamp
+        updateHeatmapTimestamp();
+    }
+
+    // Update heatmap timestamp
+    function updateHeatmapTimestamp() {
+        const statusContainer = document.getElementById('status-sectors');
+        if (!statusContainer) return;
+
+        // Check if timestamp span exists, if not create it
+        let tsSpan = statusContainer.querySelector('.heatmap-ts');
+        if (!tsSpan) {
+            tsSpan = document.createElement('span');
+            tsSpan.className = 'heatmap-ts';
+            statusContainer.appendChild(tsSpan);
+        }
+
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        tsSpan.textContent = `${timeStr}`;
     }
 
     // Sector Scroll Button Logic
@@ -842,7 +899,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // fetchVIX removed (replaced by CNN Fear & Greed)
 
-    function updateTFI(value, rating, vixRef) {
+    function updateTFI(value, rating, source) {
 
         // DOM Elements
         const tfiSegmentsContainer = document.getElementById('tfi-segments');
@@ -864,9 +921,9 @@ document.addEventListener('DOMContentLoaded', () => {
             tfiRating.style.color = ""; // Reset color
         }
 
-        // Update VIX reference
-        if (tfiVixRef && vixRef) {
-            tfiVixRef.textContent = `VIX: ${vixRef}`;
+        // Update source reference (was VIX, now shows Crypto F&G)
+        if (tfiVixRef && source) {
+            tfiVixRef.textContent = `₿ ${source}`;
         }
 
         // Clear previous classes
@@ -924,8 +981,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const data = await response.json();
 
-
-            updateTFI(data.value, data.rating, data.vix_reference);
+            updateTFI(data.value, data.rating, data.source);
 
             updateStatus('status-tfi', true);
         } catch (error) {
@@ -1331,6 +1387,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Map to internal format
+        const nowTs = Date.now() / 1000; // Current time for "entered feed" timestamp
         const trades = data.map(item => ({
             ticker: item.baseSymbol || item.symbol,
             strike: item.strikePrice,
@@ -1346,6 +1403,7 @@ document.addEventListener('DOMContentLoaded', () => {
             is_mega_whale: item.is_mega_whale || false,
             notional_value: item.notional_value || 0,
             timestamp: item.timestamp || 0,
+            enteredAt: nowTs, // When trade entered OUR feed (for relative time display)
             delta: item.delta,
             iv: item.iv
         }));
@@ -1463,8 +1521,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchGammaWall(ticker = 'SPY') {
         // Check localStorage cache first (TTL 2 minutes)
         try {
-            // Inject Intel Minimalist Loader
-            if (gammaChartBars) {
+            // Only show loader on INITIAL load (no existing rows)
+            const hasExistingData = gammaChartBars && gammaChartBars.querySelector('.gamma-row');
+            if (gammaChartBars && !hasExistingData) {
                 gammaChartBars.innerHTML = `
                 <div class="intel-loader">
                     <div class="intel-row">> TARGET: ${ticker}</div>
@@ -1519,8 +1578,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (!gammaChartBars) return;
 
-        // Clear loading message
-        gammaChartBars.innerHTML = '';
+        // Clear loading message ONLY (don't clear existing rows)
+        const loader = gammaChartBars.querySelector('.intel-loader');
+        if (loader) loader.remove();
 
         // Create Tooltip
         let tooltip = document.getElementById('gamma-tooltip');
@@ -1816,12 +1876,14 @@ document.addEventListener('DOMContentLoaded', () => {
         tickerSpan.textContent = flow.ticker;
         colTicker.appendChild(tickerSpan);
 
-        // Time-ago badge
-        if (flow.timestamp) {
+        // Time-ago badge (based on when trade entered OUR feed, not actual trade time)
+        const feedTimestamp = flow.enteredAt || flow.timestamp;
+        if (feedTimestamp) {
             const timeAgoSpan = document.createElement('span');
             timeAgoSpan.className = 'time-ago';
-            const secsAgo = Math.floor(Date.now() / 1000 - flow.timestamp);
-            if (secsAgo < 60) timeAgoSpan.textContent = 'now';
+            const secsAgo = Math.floor(Date.now() / 1000 - feedTimestamp);
+            if (secsAgo < 30) timeAgoSpan.textContent = 'now';
+            else if (secsAgo < 60) timeAgoSpan.textContent = '30s';
             else if (secsAgo < 3600) timeAgoSpan.textContent = `${Math.floor(secsAgo / 60)}m`;
             else timeAgoSpan.textContent = `${Math.floor(secsAgo / 3600)}h`;
             colTicker.appendChild(timeAgoSpan);
