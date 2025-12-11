@@ -103,8 +103,37 @@ document.addEventListener('DOMContentLoaded', () => {
         setInterval(updateSystemStatus, 5000); // Check every 5 seconds
     }
 
+    // Market Status Button Updater
+    function updateMarketStatusBtn() {
+        const btn = document.getElementById('market-status-btn');
+        if (!btn) return;
+
+        const state = getMarketState();
+
+        // Remove all state classes
+        btn.classList.remove('after-market', 'pre-market', 'market-open');
+
+        if (state.isWeekend) {
+            btn.textContent = 'WEEKEND';
+            btn.classList.add('after-market'); // Orange for weekend
+        } else if (state.isMarketHours) {
+            btn.textContent = 'OPEN';
+            btn.classList.add('market-open');
+        } else if (state.isPreMarket) {
+            btn.textContent = 'PRE MARKET';
+            btn.classList.add('pre-market');
+        } else {
+            btn.textContent = 'AFTER MARKET';
+            btn.classList.add('after-market');
+        }
+    }
+
     // Start the Watchdog
     startWatchdog();
+
+    // Start Market Status Updater
+    updateMarketStatusBtn();
+    setInterval(updateMarketStatusBtn, 30000); // Update every 30 seconds
 
     // Configuration
     const threatBox = document.getElementById('threat-box');
@@ -148,14 +177,12 @@ document.addEventListener('DOMContentLoaded', () => {
             new TradingView.widget({
                 "autosize": true,
                 "symbol": "NASDAQ:" + ticker,
-                "interval": "5",
+                "interval": "15",
                 "timezone": "Etc/UTC",
                 "theme": "dark",
                 "style": "1", // Candle style
                 "locale": "en",
                 "enable_publishing": false,
-                "backgroundColor": "#000000", // Pure Black to match PCR
-                "gridColor": "rgba(30, 144, 255, 0.1)", // Subtle Deep Sky Blue grid
                 "hide_top_toolbar": true,
                 "studies": [
                     "MASimple@tv-basicstudies",    // Simple Moving Average
@@ -249,7 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Initialize TFI
-    updateTFI(50, 'Neutral'); // Default neutral
+    updateTFI(50, 'Neutral', null); // Default neutral
 
     // Render Institutional Edge (Options) - Filtered
     function renderOptions(options) {
@@ -815,35 +842,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // fetchVIX removed (replaced by CNN Fear & Greed)
 
-    function updateTFI(value, rating) {
-
-        // Configuration
-        const IS_FILE_PROTOCOL = window.location.protocol === 'file:';
-        const API_BASE_URL = IS_FILE_PROTOCOL ? 'http://localhost:8001' : '';
+    function updateTFI(value, rating, vixRef) {
 
         // DOM Elements
-        // DOM Elements
-        const timeDisplay = document.getElementById('time-display');
-        // const tfiText = document.getElementById('tfi-text'); // REMOVED - element does not exist
         const tfiSegmentsContainer = document.getElementById('tfi-segments');
         const tfiContainer = document.querySelector('.tfi-container');
-
-
-
 
         if (!tfiSegmentsContainer) {
             console.error('TFI elements not found!');
             return;
         }
 
-        // Update text
+        // Update score and rating
         const tfiScore = document.getElementById('tfi-score');
         const tfiRating = document.getElementById('tfi-rating');
+        const tfiVixRef = document.getElementById('tfi-vix-ref');
 
         if (tfiScore && tfiRating) {
             tfiScore.textContent = Math.round(value);
             tfiRating.textContent = rating.toUpperCase();
             tfiRating.style.color = ""; // Reset color
+        }
+
+        // Update VIX reference
+        if (tfiVixRef && vixRef) {
+            tfiVixRef.textContent = `VIX: ${vixRef}`;
         }
 
         // Clear previous classes
@@ -902,7 +925,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
 
-            updateTFI(data.value, data.rating);
+            updateTFI(data.value, data.rating, data.vix_reference);
 
             updateStatus('status-tfi', true);
         } catch (error) {
@@ -1322,6 +1345,7 @@ document.addEventListener('DOMContentLoaded', () => {
             moneyness: item.moneyness,
             is_mega_whale: item.is_mega_whale || false,
             notional_value: item.notional_value || 0,
+            timestamp: item.timestamp || 0,
             delta: item.delta,
             iv: item.iv
         }));
@@ -1513,7 +1537,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update Header
         const title = document.querySelector('.gamma-title');
         if (title) {
-            let html = `GAMMA WALL (${data.symbol}) 👾`;
+            let html = `GAMMA WALL`;
             if (data.is_weekend_data) {
                 html += ` <span class="weekend-badge">FRI DATA</span>`;
             }
@@ -1521,11 +1545,52 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         let maxVol = 0;
+        let totalCallVol = 0;
+        let totalPutVol = 0;
         data.strikes.forEach(s => {
             if (s.call_vol > maxVol) maxVol = s.call_vol;
             if (s.put_vol > maxVol) maxVol = s.put_vol;
+            totalCallVol += s.call_vol || 0;
+            totalPutVol += s.put_vol || 0;
         });
         if (maxVol === 0) maxVol = 1;
+
+        // Helper: Format volume (42000 → "42K")
+        const formatVol = (vol) => {
+            if (vol >= 1000) return (vol / 1000).toFixed(1).replace('.0', '') + 'K';
+            return vol.toString();
+        };
+
+        // === DOMINANCE BADGE ===
+        const totalVolumeAll = totalCallVol + totalPutVol;
+        let dominanceBadgeHtml = '';
+        if (totalVolumeAll > 0) {
+            const callPct = (totalCallVol / totalVolumeAll) * 100;
+            const putPct = (totalPutVol / totalVolumeAll) * 100;
+            const diff = Math.abs(callPct - putPct);
+
+            if (diff >= 10) {
+                if (callPct > putPct) {
+                    dominanceBadgeHtml = `<span class="dominance-badge bullish">📈 CALLS +${Math.round(diff)}%</span>`;
+                } else {
+                    dominanceBadgeHtml = `<span class="dominance-badge bearish">📉 PUTS +${Math.round(diff)}%</span>`;
+                }
+            } else {
+                dominanceBadgeHtml = `<span class="dominance-badge neutral">⚖️ BALANCED</span>`;
+            }
+        }
+
+        // Update Header with dominance badge
+        const gammaHeader = document.querySelector('#gamma-wall .widget-header h2');
+        if (gammaHeader) {
+            let html = `GAMMA WALL`;
+            if (data.is_weekend_data) {
+                html += ` <span class="weekend-badge">FRI DATA</span>`;
+            }
+            html += dominanceBadgeHtml;
+            gammaHeader.innerHTML = html;
+        }
+
 
         const existingRows = new Map();
         Array.from(gammaChartBars.children).forEach(row => {
@@ -1547,6 +1612,30 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // Store current price for tooltip calculations
+        window.lastGammaPrice = data.current_price;
+
+        // === FIND THE SINGLE MOST UNUSUAL WALL ===
+        // Find the strike with the highest total volume relative to average
+        let totalVol = 0;
+        data.strikes.forEach(s => {
+            totalVol += (s.call_vol || 0) + (s.put_vol || 0);
+        });
+        const avgVol = data.strikes.length > 0 ? totalVol / data.strikes.length : 0;
+
+        let mostUnusualStrike = null;
+        let highestVolRatio = 0;
+
+        data.strikes.forEach(s => {
+            const strikeTotal = (s.call_vol || 0) + (s.put_vol || 0);
+            const ratio = avgVol > 0 ? strikeTotal / avgVol : 0;
+            // Must be at least 2x average to qualify
+            if (ratio >= 2.0 && ratio > highestVolRatio) {
+                highestVolRatio = ratio;
+                mostUnusualStrike = s.strike;
+            }
+        });
+
         data.strikes.forEach(strikeData => {
             let row = existingRows.get(strikeData.strike);
             const putWidth = (strikeData.put_vol / maxVol) * 100;
@@ -1554,6 +1643,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Is this the "Zero Gamma" (ATM) row?
             const isZeroGamma = strikeData.strike === closestStrike;
+
+            // Is this THE most unusual wall?
+            const isMostUnusual = strikeData.strike === mostUnusualStrike;
 
             if (row) {
                 // Update
@@ -1579,6 +1671,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (label) label.remove();
                 }
 
+                // === Apply Most Unusual Wall Styling ===
+                if (isMostUnusual) {
+                    row.classList.add('most-unusual-wall');
+                } else {
+                    row.classList.remove('most-unusual-wall');
+                }
+
                 existingRows.delete(strikeData.strike);
             } else {
                 // Create New
@@ -1593,13 +1692,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     row.appendChild(label);
                 }
 
+                // === Apply Most Unusual Wall Styling (New Rows) ===
+                if (isMostUnusual) {
+                    row.classList.add('most-unusual-wall');
+                }
+
+                // Format volume labels (only show if bar is significant - at least 5% width)
+                const putVolLabel = putWidth >= 5 ? `<span class="gamma-vol-label put-label">${formatVol(strikeData.put_vol)}</span>` : '';
+                const callVolLabel = callWidth >= 5 ? `<span class="gamma-vol-label call-label">${formatVol(strikeData.call_vol)}</span>` : '';
+
                 row.innerHTML = `
                     <div class="gamma-put-side">
+                        ${putVolLabel}
                         <div class="gamma-bar-put" style="width: ${putWidth}%"></div>
                     </div>
                     <div class="gamma-strike">${strikeData.strike.toFixed(1)}</div>
                     <div class="gamma-call-side">
                         <div class="gamma-bar-call" style="width: ${callWidth}%"></div>
+                        ${callVolLabel}
                     </div>
                 `;
 
@@ -1636,6 +1746,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const oi = type === 'CALL' ? data.call_oi : data.put_oi;
         const color = type === 'CALL' ? 'var(--bullish-color)' : 'var(--bearish-color)';
 
+        // Estimate notional value: volume × 100 shares × ~$3 avg premium (conservative)
+        // This is a rough estimate since we don't have actual premium data
+        const avgPremium = Math.abs(data.strike - (window.lastGammaPrice || data.strike)) * 0.3 + 2;
+        const notional = vol * 100 * avgPremium;
+
+        // Format as currency
+        const formatMoney = (val) => {
+            if (val >= 1000000) return '$' + (val / 1000000).toFixed(1) + 'M';
+            if (val >= 1000) return '$' + (val / 1000).toFixed(0) + 'K';
+            return '$' + val.toFixed(0);
+        };
+
         tooltip.className = `gamma-tooltip ${type === 'CALL' ? 'call-tooltip' : 'put-tooltip'}`;
         tooltip.innerHTML = `
             <div class="tooltip-header" style="color: ${color}">
@@ -1643,11 +1765,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span>$${data.strike}</span>
             </div>
             <div class="tooltip-row">
-                <span class="tooltip-label">VOL:</span>
-                <span class="tooltip-value">${vol.toLocaleString()}</span>
+                <span class="tooltip-label">💸 EST. FLOW:</span>
+                <span class="tooltip-value">${formatMoney(notional)}</span>
             </div>
             <div class="tooltip-row">
-                <span class="tooltip-label">OI:</span>
+                <span class="tooltip-label">OPEN INT:</span>
                 <span class="tooltip-value">${oi ? oi.toLocaleString() : 'N/A'}</span>
             </div>
         `;
@@ -1677,18 +1799,35 @@ document.addEventListener('DOMContentLoaded', () => {
             row.classList.add('new-row');
         }
 
+        // Add MEGA pulse animation ONLY for >$40M elite trades
+        if (flow.notional_value && flow.notional_value >= 40000000) {
+            row.classList.add('mega-row');
+        }
+
+        // Add direction class for hover glow
+        const isCall = flow.type === 'CALL';
+        row.classList.add(isCall ? 'call-row' : 'put-row');
+
         // 1. Ticker Column
         const colTicker = document.createElement('div');
         colTicker.className = 'col-ticker';
-
-        // Badge removed per user request
 
         const tickerSpan = document.createElement('span');
         tickerSpan.textContent = flow.ticker;
         colTicker.appendChild(tickerSpan);
 
-        // Common Variables for Type
-        const isCall = flow.type === 'CALL';
+        // Time-ago badge
+        if (flow.timestamp) {
+            const timeAgoSpan = document.createElement('span');
+            timeAgoSpan.className = 'time-ago';
+            const secsAgo = Math.floor(Date.now() / 1000 - flow.timestamp);
+            if (secsAgo < 60) timeAgoSpan.textContent = 'now';
+            else if (secsAgo < 3600) timeAgoSpan.textContent = `${Math.floor(secsAgo / 60)}m`;
+            else timeAgoSpan.textContent = `${Math.floor(secsAgo / 3600)}h`;
+            colTicker.appendChild(timeAgoSpan);
+        }
+
+        // Common Variables for Type (isCall already declared above)
         const typeClass = isCall ? 'type-c' : 'type-p';
         const typeLabel = isCall ? 'C' : 'P';
 

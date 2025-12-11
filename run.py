@@ -121,8 +121,8 @@ def api_status():
 
 # === CONFIGURATION ===
 WHALE_WATCHLIST = [
-    'NVDA', 'TSLA', 'SPY', 'QQQ', 'IWM', 'AAPL', 'AMD', 'MSFT', 'AMZN', 
-    'GOOGL', 'GOOG', 'META', 'PLTR', 'SNDK', 'MU', 'NBIS', 'PANW', 'CRWD'
+    'NVDA', 'TSLA', 'SPY', 'QQQ', 'AAPL', 'AMD', 'MSFT', 'AMZN', 
+    'GOOGL', 'GOOG', 'META', 'PLTR', 'MU', 'NBIS', 'VIX', 'AVGO'
 ]
 
 # Track last reported volume to simulate "stream" feel
@@ -621,6 +621,26 @@ def api_polymarket():
         if resp.status_code == 200:
             events = resp.json()
             
+            # FALLBACK: Explicitly fetch important FOMC events that may not appear in main query
+            # (New events might not be indexed immediately after previous month resolves)
+            important_slugs = [
+                'fed-decision-in-january',
+                'fed-decision-in-february', 
+                'fed-decision-in-march',
+                'fed-decisions-dec-mar'
+            ]
+            for slug in important_slugs:
+                try:
+                    slug_resp = requests.get(f'https://gamma-api.polymarket.com/events?slug={slug}', headers=headers, verify=False, timeout=3)
+                    if slug_resp.status_code == 200:
+                        slug_events = slug_resp.json()
+                        for se in slug_events:
+                            # Only add if not closed and not already in events
+                            if not se.get('closed') and not any(e.get('slug') == se.get('slug') for e in events):
+                                events.append(se)
+                except:
+                    pass
+            
             # --- NEW LOGIC START ---
             import math # Import locally to avoid changing top of file
             
@@ -633,7 +653,7 @@ def api_polymarket():
                 "SCIENCE": ['space', 'nasa', 'spacex', 'mars', 'moon', 'cancer', 'climate', 'temperature', 'fda', 'medicine']
             }
 
-            BLACKLIST = ['nfl', 'nba', 'super bowl', 'sport', 'football', 'basketball', 'soccer', 'tennis', 'golf', 'searched', 'election', 'solana', 'microstrategy', 'mstr', 'zootopia', 'wicked', 'movie', 'film', 'box office', 'cinema', 'counterstrike', 'counter-strike', 'cs2', 'satoshi']
+            BLACKLIST = ['nfl', 'nba', 'super bowl', 'sport', 'football', 'basketball', 'soccer', 'tennis', 'golf', 'searched', 'election', 'solana', 'microstrategy', 'mstr', 'zootopia', 'wicked', 'movie', 'film', 'box office', 'cinema', 'counterstrike', 'counter-strike', 'cs2', 'satoshi', 'in december']
             
             candidates = []
             seen_stems = {}
@@ -660,6 +680,15 @@ def api_polymarket():
             for event in events:
                 title = event.get('title', '')
                 title_lower = title.lower()
+                
+                # 0. Skip CLOSED markets (API sometimes returns them despite closed=false)
+                if event.get('closed', False):
+                    continue
+                
+                # 0b. Skip markets whose end date has passed
+                end_date = event.get('endDate', '')
+                if end_date and end_date < datetime.now(pytz.UTC).isoformat():
+                    continue
 
                 # 1. Blacklist Check
                 if any(bad in title_lower for bad in BLACKLIST): continue
@@ -699,10 +728,24 @@ def api_polymarket():
                 markets = event.get('markets', [])
                 if not markets: continue
                 
-                # Find best market (highest volume or main)
-                # For the actual widget, we need more data than the audit script (outcomes, prices)
-                # We'll pick the first market for now, but we could search for the "Yes" market
-                m = markets[0] 
+                # For multi-outcome events (e.g., Fed decisions with 4+ options),
+                # pick the sub-market with the HIGHEST "Yes" probability.
+                # This shows the most likely outcome instead of a random low-probability one.
+                if len(markets) > 1:
+                    best_market = None
+                    best_yes_prob = 0
+                    for mkt in markets:
+                        try:
+                            prices = json.loads(mkt['outcomePrices']) if isinstance(mkt['outcomePrices'], str) else mkt['outcomePrices']
+                            yes_prob = float(prices[0]) if prices else 0
+                            if yes_prob > best_yes_prob:
+                                best_yes_prob = yes_prob
+                                best_market = mkt
+                        except:
+                            continue
+                    m = best_market if best_market else markets[0]
+                else:
+                    m = markets[0] 
                 
                 # Calculate Metrics
                 try:
@@ -740,10 +783,31 @@ def api_polymarket():
                         val = m.get('groupItemTitle', '')
                         if val: title = title.replace("___", val)
 
-                    outcomes = json.loads(m['outcomes']) if isinstance(m['outcomes'], str) else m['outcomes']
-                    prices = json.loads(m['outcomePrices']) if isinstance(m['outcomePrices'], str) else m['outcomePrices']
-                    
-                    if len(outcomes) >= 2 and len(prices) >= 2:
+                    # MULTI-OUTCOME HANDLING:
+                    # For events with multiple sub-markets (e.g., Fed decisions),
+                    # aggregate all sub-market probabilities to show proper outcomes.
+                    if len(markets) > 1 and markets[0].get('groupItemTitle'):
+                        outcome_data = []
+                        for mkt in markets:
+                            gt = mkt.get('groupItemTitle', '')
+                            if not gt: continue
+                            try:
+                                prices = json.loads(mkt['outcomePrices']) if isinstance(mkt['outcomePrices'], str) else mkt['outcomePrices']
+                                yes_prob = float(prices[0]) if prices else 0
+                                outcome_data.append({"label": gt, "price": yes_prob})
+                            except:
+                                continue
+                        
+                        if len(outcome_data) < 2:
+                            # Fallback to single market logic
+                            outcomes = json.loads(m['outcomes']) if isinstance(m['outcomes'], str) else m['outcomes']
+                            prices = json.loads(m['outcomePrices']) if isinstance(m['outcomePrices'], str) else m['outcomePrices']
+                            outcome_data = [{"label": str(outcomes[i]), "price": float(prices[i])} for i in range(len(outcomes))]
+                    else:
+                        # Single market or non-grouped: use standard Yes/No outcomes
+                        outcomes = json.loads(m['outcomes']) if isinstance(m['outcomes'], str) else m['outcomes']
+                        prices = json.loads(m['outcomePrices']) if isinstance(m['outcomePrices'], str) else m['outcomePrices']
+                        
                         outcome_data = []
                         for i in range(len(outcomes)):
                             try:
@@ -752,38 +816,38 @@ def api_polymarket():
                                 outcome_data.append({"label": label, "price": price})
                             except: continue
                         
-                        outcome_data.sort(key=lambda x: x['price'], reverse=True)
-                        if len(outcome_data) < 2: continue
-                        
-                        top1 = outcome_data[0]
-                        top2 = outcome_data[1]
-                        
-                        # OVERRIDE LABEL
+                        # OVERRIDE LABEL for grouped markets
                         group_title = m.get('groupItemTitle')
-                        if group_title and top1['label'].lower() == "yes":
-                            top1['label'] = group_title
-                        
-                        def format_money(val):
-                            if val >= 1_000_000: return f"${val/1_000_000:.1f}M"
-                            if val >= 1_000: return f"${val/1_000:.0f}k"
-                            return f"${val:.0f}"
+                        if group_title and len(outcome_data) > 0 and outcome_data[0]['label'].lower() == "yes":
+                            outcome_data[0]['label'] = group_title
+                    
+                    outcome_data.sort(key=lambda x: x['price'], reverse=True)
+                    if len(outcome_data) < 2: continue
+                    
+                    top1 = outcome_data[0]
+                    top2 = outcome_data[1]
+                    
+                    def format_money(val):
+                        if val >= 1_000_000: return f"${val/1_000_000:.1f}M"
+                        if val >= 1_000: return f"${val/1_000:.0f}k"
+                        return f"${val:.0f}"
 
-                        candidates.append({
-                            "event": title,
-                            "category": category,
-                            "is_volatile": abs(delta) >= 0.05,
-                            "volume": vol, # Keep raw for sorting
-                            "volume_fmt": format_money(vol),
-                            "liquidity": format_money(liq),
-                            "outcome_1_label": top1['label'],
-                            "outcome_1_prob": int(top1['price'] * 100),
-                            "outcome_2_label": top2['label'],
-                            "outcome_2_prob": int(top2['price'] * 100),
-                            "slug": event.get('slug', ''),
-                            "delta": delta,
-                            "score": score,
-                            "skip": False
-                        })
+                    candidates.append({
+                        "event": title,
+                        "category": category,
+                        "is_volatile": abs(delta) >= 0.05,
+                        "volume": vol, # Keep raw for sorting
+                        "volume_fmt": format_money(vol),
+                        "liquidity": format_money(liq),
+                        "outcome_1_label": top1['label'],
+                        "outcome_1_prob": int(top1['price'] * 100),
+                        "outcome_2_label": top2['label'],
+                        "outcome_2_prob": int(top2['price'] * 100),
+                        "slug": event.get('slug', ''),
+                        "delta": delta,
+                        "score": score,
+                        "skip": False
+                    })
                 except Exception as e:
                     continue
 

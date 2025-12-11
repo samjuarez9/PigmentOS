@@ -746,9 +746,10 @@ h1 {
 }
 
 .news-highlight-mag7 {
-    border-left: 3px solid #FF0055 !important;
-    background: linear-gradient(90deg, rgba(255, 0, 85, 0.15) 0%, transparent 100%) !important;
-    animation: pulse-red-border 2s infinite;
+    border: 1px solid rgba(255, 51, 102, 0.8) !important;
+    border-radius: 6px;
+    box-shadow: 0 0 8px rgba(255, 51, 102, 0.4), inset 0 0 4px rgba(255, 51, 102, 0.1);
+    animation: pizzint-pulse 2.5s ease-in-out infinite;
 }
 
 .news-source-tag {
@@ -1131,10 +1132,10 @@ td {
 
 /* TFI Segmented Health Bar */
 .tfi-container {
-    padding: 10px;
+    padding: 5px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
     position: relative;
 }
 
@@ -1143,6 +1144,35 @@ td {
     flex-direction: column;
     align-items: center;
     gap: 4px;
+}
+
+.tfi-score-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tfi-delta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.tfi-delta.up {
+    color: #00ff41;
+}
+
+.tfi-delta.down {
+    color: #ff5555;
+}
+
+.tfi-vix-ref {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #666;
+    letter-spacing: 1px;
+    margin-top: 4px;
 }
 
 .tfi-score {
@@ -1330,6 +1360,47 @@ td {
     transition: all 0.3s ease;
     position: relative;
     z-index: 10;
+}
+
+/* Staggered animation delay for segments */
+.tfi-seg:nth-child(1) {
+    transition-delay: 0ms;
+}
+
+.tfi-seg:nth-child(2) {
+    transition-delay: 30ms;
+}
+
+.tfi-seg:nth-child(3) {
+    transition-delay: 60ms;
+}
+
+.tfi-seg:nth-child(4) {
+    transition-delay: 90ms;
+}
+
+.tfi-seg:nth-child(5) {
+    transition-delay: 120ms;
+}
+
+.tfi-seg:nth-child(6) {
+    transition-delay: 150ms;
+}
+
+.tfi-seg:nth-child(7) {
+    transition-delay: 180ms;
+}
+
+.tfi-seg:nth-child(8) {
+    transition-delay: 210ms;
+}
+
+.tfi-seg:nth-child(9) {
+    transition-delay: 240ms;
+}
+
+.tfi-seg:nth-child(10) {
+    transition-delay: 270ms;
 }
 
 /* Active States - LED Glow */
@@ -1810,6 +1881,78 @@ td {
     pointer-events: none;
     animation: humPulse 3s infinite ease-in-out;
     /* The Hum */
+}
+
+/* === UNUSUAL GAMMA WALL - Red All-Around Border (PizzINT Style) === */
+/* Only applied to the SINGLE most unusual wall */
+.most-unusual-wall {
+    position: relative;
+    border: 1px solid rgba(255, 51, 102, 0.8);
+    border-radius: 4px;
+    box-shadow: 0 0 8px rgba(255, 51, 102, 0.4), inset 0 0 4px rgba(255, 51, 102, 0.1);
+    animation: pizzint-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes pizzint-pulse {
+
+    0%,
+    100% {
+        border-color: rgba(255, 51, 102, 0.6);
+        box-shadow: 0 0 6px rgba(255, 51, 102, 0.3), inset 0 0 3px rgba(255, 51, 102, 0.05);
+    }
+
+    50% {
+        border-color: rgba(255, 51, 102, 1);
+        box-shadow: 0 0 12px rgba(255, 51, 102, 0.5), inset 0 0 5px rgba(255, 51, 102, 0.12);
+    }
+}
+
+/* === GAMMA VOLUME LABELS === */
+.gamma-vol-label {
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    white-space: nowrap;
+    opacity: 0.9;
+    padding: 0 3px;
+}
+
+.gamma-vol-label.put-label {
+    color: #FF66B2;
+    margin-right: 4px;
+}
+
+.gamma-vol-label.call-label {
+    color: #66FF99;
+    margin-left: 4px;
+}
+
+/* === CALL/PUT DOMINANCE BADGE === */
+.dominance-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    margin-left: 10px;
+}
+
+.dominance-badge.bullish {
+    background: rgba(0, 255, 65, 0.15);
+    color: #00FF41;
+    border: 1px solid rgba(0, 255, 65, 0.4);
+}
+
+.dominance-badge.bearish {
+    background: rgba(255, 0, 153, 0.15);
+    color: #FF0099;
+    border: 1px solid rgba(255, 0, 153, 0.4);
+}
+
+.dominance-badge.neutral {
+    background: rgba(255, 255, 255, 0.1);
+    color: #888;
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 /* The Hum Animation */
@@ -3030,6 +3173,38 @@ td {
     box-shadow: 0 0 15px rgba(157, 78, 221, 0.6);
 }
 
+/* Market Status Button */
+.market-status-btn {
+    background: rgba(255, 165, 0, 0.2);
+    border: 1px solid #FFA500;
+    color: #FFFFFF;
+    padding: 3px 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    cursor: default;
+    transition: all 0.3s ease;
+    margin-left: 10px;
+}
+
+.market-status-btn.after-market {
+    background: rgba(255, 165, 0, 0.2);
+    border-color: #FFA500;
+    box-shadow: 0 0 8px rgba(255, 165, 0, 0.3);
+}
+
+.market-status-btn.pre-market {
+    background: rgba(157, 78, 221, 0.2);
+    border-color: #9D4EDD;
+    box-shadow: 0 0 8px rgba(157, 78, 221, 0.3);
+}
+
+.market-status-btn.market-open {
+    background: rgba(0, 200, 83, 0.2);
+    border-color: #00c853;
+    box-shadow: 0 0 8px rgba(0, 200, 83, 0.3);
+}
+
 /* Fixed Discord Button next to X */
 .discord-fixed-btn {
     position: fixed;
@@ -3089,6 +3264,65 @@ td {
 
 .whale-row.new-row {
     animation: flash-row 800ms ease-out forwards;
+}
+
+/* Stagger animation for multiple new rows */
+.whale-row.new-row:nth-child(1) {
+    animation-delay: 0ms;
+}
+
+.whale-row.new-row:nth-child(2) {
+    animation-delay: 50ms;
+}
+
+.whale-row.new-row:nth-child(3) {
+    animation-delay: 100ms;
+}
+
+.whale-row.new-row:nth-child(4) {
+    animation-delay: 150ms;
+}
+
+.whale-row.new-row:nth-child(5) {
+    animation-delay: 200ms;
+}
+
+/* MEGA trade pulse animation (PizzINT-style red) */
+@keyframes mega-pulse {
+
+    0%,
+    100% {
+        box-shadow: inset 0 0 0 1px rgba(255, 82, 82, 0.3);
+        background: rgba(255, 82, 82, 0.05);
+    }
+
+    50% {
+        box-shadow: inset 0 0 0 2px rgba(255, 82, 82, 0.6);
+        background: rgba(255, 82, 82, 0.12);
+    }
+}
+
+.whale-row.mega-row {
+    animation: mega-pulse 2s ease-in-out infinite;
+    border-left: 3px solid #ff5252 !important;
+}
+
+/* Directional hover glow */
+.whale-row.call-row:hover {
+    background: rgba(0, 200, 83, 0.08);
+    border-left-color: #00c853;
+}
+
+.whale-row.put-row:hover {
+    background: rgba(255, 82, 82, 0.08);
+    border-left-color: #ff5252;
+}
+
+/* Time-ago badge */
+.time-ago {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.4);
+    margin-left: 4px;
 }
 
 #whale-stale-banner {
@@ -3323,8 +3557,10 @@ td {
 
 
 .news-highlight-mag7 {
-    border-left: 3px solid #FF0055 !important;
-    background: linear-gradient(90deg, rgba(255, 0, 85, 0.1) 0%, transparent 100%);
+    border: 1px solid rgba(255, 51, 102, 0.8) !important;
+    border-radius: 6px;
+    box-shadow: 0 0 8px rgba(255, 51, 102, 0.4), inset 0 0 4px rgba(255, 51, 102, 0.1);
+    animation: pizzint-pulse 2.5s ease-in-out infinite;
 }
 
 .news-source-tag {
