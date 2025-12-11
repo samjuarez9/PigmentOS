@@ -46,6 +46,16 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
+# Rate Limiting
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+
 # Stripe Configuration
 import stripe
 from stripe_config import STRIPE_SECRET_KEY, STRIPE_PRICE_ID, TRIAL_DAYS, STRIPE_WEBHOOK_SECRET, FIREBASE_CREDENTIALS_B64
@@ -53,7 +63,7 @@ stripe.api_key = STRIPE_SECRET_KEY
 
 # Firebase Admin SDK Initialization
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, auth as firebase_auth
 import base64
 
 firestore_db = None  # Will be initialized if credentials are available
@@ -389,12 +399,60 @@ def create_checkout_session():
         return jsonify({'error': str(e)}), 400
 
 @app.route('/api/subscription-status', methods=['POST'])
+@limiter.limit("10 per minute")
 def subscription_status():
-    """Check if user has active subscription or valid trial"""
+    """Check if user has active subscription or valid trial - SERVER-SIDE VERIFIED"""
     try:
-        data = request.get_json()
-        user_email = data.get('email')
-        trial_start_date = data.get('trial_start_date')  # ISO format string from Firebase
+        # 1. VERIFY FIREBASE TOKEN (don't trust client-sent email)
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Missing or invalid Authorization header'}), 401
+        
+        id_token = auth_header.split('Bearer ')[1]
+        
+        try:
+            decoded_token = firebase_auth.verify_id_token(id_token)
+            user_email = decoded_token.get('email')
+            user_uid = decoded_token.get('uid')
+        except Exception as auth_error:
+            print(f"Firebase token verification failed: {auth_error}")
+            return jsonify({'error': 'Invalid authentication token'}), 401
+        
+        if not user_email:
+            return jsonify({'error': 'No email in token'}), 401
+        
+        # 2. FETCH TRIAL DATE FROM FIRESTORE (don't trust client-sent date)
+        trial_start_date = None
+        if firestore_db:
+            try:
+                user_doc = firestore_db.collection('users').document(user_uid).get()
+                if user_doc.exists:
+                    user_data = user_doc.to_dict()
+                    trial_start_ts = user_data.get('trialStartDate')
+                    subscription_status_db = user_data.get('subscriptionStatus', 'trialing')
+                    
+                    # If already marked as active in Firestore, trust it
+                    if subscription_status_db == 'active':
+                        return jsonify({
+                            'status': 'active',
+                            'has_access': True
+                        })
+                    
+                    # If marked as expired or past_due
+                    if subscription_status_db in ['expired', 'past_due']:
+                        # Double-check with Stripe
+                        customers = stripe.Customer.list(email=user_email, limit=1)
+                        if customers.data:
+                            subscriptions = stripe.Subscription.list(customer=customers.data[0].id, status='active', limit=1)
+                            if subscriptions.data:
+                                return jsonify({'status': 'active', 'has_access': True})
+                        return jsonify({'status': 'expired', 'has_access': False})
+                    
+                    # Convert Firestore timestamp to datetime
+                    if trial_start_ts:
+                        trial_start_date = trial_start_ts
+            except Exception as db_error:
+                print(f"Firestore lookup error: {db_error}")
         
         if not trial_start_date:
             # New user, trial just started
@@ -404,22 +462,27 @@ def subscription_status():
                 'has_access': True
             })
         
-        # Calculate trial expiration
+        # 3. CALCULATE TRIAL EXPIRATION
         from datetime import datetime, timedelta
-        trial_start = datetime.fromisoformat(trial_start_date.replace('Z', '+00:00'))
+        
+        # Handle Firestore Timestamp
+        if hasattr(trial_start_date, 'timestamp'):
+            trial_start = datetime.fromtimestamp(trial_start_date.timestamp(), tz=pytz.UTC)
+        else:
+            trial_start = trial_start_date
+            
         trial_end = trial_start + timedelta(days=TRIAL_DAYS)
-        now = datetime.now(trial_start.tzinfo)
+        now = datetime.now(pytz.UTC)
         days_remaining = (trial_end - now).days
         
         if days_remaining > 0:
-            # Trial still active
             return jsonify({
                 'status': 'trialing',
                 'days_remaining': days_remaining,
                 'has_access': True
             })
         
-        # Trial expired - check for active subscription
+        # 4. TRIAL EXPIRED - CHECK STRIPE
         customers = stripe.Customer.list(email=user_email, limit=1)
         if customers.data:
             customer = customers.data[0]
@@ -430,7 +493,6 @@ def subscription_status():
                     'has_access': True
                 })
         
-        # No active subscription
         return jsonify({
             'status': 'expired',
             'has_access': False
@@ -543,6 +605,30 @@ def stripe_webhook():
                     break
         except Exception as e:
             print(f"❌ Subscription update handling failed: {e}")
+    
+    elif event_type == 'invoice.payment_failed':
+        # Handle failed payment - mark as past_due
+        invoice = event['data']['object']
+        customer_id = invoice.get('customer')
+        
+        try:
+            customer = stripe.Customer.retrieve(customer_id)
+            customer_email = customer.get('email')
+            
+            if customer_email and firestore_db:
+                users_ref = firestore_db.collection('users')
+                query = users_ref.where('email', '==', customer_email).limit(1)
+                docs = query.stream()
+                
+                for doc in docs:
+                    doc.reference.update({
+                        'subscriptionStatus': 'past_due',
+                        'subscriptionUpdatedAt': firestore.SERVER_TIMESTAMP
+                    })
+                    print(f"⚠️ Payment failed for {customer_email}: subscriptionStatus = past_due")
+                    break
+        except Exception as e:
+            print(f"❌ Payment failed handling error: {e}")
     
     return jsonify({'status': 'success'}), 200
 

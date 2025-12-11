@@ -5,6 +5,7 @@ pytz
 urllib3
 flask
 flask-cors
+flask-limiter
 gunicorn
 feedparser
 lxml

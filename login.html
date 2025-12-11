@@ -987,6 +987,14 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
+        // Initialize Analytics
+        import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
+        const analytics = getAnalytics(app);
+        logEvent(analytics, 'page_view', { page_title: 'Login' });
+
+        // Make analytics available globally
+        window.pigmentAnalytics = { logEvent, analytics };
+
         // Make functions available globally
         window.signInWithGoogle = signInWithGoogle;
         window.signInWithPhone = signInWithPhone;
@@ -1008,6 +1016,9 @@
                         trialStartDate: serverTimestamp(),
                         subscriptionStatus: "trialing"
                     });
+                    logEvent(analytics, 'sign_up', { method: 'Google' });
+                } else {
+                    logEvent(analytics, 'login', { method: 'Google' });
                 }
 
                 redirectToDashboard();
@@ -1099,6 +1110,7 @@
                 // Try to sign in first
                 await signInWithEmailAndPassword(auth, email, password);
                 console.log("Email sign-in successful");
+                logEvent(analytics, 'login', { method: 'Email' });
                 redirectToDashboard();
             } catch (error) {
                 if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
@@ -1114,6 +1126,7 @@
                             subscriptionStatus: "trialing"
                         });
 
+                        logEvent(analytics, 'sign_up', { method: 'Email' });
                         redirectToDashboard();
                     } catch (createError) {
                         console.error("Account creation error:", createError);

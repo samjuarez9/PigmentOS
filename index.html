@@ -15,7 +15,7 @@
     <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 
-<body>
+<body style="visibility: hidden;">
     <div class="terminal-container">
         <!-- Header -->
         <header class="main-header">
@@ -323,6 +323,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCEtjs3kYaB7usZjplg797NYtM4MFIdm7g",
@@ -330,12 +331,20 @@
             projectId: "pigmentos-49d50",
             storageBucket: "pigmentos-49d50.firebasestorage.app",
             messagingSenderId: "52957674554",
-            appId: "1:52957674554:web:2a3b295c23978980a6c903"
+            appId: "1:52957674554:web:2a3b295c23978980a6c903",
+            measurementId: "G-RDE19D05G2"
         };
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        const analytics = getAnalytics(app);
+
+        // Track page view
+        logEvent(analytics, 'page_view', { page_title: 'Dashboard' });
+
+        // Make analytics available globally for custom events
+        window.pigmentAnalytics = { logEvent, analytics };
 
         // Sign Out Logic
         const signOutBtn = document.getElementById('sign-out-btn');
@@ -359,6 +368,7 @@
             const adminEmails = ['sam.juarez092678@gmail.com', 'jaxnailedit@gmail.com', 'Gtmichael9218@gmail.com'];
             if (adminEmails.includes(user.email)) {
                 console.log('Admin user logged in - bypassing trial check');
+                document.body.style.visibility = 'visible'; // Show dashboard
                 showVipAnimation();
                 return;
             }
@@ -380,13 +390,16 @@
                 const userData = userDoc.data();
                 const trialStart = userData.trialStartDate?.toDate();
 
+                // Get Firebase ID token for server-side verification
+                const idToken = await user.getIdToken();
+
                 const response = await fetch('/api/subscription-status', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email: user.email,
-                        trial_start_date: trialStart?.toISOString()
-                    })
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${idToken}`
+                    },
+                    body: JSON.stringify({})  // No longer sending email/date - server fetches from Firestore
                 });
 
                 const status = await response.json();
@@ -396,12 +409,17 @@
                     return;
                 }
 
+                // User has access - show dashboard
+                document.body.style.visibility = 'visible';
+
                 if (status.status === 'trialing') {
                     showTrialBanner(status.days_remaining);
                 }
 
             } catch (error) {
                 console.error('Trial check error:', error);
+                // On error, still show dashboard (fail open for UX)
+                document.body.style.visibility = 'visible';
             }
         });
 
