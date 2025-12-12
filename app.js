@@ -1328,7 +1328,36 @@ document.addEventListener('DOMContentLoaded', () => {
         const isSystemHealthy = !stale;
         const hasData = data && data.length > 0;
 
+        // Get market state early
+        const marketState = getMarketState();
 
+        // PRE-MARKET / WEEKEND: Clear all caches and show radar
+        if (marketState.isPreMarket || marketState.isWeekend) {
+            // Clear all tracking caches
+            seenTrades.clear();
+            tradeFirstSeen.clear();
+            previousSnapshotTradeIds.clear();
+
+            const flowFeedContainer = document.getElementById('flow-feed-container');
+            if (flowFeedContainer) {
+                const statusText = marketState.isWeekend ? "WEEKEND" : "PRE-MARKET";
+                flowFeedContainer.innerHTML = `
+                    <div class="whale-pre-market-container">
+                        <div class="radar-container">
+                            <div class="radar-ring radar-ring-1"></div>
+                            <div class="radar-ring radar-ring-2"></div>
+                            <div class="radar-ring radar-ring-3"></div>
+                            <div class="radar-center"></div>
+                        </div>
+                        <div class="status-message">
+                            <span style="color: #888; font-size: 11px; font-family: var(--font-mono);">STATUS: ${statusText}. Monitoring for block orders...</span>
+                        </div>
+                    </div>
+                `;
+            }
+            updateStatus('status-whales', isSystemHealthy);
+            return; // Exit early - don't process any data during pre-market
+        }
 
         // Update Status: Only show OFFLINE if system is actually down (stale)
         updateStatus('status-whales', isSystemHealthy);
@@ -1347,66 +1376,61 @@ document.addEventListener('DOMContentLoaded', () => {
         const flowFeedContainer = document.getElementById('flow-feed-container');
         if (!flowFeedContainer) return;
 
-        // Handle empty data
+        // Handle empty data (only reached during market hours / after hours)
         if (!hasData) {
 
             // Clear existing items
             flowFeedContainer.innerHTML = '';
 
             if (isSystemHealthy) {
-                const marketState = getMarketState();
-
-
-                if (marketState.isPreMarket || marketState.isWeekend) {
-
-                    // PRE-MARKET or WEEKEND: Show pulsing radar rings
-                    const statusText = marketState.isWeekend ? "WEEKEND" : "PRE-MARKET";
-                    flowFeedContainer.innerHTML = `
-    <div class="whale-pre-market-container">
-                            <div class="radar-container">
-                                <div class="radar-ring radar-ring-1"></div>
-                                <div class="radar-ring radar-ring-2"></div>
-                                <div class="radar-ring radar-ring-3"></div>
-                                <div class="radar-center"></div>
-                            </div>
-                            <div class="status-message">
-                                <span style="color: #888; font-size: 11px; font-family: var(--font-mono);">STATUS: ${statusText}. Monitoring for block orders...</span>
-                            </div>
-                        </div>
-    `;
-                } else {
-                    // MARKET HOURS or AFTER HOURS: Show waiting message
-                    const waitingDiv = document.createElement('div');
-                    waitingDiv.className = 'placeholder-item';
-                    waitingDiv.textContent = 'Waiting for trade...';
-                    flowFeedContainer.appendChild(waitingDiv);
-                }
+                // MARKET HOURS or AFTER HOURS: Show waiting message
+                const waitingDiv = document.createElement('div');
+                waitingDiv.className = 'placeholder-item';
+                waitingDiv.textContent = 'Waiting for trade...';
+                flowFeedContainer.appendChild(waitingDiv);
             }
-            // If system is unhealthy (stale), the OFFLINE indicator already shows, so leave empty
             return;
         }
 
         // Map to internal format
         const nowTs = Date.now() / 1000; // Current time for "entered feed" timestamp
-        const trades = data.map(item => ({
-            ticker: item.baseSymbol || item.symbol,
-            strike: item.strikePrice,
-            type: item.putCall === 'C' ? 'CALL' : 'PUT',
-            expiry: item.expirationDate,
-            premium: item.premium || "DELAYED",
-            volume: item.volume,
-            direction: item.putCall === 'C' ? 'BULL' : 'BEAR',
-            isWhale: true,
-            isCritical: false,
-            vol_oi: item.vol_oi,
-            moneyness: item.moneyness,
-            is_mega_whale: item.is_mega_whale || false,
-            notional_value: item.notional_value || 0,
-            timestamp: item.timestamp || 0,
-            enteredAt: nowTs, // When trade entered OUR feed (for relative time display)
-            delta: item.delta,
-            iv: item.iv
-        }));
+        const trades = data.map(item => {
+            // Generate trade ID to check if we've seen it before
+            const ticker = item.baseSymbol || item.symbol;
+            const strike = item.strikePrice;
+            const type = item.putCall === 'C' ? 'CALL' : 'PUT';
+            const expiry = item.expirationDate;
+            const volume = item.volume;
+            const tradeId = `${ticker}_${strike}_${type}_${expiry}_${volume} `;
+
+            // Use existing enteredAt if we've seen this trade, otherwise use now
+            let enteredAtTime = nowTs;
+            if (tradeFirstSeen.has(tradeId)) {
+                enteredAtTime = tradeFirstSeen.get(tradeId) / 1000; // Convert ms to seconds
+            } else {
+                tradeFirstSeen.set(tradeId, Date.now()); // Store in ms for consistency
+            }
+
+            return {
+                ticker,
+                strike,
+                type,
+                expiry,
+                premium: item.premium || "DELAYED",
+                volume,
+                direction: item.putCall === 'C' ? 'BULL' : 'BEAR',
+                isWhale: true,
+                isCritical: false,
+                vol_oi: item.vol_oi,
+                moneyness: item.moneyness,
+                is_mega_whale: item.is_mega_whale || false,
+                notional_value: item.notional_value || 0,
+                timestamp: item.timestamp || 0,
+                enteredAt: enteredAtTime, // Preserve original entry time
+                delta: item.delta,
+                iv: item.iv
+            };
+        });
 
         // Hover Pause Logic
         if (isFeedHovered) {
@@ -1876,17 +1900,26 @@ document.addEventListener('DOMContentLoaded', () => {
         tickerSpan.textContent = flow.ticker;
         colTicker.appendChild(tickerSpan);
 
-        // Time-ago badge (based on when trade entered OUR feed, not actual trade time)
+        // Time-ago badge - only show "now" for first 3 seconds, then fade out
         const feedTimestamp = flow.enteredAt || flow.timestamp;
         if (feedTimestamp) {
-            const timeAgoSpan = document.createElement('span');
-            timeAgoSpan.className = 'time-ago';
             const secsAgo = Math.floor(Date.now() / 1000 - feedTimestamp);
-            if (secsAgo < 30) timeAgoSpan.textContent = 'now';
-            else if (secsAgo < 60) timeAgoSpan.textContent = '30s';
-            else if (secsAgo < 3600) timeAgoSpan.textContent = `${Math.floor(secsAgo / 60)}m`;
-            else timeAgoSpan.textContent = `${Math.floor(secsAgo / 3600)}h`;
-            colTicker.appendChild(timeAgoSpan);
+
+            // Only show "now" badge for trades that just entered (within 3 seconds)
+            if (secsAgo < 3) {
+                const timeAgoSpan = document.createElement('span');
+                timeAgoSpan.className = 'time-ago time-ago-now';
+                timeAgoSpan.textContent = 'now';
+                colTicker.appendChild(timeAgoSpan);
+
+                // Fade out after 3 seconds
+                const fadeDelay = Math.max(0, 3 - secsAgo) * 1000;
+                setTimeout(() => {
+                    timeAgoSpan.classList.add('fade-out');
+                    setTimeout(() => timeAgoSpan.remove(), 500);
+                }, fadeDelay);
+            }
+            // No badge shown for older trades (cleaner look)
         }
 
         // Common Variables for Type (isCall already declared above)

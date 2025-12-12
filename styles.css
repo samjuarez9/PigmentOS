@@ -3364,6 +3364,15 @@ td {
     font-size: 10px;
     color: rgba(255, 255, 255, 0.4);
     margin-left: 4px;
+    transition: opacity 0.5s ease-out;
+}
+
+.time-ago-now {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.time-ago.fade-out {
+    opacity: 0;
 }
 
 #whale-stale-banner {
