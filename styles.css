@@ -3888,13 +3888,17 @@ td {
 
     /* Ticker Widget */
     .ticker-widget {
-        bottom: 0;
+        position: fixed !important;
+        bottom: 0 !important;
         left: 0;
         right: 0;
         z-index: 9999;
         min-height: auto;
-        /* Override generic widget min-height */
         height: auto;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+        border-bottom: none;
     }
 
     /* Ensure dropdown doesn't get cut off */

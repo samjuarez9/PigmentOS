@@ -872,6 +872,29 @@
             color: #0000FF;
         }
 
+        /* Remember Me Checkbox */
+        .remember-row {
+            display: flex;
+            justify-content: center;
+            margin-top: 8px;
+        }
+
+        .remember-label {
+            font-family: 'VT323', monospace;
+            font-size: 10px;
+            color: #000;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+        }
+
+        .remember-label input[type="checkbox"] {
+            width: 12px;
+            height: 12px;
+            cursor: pointer;
+        }
+
         .login-btn:active {
             box-shadow:
                 inset 4px 4px 0px #404040,
@@ -1007,6 +1030,13 @@
                     </div>
                 </div>
 
+                <div class="remember-row">
+                    <label class="remember-label">
+                        <input type="checkbox" id="remember-me" checked>
+                        <span>Remember me</span>
+                    </label>
+                </div>
+
                 <div class="btn-row">
                     <button type="submit" class="pixel-btn btn-login">LOGIN</button>
                     <button type="button" onclick="signInWithGoogle()" class="pixel-btn btn-google">
@@ -1057,7 +1087,7 @@
     <script type="module">
         // Import Firebase SDKs
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, signInWithPopup, GoogleAuthProvider, signInWithPhoneNumber, RecaptchaVerifier, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, signInWithPhoneNumber, RecaptchaVerifier, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, setPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         // Firebase configuration
@@ -1094,6 +1124,10 @@
         async function signInWithGoogle() {
             const provider = new GoogleAuthProvider();
             try {
+                // Set persistence based on "Remember me" checkbox
+                const rememberMe = document.getElementById('remember-me').checked;
+                await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+
                 const result = await signInWithPopup(auth, provider);
                 console.log("Google Sign-In successful:", result.user);
 
@@ -1198,6 +1232,10 @@
             btn.style.color = "#000";
 
             try {
+                // Set persistence based on "Remember me" checkbox
+                const rememberMe = document.getElementById('remember-me').checked;
+                await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+
                 // Try to sign in first
                 await signInWithEmailAndPassword(auth, email, password);
                 console.log("Email sign-in successful");
