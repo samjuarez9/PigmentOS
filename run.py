@@ -132,7 +132,7 @@ def api_status():
 # === CONFIGURATION ===
 WHALE_WATCHLIST = [
     'NVDA', 'TSLA', 'SPY', 'QQQ', 'AAPL', 'AMD', 'MSFT', 'AMZN', 
-    'GOOGL', 'GOOG', 'META', 'PLTR', 'MU', 'NBIS', 'VIX', 'AVGO'
+    'GOOGL', 'GOOG', 'META', 'PLTR', 'MU', 'NBIS', 'AVGO'
 ]
 
 # Track last reported volume to simulate "stream" feel
@@ -977,22 +977,7 @@ def api_polymarket():
 
     return jsonify({"data": CACHE["polymarket"]["data"], "is_mock": CACHE["polymarket"]["is_mock"]})
 
-@app.route('/api/vix')
-def api_vix():
-    global CACHE
-    current_time = time.time()
-    FRED_KEY = os.environ.get("FRED_API_KEY", "9832f887b004951ec7d53cb78f1063a0")
-    
-    if current_time - CACHE["vix"]["timestamp"] >= MACRO_CACHE_DURATION:
-        try:
-            url = f"https://api.stlouisfed.org/fred/series/observations?series_id=VIXCLS&api_key={FRED_KEY}&file_type=json&sort_order=desc&limit=1"
-            resp = requests.get(url, timeout=5)
-            CACHE["vix"]["data"] = resp.json()
-            CACHE["vix"]["timestamp"] = current_time
-        except Exception as e:
-            return jsonify({"error": str(e)})
-            
-    return jsonify(CACHE["vix"]["data"])
+# VIX endpoint removed - not used (TFI uses Alternative.me Crypto F&G instead)
 
 @app.route('/api/cnn-fear-greed')
 def api_fear_greed():
