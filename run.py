@@ -132,7 +132,7 @@ def api_status():
 # === CONFIGURATION ===
 WHALE_WATCHLIST = [
     'NVDA', 'TSLA', 'SPY', 'QQQ', 'AAPL', 'AMD', 'MSFT', 'AMZN', 
-    'GOOGL', 'GOOG', 'META', 'PLTR', 'MU', 'NBIS', 'AVGO'
+    'GOOGL', 'GOOG', 'META', 'PLTR', 'MU', 'NBIS'
 ]
 
 # Track last reported volume to simulate "stream" feel
