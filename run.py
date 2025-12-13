@@ -137,14 +137,24 @@ WHALE_WATCHLIST = [
 
 # MarketData.app API Token (for enhanced options data)
 MARKETDATA_TOKEN = os.environ.get("MARKETDATA_TOKEN")
+# Rate limit tracking for MarketData.app
+MARKETDATA_LAST_REQUEST = 0
+MARKETDATA_MIN_INTERVAL = 0.25  # 250ms between requests
 
 def fetch_options_chain_marketdata(symbol, expiry=None):
     """
     Fetch options chain from MarketData.app API.
     Returns parsed data or None if failed.
     """
+    global MARKETDATA_LAST_REQUEST
+    
     if not MARKETDATA_TOKEN:
         return None
+    
+    # Rate limit: wait at least 250ms between requests
+    elapsed = time.time() - MARKETDATA_LAST_REQUEST
+    if elapsed < MARKETDATA_MIN_INTERVAL:
+        time.sleep(MARKETDATA_MIN_INTERVAL - elapsed)
         
     try:
         url = f"https://api.marketdata.app/v1/options/chain/{symbol}/"
@@ -153,6 +163,7 @@ def fetch_options_chain_marketdata(symbol, expiry=None):
         if expiry:
             params["expiration"] = expiry
             
+        MARKETDATA_LAST_REQUEST = time.time()
         resp = requests.get(url, headers=headers, params=params, timeout=10)
         
         # Accept any 2xx status (MarketData.app returns 203 for cached/trial data)
@@ -160,6 +171,11 @@ def fetch_options_chain_marketdata(symbol, expiry=None):
             data = resp.json()
             if data.get("s") == "ok":
                 return data
+        
+        # Rate limited - return None silently to fall back to yfinance
+        if resp.status_code == 429:
+            print(f"MarketData.app Rate Limit ({symbol}) - falling back")
+            return None
         
         print(f"MarketData.app Error ({symbol}): Status {resp.status_code}")
         return None
@@ -173,13 +189,22 @@ WHALE_HISTORY = {}
 VOLUME_THRESHOLD = 100 # Only show update if volume increases by this much
 
 def refresh_single_whale(symbol):
+    """Fetch unusual options activity for a single ticker using yfinance."""
     global CACHE
-
+    
+    tz_eastern = pytz.timezone('US/Eastern')
+    today_date = datetime.now(tz_eastern).date()
+    
+    def format_money(val):
+        if val >= 1_000_000: return f"${val/1_000_000:.1f}M"
+        if val >= 1_000: return f"${val/1_000:.0f}k"
+        return f"${val:.0f}"
+    
+    new_whales = []
     
     try:
         ticker = yf.Ticker(symbol)
         
-        # Get underlying price
         try:
             current_price = ticker.fast_info.last_price
         except:
@@ -187,23 +212,15 @@ def refresh_single_whale(symbol):
         
         if not current_price: return
 
-        # Get expiration dates
         expirations = ticker.options
         if not expirations: return
             
-        # Check next 2 expirations (approx 2 weeks out)
         target_expirations = expirations[:2]
-        
-        new_whales = []
         
         for expiry in target_expirations:
             try:
-                # FILTER: 0DTE for Indices (SPY, QQQ, IWM)
-                # 0DTE is mostly noise/hedging. We want strategic positioning.
                 if symbol in ['SPY', 'QQQ', 'IWM']:
                     expiry_date = datetime.strptime(expiry, "%Y-%m-%d").date()
-                    # Use Eastern time for market date
-                    today_date = datetime.now(pytz.timezone('US/Eastern')).date()
                     if expiry_date <= today_date:
                         continue
 
@@ -212,9 +229,6 @@ def refresh_single_whale(symbol):
                 puts = opts.puts; puts['type'] = 'PUT'
                 chain = pd.concat([calls, puts])
                 
-                # UNUSUAL CRITERIA - Vol/OI ratio varies by symbol type
-                # For indices: 4x ratio to filter noise
-                # For stocks: 3x ratio
                 vol_oi_multiplier = 4 if symbol in ['SPY', 'QQQ', 'IWM'] else 3
                 unusual = chain[
                     (chain['volume'] > (chain['openInterest'] * vol_oi_multiplier)) & 
@@ -225,39 +239,26 @@ def refresh_single_whale(symbol):
                 for _, row in unusual.iterrows():
                     notional = row['volume'] * row['lastPrice'] * 100
                     
-                    # FILTER: MINIMUM WHALE SIZE
                     min_whale_val = 500_000
                     if symbol in ['SPY', 'QQQ', 'IWM']: min_whale_val = 5_000_000
                         
                     if notional < min_whale_val: continue
 
-                    # FILTER: STRICT DATE CHECK (US/Eastern)
-                    tz_eastern = pytz.timezone('US/Eastern')
                     trade_ts = row['lastTradeDate']
                     if trade_ts.tzinfo is None: trade_ts = pytz.utc.localize(trade_ts)
                     
-                    if trade_ts.astimezone(tz_eastern).date() != datetime.now(tz_eastern).date():
+                    if trade_ts.astimezone(tz_eastern).date() != today_date:
                         continue
                     
-                    # FORMATTING
                     strike = float(row['strike'])
                     is_call = row['type'] == 'CALL'
                     
-                    # FILTER: MONEYNESS (Industry Standard - within 10% of current price)
-                    # Only show ATM and near-the-money options
                     price_diff_pct = abs(strike - current_price) / current_price
-                    if price_diff_pct > 0.10:  # More than 10% away from current price
+                    if price_diff_pct > 0.10:
                         continue
                     
                     moneyness = "ITM" if (is_call and current_price > strike) or (not is_call and current_price < strike) else "OTM"
                     
-                    # Format Premium
-                    def format_money(val):
-                        if val >= 1_000_000: return f"${val/1_000_000:.1f}M"
-                        if val >= 1_000: return f"${val/1_000:.0f}k"
-                        return f"${val:.0f}"
-                    
-                    # Handle Timestamp
                     trade_time_obj = row['lastTradeDate']
                     if hasattr(trade_time_obj, 'strftime'):
                         trade_time_str = trade_time_obj.strftime("%H:%M:%S")
@@ -266,7 +267,6 @@ def refresh_single_whale(symbol):
                         trade_time_str = str(trade_time_obj)
                         timestamp_val = time.time()
 
-                    # VOLUME THRESHOLD LOGIC
                     contract_id = row['contractSymbol']
                     current_vol = int(row['volume'])
                     last_vol = WHALE_HISTORY.get(contract_id, 0)
@@ -296,7 +296,6 @@ def refresh_single_whale(symbol):
                         whale_data["volume"] = current_vol
                         new_whales.append(whale_data)
                     else:
-                        # Report OLD volume to prevent animation
                         whale_data["volume"] = last_vol
                         whale_data["premium"] = format_money(last_vol * row['lastPrice'] * 100)
                         whale_data["notional_value"] = last_vol * row['lastPrice'] * 100
@@ -305,17 +304,11 @@ def refresh_single_whale(symbol):
 
             except Exception: continue
 
-        # Update Cache safely (Always update to allow clearing old data)
         with CACHE_LOCK:
-            # Merge with existing cache
             current_data = CACHE["whales"]["data"]
-            # Filter out THIS symbol's old data to avoid duplicates (or to clear it if new_whales is empty)
             other_data = [w for w in current_data if w['baseSymbol'] != symbol]
             updated_data = other_data + new_whales
-            
-            # Sort all
             updated_data.sort(key=lambda x: x['timestamp'], reverse=True)
-            
             CACHE["whales"]["data"] = updated_data
             CACHE["whales"]["timestamp"] = time.time()
 
