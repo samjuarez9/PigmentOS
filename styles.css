@@ -4196,6 +4196,11 @@ td {
     background: #000;
 }
 
+/* Override chart-container overflow for gamma widget */
+#gamma-container {
+    overflow: visible;
+}
+
 /* Gamma Header Removed - Title handled by widget header */
 
 #gamma-chart-bars {
