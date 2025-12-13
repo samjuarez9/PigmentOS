@@ -1408,22 +1408,39 @@ def refresh_gamma_logic(symbol="SPY"):
             gamma_data[strike]["put_vol"] += vol
             gamma_data[strike]["put_oi"] += oi
             
-        # Filter for relevant range
-        lower_bound = current_price * 0.80
-        upper_bound = current_price * 1.20
+        # Industry-standard filtering (matching MarketData.app)
+        # - Strike range: ±10% of current price (tighter than before)
+        # - Min volume: 100 (filter dead strikes)
+        # - Max strikes: ~40 (centered on ATM)
+        lower_bound = current_price * 0.90
+        upper_bound = current_price * 1.10
+        MIN_VOLUME = 100
         
         final_data = []
         for strike, data in gamma_data.items():
-            if lower_bound <= strike <= upper_bound:
-                final_data.append({
-                    "strike": strike,
-                    "call_vol": data["call_vol"],
-                    "put_vol": data["put_vol"],
-                    "call_oi": data["call_oi"],
-                    "put_oi": data["put_oi"]
-                })
+            # Apply strike range filter
+            if not (lower_bound <= strike <= upper_bound):
+                continue
+            
+            # Apply volume filter (at least 100 contracts traded)
+            total_vol = data["call_vol"] + data["put_vol"]
+            if total_vol < MIN_VOLUME:
+                continue
+                
+            final_data.append({
+                "strike": strike,
+                "call_vol": data["call_vol"],
+                "put_vol": data["put_vol"],
+                "call_oi": data["call_oi"],
+                "put_oi": data["put_oi"]
+            })
                 
         final_data.sort(key=lambda x: x['strike'])
+        
+        # Limit to ~40 strikes centered on ATM (industry standard)
+        if len(final_data) > 40:
+            mid = len(final_data) // 2
+            final_data = final_data[mid-20:mid+20]
         
         result = {
             "symbol": symbol,
