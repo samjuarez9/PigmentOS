@@ -141,9 +141,17 @@ MARKETDATA_TOKEN = os.environ.get("MARKETDATA_TOKEN")
 MARKETDATA_LAST_REQUEST = 0
 MARKETDATA_MIN_INTERVAL = 0.25  # 250ms between requests
 
-def fetch_options_chain_marketdata(symbol, expiry=None):
+def fetch_options_chain_marketdata(symbol, expiry=None, dte=None, strike_limit=None, min_volume=None):
     """
     Fetch options chain from MarketData.app API.
+    
+    Args:
+        symbol: Underlying ticker
+        expiry: Specific expiration date
+        dte: Days to expiration filter (e.g., 7 for weekly)
+        strike_limit: Max number of strikes to return (centered around ATM)
+        min_volume: Minimum volume filter
+    
     Returns parsed data or None if failed.
     """
     global MARKETDATA_LAST_REQUEST
@@ -160,8 +168,16 @@ def fetch_options_chain_marketdata(symbol, expiry=None):
         url = f"https://api.marketdata.app/v1/options/chain/{symbol}/"
         headers = {"Authorization": f"Bearer {MARKETDATA_TOKEN}"}
         params = {}
+        
+        # Apply filters
         if expiry:
             params["expiration"] = expiry
+        if dte:
+            params["dte"] = dte
+        if strike_limit:
+            params["strikeLimit"] = strike_limit
+        if min_volume:
+            params["minVolume"] = min_volume
             
         MARKETDATA_LAST_REQUEST = time.time()
         resp = requests.get(url, headers=headers, params=params, timeout=10)
@@ -1235,8 +1251,16 @@ def refresh_gamma_logic(symbol="SPY"):
     weekday = today_date.weekday()
     is_weekend = weekday >= 5
     
-    # Try MarketData.app first (better data, includes Greeks)
-    md_data = fetch_options_chain_marketdata(symbol)
+    # Try MarketData.app first with industry-standard filters
+    # dte=7: Weekly expiration (most liquid, highest gamma impact)
+    # strikeLimit=40: ~20 strikes on each side of ATM
+    # minVolume=100: Filter out dead strikes
+    md_data = fetch_options_chain_marketdata(
+        symbol, 
+        dte=7, 
+        strike_limit=40, 
+        min_volume=100
+    )
     
     if md_data and md_data.get("strike"):
         try:
