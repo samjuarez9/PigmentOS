@@ -135,6 +135,39 @@ WHALE_WATCHLIST = [
     'GOOGL', 'GOOG', 'META', 'PLTR', 'MU', 'NBIS'
 ]
 
+# MarketData.app API Token (for enhanced options data)
+MARKETDATA_TOKEN = os.environ.get("MARKETDATA_TOKEN")
+
+def fetch_options_chain_marketdata(symbol, expiry=None):
+    """
+    Fetch options chain from MarketData.app API.
+    Returns parsed data or None if failed.
+    """
+    if not MARKETDATA_TOKEN:
+        return None
+        
+    try:
+        url = f"https://api.marketdata.app/v1/options/chain/{symbol}/"
+        headers = {"Authorization": f"Bearer {MARKETDATA_TOKEN}"}
+        params = {}
+        if expiry:
+            params["expiration"] = expiry
+            
+        resp = requests.get(url, headers=headers, params=params, timeout=10)
+        
+        # Accept any 2xx status (MarketData.app returns 203 for cached/trial data)
+        if 200 <= resp.status_code < 300:
+            data = resp.json()
+            if data.get("s") == "ok":
+                return data
+        
+        print(f"MarketData.app Error ({symbol}): Status {resp.status_code}")
+        return None
+        
+    except Exception as e:
+        print(f"MarketData.app Fetch Failed ({symbol}): {e}")
+        return None
+
 # Track last reported volume to simulate "stream" feel
 WHALE_HISTORY = {} 
 VOLUME_THRESHOLD = 100 # Only show update if volume increases by this much
@@ -1201,8 +1234,95 @@ def refresh_news_logic():
 
 def refresh_gamma_logic(symbol="SPY"):
     global CACHE
-
+    
+    from datetime import timedelta
+    tz_eastern = pytz.timezone('US/Eastern')
+    now_eastern = datetime.now(tz_eastern)
+    today_date = now_eastern.date()
+    weekday = today_date.weekday()
+    is_weekend = weekday >= 5
+    
+    # Try MarketData.app first (better data, includes Greeks)
+    md_data = fetch_options_chain_marketdata(symbol)
+    
+    if md_data and md_data.get("strike"):
+        try:
+            print(f"Gamma: Using MarketData.app for {symbol}")
+            
+            # Get current price from response
+            underlying_prices = md_data.get("underlyingPrice", [])
+            current_price = underlying_prices[0] if underlying_prices else 0
+            
+            if not current_price:
+                raise ValueError("No underlying price in MarketData response")
+            
+            # Get expiration from response  
+            expirations = md_data.get("expiration", [])
+            expiry_ts = expirations[0] if expirations else None
+            expiry = datetime.fromtimestamp(expiry_ts).strftime("%Y-%m-%d") if expiry_ts else "N/A"
+            
+            # Parse arrays into strike data
+            strikes_arr = md_data.get("strike", [])
+            volumes_arr = md_data.get("volume", [])
+            ois_arr = md_data.get("openInterest", [])
+            sides_arr = md_data.get("side", [])
+            
+            # Aggregate by strike
+            gamma_data = {}
+            for i in range(len(strikes_arr)):
+                strike = float(strikes_arr[i])
+                vol = int(volumes_arr[i]) if i < len(volumes_arr) and volumes_arr[i] else 0
+                oi = int(ois_arr[i]) if i < len(ois_arr) and ois_arr[i] else 0
+                side = sides_arr[i] if i < len(sides_arr) else "call"
+                
+                if strike not in gamma_data:
+                    gamma_data[strike] = {"call_vol": 0, "put_vol": 0, "call_oi": 0, "put_oi": 0}
+                
+                if side == "call":
+                    gamma_data[strike]["call_vol"] += vol
+                    gamma_data[strike]["call_oi"] += oi
+                else:
+                    gamma_data[strike]["put_vol"] += vol
+                    gamma_data[strike]["put_oi"] += oi
+            
+            # Filter for relevant range (+/- 20% of current price)
+            lower_bound = current_price * 0.80
+            upper_bound = current_price * 1.20
+            
+            final_data = []
+            for strike, data in gamma_data.items():
+                if lower_bound <= strike <= upper_bound:
+                    final_data.append({
+                        "strike": strike,
+                        "call_vol": data["call_vol"],
+                        "put_vol": data["put_vol"],
+                        "call_oi": data["call_oi"],
+                        "put_oi": data["put_oi"]
+                    })
+            
+            final_data.sort(key=lambda x: x['strike'])
+            
+            result = {
+                "symbol": symbol,
+                "current_price": current_price,
+                "expiry": expiry,
+                "strikes": final_data,
+                "is_weekend_data": is_weekend,
+                "source": "marketdata.app"
+            }
+            
+            cache_key = f"gamma_{symbol}"
+            CACHE[cache_key] = {"data": result, "timestamp": time.time()}
+            SERVICE_STATUS["GAMMA"] = {"status": "ONLINE", "last_updated": time.time()}
+            return
+            
+        except Exception as e:
+            print(f"MarketData.app Parse Error ({symbol}): {e}")
+            # Fall through to yfinance
+    
+    # Fallback to yfinance
     try:
+        print(f"Gamma: Falling back to yfinance for {symbol}")
         ticker = yf.Ticker(symbol)
         
         # Get Current Price
@@ -1234,20 +1354,9 @@ def refresh_gamma_logic(symbol="SPY"):
         # Aggregate Volume and Open Interest by Strike
         gamma_data = {}
         
-        # Helper to check if trade is from today (or Friday if weekend)
-        from datetime import timedelta # Import locally
-        tz_eastern = pytz.timezone('US/Eastern')
-        now_eastern = datetime.now(tz_eastern)
-        today_date = now_eastern.date()
-        weekday = today_date.weekday() # 0=Mon, 6=Sun
-        
-        # Weekend Logic: If Sat(5) or Sun(6), allow trades from last Friday
-        is_weekend = weekday >= 5
+        # Weekend Logic
         allowed_date = today_date
-        
         if is_weekend:
-            # If Sat(5), Friday is today-1
-            # If Sun(6), Friday is today-2
             days_back = 1 if weekday == 5 else 2
             allowed_date = today_date - timedelta(days=days_back)
             print(f"Gamma: Weekend Mode ({weekday}). Using data from {allowed_date}")
@@ -1258,16 +1367,13 @@ def refresh_gamma_logic(symbol="SPY"):
             trade_date = ts.astimezone(tz_eastern).date()
             
             if is_weekend:
-                # On weekend, accept Friday's data
                 return trade_date == allowed_date
             else:
-                # On weekday, strict "today" check
                 return trade_date == today_date
 
         # Process Calls
         for _, row in calls.iterrows():
             strike = float(row['strike'])
-            # Only count volume if trade is from VALID DATE
             vol = int(row['volume']) if (not pd.isna(row['volume']) and is_valid_trade_date(row['lastTradeDate'])) else 0
             oi = int(row['openInterest']) if not pd.isna(row['openInterest']) else 0
             
@@ -1278,7 +1384,6 @@ def refresh_gamma_logic(symbol="SPY"):
         # Process Puts
         for _, row in puts.iterrows():
             strike = float(row['strike'])
-            # Only count volume if trade is from VALID DATE
             vol = int(row['volume']) if (not pd.isna(row['volume']) and is_valid_trade_date(row['lastTradeDate'])) else 0
             oi = int(row['openInterest']) if not pd.isna(row['openInterest']) else 0
             
@@ -1286,8 +1391,7 @@ def refresh_gamma_logic(symbol="SPY"):
             gamma_data[strike]["put_vol"] += vol
             gamma_data[strike]["put_oi"] += oi
             
-        # Convert to List for Frontend
-        # Filter for relevant range (e.g. +/- 20% of current price) to keep chart readable
+        # Filter for relevant range
         lower_bound = current_price * 0.80
         upper_bound = current_price * 1.20
         
@@ -1302,7 +1406,6 @@ def refresh_gamma_logic(symbol="SPY"):
                     "put_oi": data["put_oi"]
                 })
                 
-        # Sort by strike
         final_data.sort(key=lambda x: x['strike'])
         
         result = {
@@ -1310,14 +1413,14 @@ def refresh_gamma_logic(symbol="SPY"):
             "current_price": current_price,
             "expiry": expiry,
             "strikes": final_data,
-            "is_weekend_data": is_weekend # Flag for frontend
+            "is_weekend_data": is_weekend,
+            "source": "yfinance"
         }
         
-        # Update Cache
         cache_key = f"gamma_{symbol}"
         CACHE[cache_key] = {"data": result, "timestamp": time.time()}
         SERVICE_STATUS["GAMMA"] = {"status": "ONLINE", "last_updated": time.time()}
-        SERVICE_STATUS["YFIN"] = {"status": "ONLINE", "last_updated": time.time()} # Gamma implies YFIN is up
+        SERVICE_STATUS["YFIN"] = {"status": "ONLINE", "last_updated": time.time()}
 
     except Exception as e:
         print(f"Gamma Scan Failed ({symbol}): {e}")
