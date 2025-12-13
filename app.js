@@ -1559,6 +1559,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const cached = getGammaCache(ticker);
             if (cached) {
                 renderGammaChart(cached);
+                updateStatus('status-gamma-wall', true); // Show LIVE even from cache
                 return;
             }
 
@@ -1583,6 +1584,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setGammaCache(ticker, data);
 
             renderGammaChart(data);
+            updateStatus('status-gamma-wall', true); // Show LIVE status
         } catch (e) {
             console.error("Gamma Fetch Failed:", e);
             if (gammaChartBars) {
