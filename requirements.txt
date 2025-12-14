@@ -12,3 +12,4 @@ lxml
 gevent
 stripe
 firebase-admin
+python-dotenv
