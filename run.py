@@ -2019,11 +2019,11 @@ def start_background_worker():
             
             # Market Hours: 9:30 AM - 4:00 PM ET, Mon-Fri
             is_weekday = now.weekday() < 5
-            # Extended Hours for Heatmap/News: 4:00 AM - 8:00 PM ET
-            is_extended_hours = is_weekday and (
+            # Extended Hours for Heatmap/News: 4:00 AM - 8:00 PM ET (Weekdays) OR Anytime if cache empty
+            is_extended_hours = (is_weekday and (
                 (now.hour > 4 or (now.hour == 4 and now.minute >= 0)) and 
                 (now.hour < 20)
-            )
+            ))
             # Core Market Hours for Options (Whales/Gamma): 9:30 AM - 4:15 PM ET (ETFs trade til 4:15)
             is_market_open = is_weekday and (
                 (now.hour > 9 or (now.hour == 9 and now.minute >= 30)) and 

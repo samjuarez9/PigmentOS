@@ -1330,9 +1330,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Get market state early
         const marketState = getMarketState();
 
-        // PRE-MARKET ONLY: Clear all caches and show radar
-        // (Weekends show Friday's whale data instead)
-        if (marketState.isPreMarket) {
+        // Show Radar if Pre-Market OR if no data available (e.g. fresh weekend start)
+        if (marketState.isPreMarket || !data || data.length === 0) {
             // Clear all tracking caches
             seenTrades.clear();
             tradeFirstSeen.clear();
@@ -1349,13 +1348,15 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="radar-center"></div>
                         </div>
                         <div class="status-message">
-                            <span style="color: #888; font-size: 11px; font-family: var(--font-mono);">STATUS: PRE-MARKET. Monitoring for block orders...</span>
+                            <span style="color: #888; font-size: 11px; font-family: var(--font-mono);">
+                                ${marketState.isPreMarket ? 'STATUS: PRE-MARKET. Monitoring for block orders...' : 'STATUS: SCANNING. Waiting for market data...'}
+                            </span>
                         </div>
                     </div>
                 `;
             }
             updateStatus('status-whales', isSystemHealthy);
-            return; // Exit early - don't process any data during pre-market
+            return; // Exit early
         }
 
         // Update Status: Only show OFFLINE if system is actually down (stale)
