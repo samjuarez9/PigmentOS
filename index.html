@@ -410,8 +410,10 @@
             }
 
             // Admin/Owner Bypass
-            const adminEmails = ['sam.juarez092678@gmail.com', 'jaxnailedit@gmail.com', 'Gtmichael9218@gmail.com'];
-            if (adminEmails.includes(user.email)) {
+            const adminEmails = ['sam.juarez092678@gmail.com', 'jaxnailedit@gmail.com', 'gtmichael9218@gmail.com'];
+            const userEmailLower = user.email.toLowerCase().trim();
+            
+            if (adminEmails.map(e => e.toLowerCase()).includes(userEmailLower)) {
                 console.log('Admin user logged in - bypassing trial check');
                 hideLoadingScreen();
                 document.body.style.visibility = 'visible'; // Show dashboard

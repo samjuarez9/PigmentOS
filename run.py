@@ -972,8 +972,9 @@ def subscription_status():
             })
             
         # 3. CHECK VIP/ADMIN LIST (Bypass all checks)
-        ADMIN_EMAILS = ['sam.juarez092678@gmail.com', 'jaxnailedit@gmail.com', 'Gtmichael9218@gmail.com']
-        if user_email in ADMIN_EMAILS:
+        ADMIN_EMAILS = ['sam.juarez092678@gmail.com', 'jaxnailedit@gmail.com', 'gtmichael9218@gmail.com']
+        
+        if user_email.lower().strip() in [e.lower() for e in ADMIN_EMAILS]:
             return jsonify({
                 'status': 'active',
                 'has_access': True,
