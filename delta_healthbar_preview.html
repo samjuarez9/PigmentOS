@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delta Bar - Fits in Existing UI</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: #0a0a0f;
+            font-family: 'SF Mono', 'Consolas', monospace;
+            color: #e0e0e0;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #00ff88;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+
+        h2 {
+            color: #888;
+            font-size: 11px;
+            margin: 25px 0 12px;
+            text-transform: uppercase;
+        }
+
+        .whale-row {
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 8px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .strike {
+            color: #00ff88;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .exp {
+            color: #666;
+            font-size: 9px;
+        }
+
+        .right {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Match your existing ITM/OTM tags */
+        .tag-itm {
+            color: #FFB300;
+            border: 1px solid rgba(255, 179, 0, 0.4);
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 9px;
+        }
+
+        .tag-otm {
+            color: #D500F9;
+            border: 1px solid rgba(213, 0, 249, 0.4);
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 9px;
+        }
+
+        /* TINY delta bar - fits next to ITM/OTM */
+        .delta-mini {
+            width: 28px;
+            height: 10px;
+            background: #ff4444;
+            border-radius: 2px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .delta-mini-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            background: #00ff88;
+        }
+
+        .delta-mini-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            font-size: 7px;
+            font-weight: bold;
+            color: #fff;
+            line-height: 10px;
+            text-shadow: 0 0 2px #000;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🐳 DELTA BAR — FITS IN EXISTING SPACE</h1>
+
+    <h2>Current UI (no delta)</h2>
+
+    <div class="whale-row">
+        <div class="left">
+            <span class="strike">7.5C</span>
+            <span class="exp">9</span>
+        </div>
+        <div class="right">
+            <span class="tag-itm">ITM</span>
+        </div>
+    </div>
+    <div class="whale-row">
+        <div class="left">
+            <span class="strike">2.5C</span>
+            <span class="exp">9</span>
+        </div>
+        <div class="right">
+            <span class="tag-otm">OTM</span>
+        </div>
+    </div>
+
+    <h2>With tiny delta bar added</h2>
+
+    <div class="whale-row">
+        <div class="left">
+            <span class="strike">7.5C</span>
+            <span class="exp">9</span>
+        </div>
+        <div class="right">
+            <div class="delta-mini">
+                <div class="delta-mini-fill" style="width: 72%;"></div>
+                <span class="delta-mini-text">72</span>
+            </div>
+            <span class="tag-itm">ITM</span>
+        </div>
+    </div>
+
+    <div class="whale-row">
+        <div class="left">
+            <span class="strike">2.5C</span>
+            <span class="exp">9</span>
+        </div>
+        <div class="right">
+            <div class="delta-mini">
+                <div class="delta-mini-fill" style="width: 35%;"></div>
+                <span class="delta-mini-text">35</span>
+            </div>
+            <span class="tag-otm">OTM</span>
+        </div>
+    </div>
+
+    <div class="whale-row">
+        <div class="left">
+            <span class="strike">5C</span>
+            <span class="exp">9</span>
+        </div>
+        <div class="right">
+            <div class="delta-mini">
+                <div class="delta-mini-fill" style="width: 50%;"></div>
+                <span class="delta-mini-text">50</span>
+            </div>
+            <span class="tag-otm">OTM</span>
+        </div>
+    </div>
+
+    <div class="whale-row">
+        <div class="left">
+            <span class="strike">1.5C</span>
+            <span class="exp">9</span>
+        </div>
+        <div class="right">
+            <div class="delta-mini">
+                <div class="delta-mini-fill" style="width: 15%;"></div>
+                <span class="delta-mini-text">15</span>
+            </div>
+            <span class="tag-otm">OTM</span>
+        </div>
+    </div>
+
+</body>
+
+</html>

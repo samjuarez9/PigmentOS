@@ -186,8 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 "hide_top_toolbar": true,
                 "studies": [
                     "MASimple@tv-basicstudies",    // Simple Moving Average
-                    "RSI@tv-basicstudies",         // RSI (14-period) - Overbought/Oversold
-                    "BB@tv-basicstudies"           // Bollinger Bands (20,2) - Volatility
+                    "RSI@tv-basicstudies"          // RSI (14-period) - Overbought/Oversold
                 ],
                 "container_id": "chart-container"
             });
@@ -1331,8 +1330,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Get market state early
         const marketState = getMarketState();
 
-        // PRE-MARKET / WEEKEND: Clear all caches and show radar
-        if (marketState.isPreMarket || marketState.isWeekend) {
+        // PRE-MARKET ONLY: Clear all caches and show radar
+        // (Weekends show Friday's whale data instead)
+        if (marketState.isPreMarket) {
             // Clear all tracking caches
             seenTrades.clear();
             tradeFirstSeen.clear();
@@ -1340,7 +1340,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const flowFeedContainer = document.getElementById('flow-feed-container');
             if (flowFeedContainer) {
-                const statusText = marketState.isWeekend ? "WEEKEND" : "PRE-MARKET";
                 flowFeedContainer.innerHTML = `
                     <div class="whale-pre-market-container">
                         <div class="radar-container">
@@ -1350,7 +1349,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="radar-center"></div>
                         </div>
                         <div class="status-message">
-                            <span style="color: #888; font-size: 11px; font-family: var(--font-mono);">STATUS: ${statusText}. Monitoring for block orders...</span>
+                            <span style="color: #888; font-size: 11px; font-family: var(--font-mono);">STATUS: PRE-MARKET. Monitoring for block orders...</span>
                         </div>
                     </div>
                 `;
@@ -1524,6 +1523,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let gammaChartBars = document.getElementById('gamma-chart-bars');
     let currentGammaTicker = 'SPY';
 
+    // Cache DOM references for performance (avoid re-querying every render)
+    let gammaTooltip = null;
+    let gammaTitle = null;
+    let gammaPriceBadge = null;
+    let gammaHeader = null;
+
     // Initialize Gamma Wall
     function initGammaWall() {
         const gammaSelector = document.getElementById('gamma-ticker-select');
@@ -1545,7 +1550,21 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchGammaWall(ticker = 'SPY') {
         // Check localStorage cache first (TTL 2 minutes)
         try {
-            // Only show loader on INITIAL load (no existing rows)
+            // Add/Reset Loading Bar
+            let loadingBar = document.querySelector('.gamma-loading-bar');
+            if (!loadingBar) {
+                loadingBar = document.createElement('div');
+                loadingBar.className = 'gamma-loading-bar';
+                const container = document.querySelector('.gamma-chart-wrapper');
+                if (container) container.appendChild(loadingBar);
+            }
+
+            // Trigger animation
+            requestAnimationFrame(() => {
+                loadingBar.classList.add('loading');
+            });
+
+            // Only show full loader if NO data exists at all
             const hasExistingData = gammaChartBars && gammaChartBars.querySelector('.gamma-row');
             if (gammaChartBars && !hasExistingData) {
                 gammaChartBars.innerHTML = `
@@ -1583,17 +1602,27 @@ document.addEventListener('DOMContentLoaded', () => {
             // Cache Success
             setGammaCache(ticker, data);
 
+            // Reset Loading Bar
+            const finishedLoadingBar = document.querySelector('.gamma-loading-bar');
+            if (finishedLoadingBar) {
+                finishedLoadingBar.classList.remove('loading');
+                finishedLoadingBar.style.width = '100%'; // Ensure it looks complete
+                setTimeout(() => {
+                    finishedLoadingBar.style.width = '0%';
+                }, 300);
+            }
+
             renderGammaChart(data);
             updateStatus('status-gamma-wall', true); // Show LIVE status
         } catch (e) {
             console.error("Gamma Fetch Failed:", e);
             if (gammaChartBars) {
                 gammaChartBars.innerHTML = `
-                <div class="intel-loader" style="color: #FF3333;">
-                    <div class="intel-row">> TARGET: ${ticker}</div>
-                    <div class="intel-row">> STATUS: SYSTEM FAILURE</div>
-                </div>
-            `;
+            <div class="intel-loader" style="color: #FF3333;">
+                <div class="intel-row">> TARGET: ${ticker}</div>
+                <div class="intel-row">> STATUS: SYSTEM FAILURE</div>
+            </div>
+        `;
             }
         }
     }
@@ -1608,38 +1637,51 @@ document.addEventListener('DOMContentLoaded', () => {
         const loader = gammaChartBars.querySelector('.intel-loader');
         if (loader) loader.remove();
 
-        // Create Tooltip
-        let tooltip = document.getElementById('gamma-tooltip');
-        if (!tooltip) {
-            tooltip = document.createElement('div');
-            tooltip.id = 'gamma-tooltip';
-            tooltip.className = 'gamma-tooltip';
-            tooltip.style.opacity = '0';
-            document.body.appendChild(tooltip);
+        // Create Tooltip once (cached)
+        if (!gammaTooltip) {
+            gammaTooltip = document.getElementById('gamma-tooltip');
+            if (!gammaTooltip) {
+                gammaTooltip = document.createElement('div');
+                gammaTooltip.id = 'gamma-tooltip';
+                gammaTooltip.className = 'gamma-tooltip';
+                gammaTooltip.style.opacity = '0';
+                document.body.appendChild(gammaTooltip);
+            }
         }
 
         // Spot Price Line Removed per user request
 
+        // Cache DOM references on first render
+        if (!gammaTitle) gammaTitle = document.querySelector('.gamma-title');
+        if (!gammaPriceBadge) gammaPriceBadge = document.getElementById('gamma-current-price');
+        if (!gammaHeader) gammaHeader = document.querySelector('#gamma-wall .widget-header h2');
+
         // Update Header
-        const title = document.querySelector('.gamma-title');
-        if (title) {
+        if (gammaTitle) {
             let html = `GAMMA WALL`;
-            if (data.is_weekend_data) {
-                html += ` <span class="weekend-badge">FRI DATA</span>`;
+            if (data.time_period === 'weekend') {
+                html += ` <span class="monday-badge">MON</span>`;
+            } else if (data.time_period === 'after_hours') {
+                html += ` <span class="today-badge-green">TODAY</span>`;
+            } else if (data.time_period === 'pre_market') {
+                html += ` <span class="today-badge-purple">TODAY</span>`;
+            } else if (data.time_period === 'overnight') {
+                html += ` <span class="today-badge-dim">TODAY</span>`;
             }
-            title.innerHTML = html;
+            gammaTitle.innerHTML = html;
         }
 
-        let maxVol = 0;
+        // Update Current Price Badge
+        if (gammaPriceBadge && data.current_price) {
+            gammaPriceBadge.textContent = `$${data.current_price.toFixed(2)}`;
+        }
+
         let totalCallVol = 0;
         let totalPutVol = 0;
         data.strikes.forEach(s => {
-            if (s.call_vol > maxVol) maxVol = s.call_vol;
-            if (s.put_vol > maxVol) maxVol = s.put_vol;
             totalCallVol += s.call_vol || 0;
             totalPutVol += s.put_vol || 0;
         });
-        if (maxVol === 0) maxVol = 1;
 
         // Helper: Format volume (42000 → "42K")
         const formatVol = (vol) => {
@@ -1666,12 +1708,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Update Header with dominance badge
-        const gammaHeader = document.querySelector('#gamma-wall .widget-header h2');
+        // Update Header with dominance badge (using cached gammaHeader)
         if (gammaHeader) {
             let html = `GAMMA WALL`;
-            if (data.is_weekend_data) {
-                html += ` <span class="weekend-badge">FRI DATA</span>`;
+            if (data.time_period === 'weekend') {
+                html += ` <span class="monday-badge">MON</span>`;
+            } else if (data.time_period === 'after_hours') {
+                html += ` <span class="today-badge-green">TODAY</span>`;
+            } else if (data.time_period === 'pre_market') {
+                html += ` <span class="today-badge-purple">TODAY</span>`;
+            } else if (data.time_period === 'overnight') {
+                html += ` <span class="today-badge-dim">TODAY</span>`;
             }
             html += dominanceBadgeHtml;
             gammaHeader.innerHTML = html;
@@ -1683,9 +1730,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const strike = parseFloat(row.dataset.strike);
             if (!isNaN(strike)) existingRows.set(strike, row);
         });
-
-        // Sort High -> Low
-        data.strikes.sort((a, b) => b.strike - a.strike);
+        // Data is pre-sorted High → Low by server
 
         // Find ATM Strike for Blue Highlight
         let closestStrike = null;
@@ -1701,26 +1746,46 @@ document.addEventListener('DOMContentLoaded', () => {
         // Store current price for tooltip calculations
         window.lastGammaPrice = data.current_price;
 
-        // === FIND THE SINGLE MOST UNUSUAL WALL ===
-        // Find the strike with the highest total volume relative to average
-        let totalVol = 0;
-        data.strikes.forEach(s => {
-            totalVol += (s.call_vol || 0) + (s.put_vol || 0);
-        });
-        const avgVol = data.strikes.length > 0 ? totalVol / data.strikes.length : 0;
-
-        let mostUnusualStrike = null;
-        let highestVolRatio = 0;
+        // === FIND THE LARGEST WALLS (KEY LEVELS) ===
+        let currentMaxVol = 0;
+        let maxCallVol = 0;
+        let maxPutVol = 0;
 
         data.strikes.forEach(s => {
-            const strikeTotal = (s.call_vol || 0) + (s.put_vol || 0);
-            const ratio = avgVol > 0 ? strikeTotal / avgVol : 0;
-            // Must be at least 2x average to qualify
-            if (ratio >= 2.0 && ratio > highestVolRatio) {
-                highestVolRatio = ratio;
-                mostUnusualStrike = s.strike;
-            }
+            if ((s.call_vol || 0) > maxCallVol) maxCallVol = s.call_vol;
+            if ((s.put_vol || 0) > maxPutVol) maxPutVol = s.put_vol;
+
+            const strikeMax = Math.max(s.call_vol || 0, s.put_vol || 0);
+            if (strikeMax > currentMaxVol) currentMaxVol = strikeMax;
         });
+
+        // High Water Mark: Scale only grows (prevents jitter), but reset if max drops significantly
+        if (!window.gammaGlobalMax || currentMaxVol > window.gammaGlobalMax) {
+            window.gammaGlobalMax = currentMaxVol;
+        }
+        // Reset if current max is less than 50% of stored max (stale scaling)
+        if (currentMaxVol < window.gammaGlobalMax * 0.5) {
+            window.gammaGlobalMax = currentMaxVol;
+        }
+        // Reset on ticker change
+        if (window.lastGammaTicker !== data.symbol) {
+            window.gammaGlobalMax = currentMaxVol;
+            window.lastGammaTicker = data.symbol;
+        }
+        // Reset on new trading day (handles users who don't refresh overnight)
+        const today = new Date().toDateString();
+        if (window.lastGammaDate !== today) {
+            window.gammaGlobalMax = currentMaxVol;
+            window.lastGammaDate = today;
+        }
+
+        const maxVol = window.gammaGlobalMax || 1;
+
+        // Dynamic Row Height Calculation
+        // Target container height ~500px. 
+        // If few strikes, make rows taller (max 30px). If many, keep compact (min 14px).
+        const containerHeight = 500;
+        const rowHeight = Math.min(30, Math.max(14, Math.floor(containerHeight / data.strikes.length)));
 
         data.strikes.forEach(strikeData => {
             let row = existingRows.get(strikeData.strike);
@@ -1730,10 +1795,16 @@ document.addEventListener('DOMContentLoaded', () => {
             // Is this the "Zero Gamma" (ATM) row?
             const isZeroGamma = strikeData.strike === closestStrike;
 
-            // Is this THE most unusual wall?
-            const isMostUnusual = strikeData.strike === mostUnusualStrike;
+            // Is this the Largest Call Wall?
+            const isMaxCall = (strikeData.call_vol || 0) === maxCallVol && maxCallVol > 0;
+
+            // Is this the Largest Put Wall?
+            const isMaxPut = (strikeData.put_vol || 0) === maxPutVol && maxPutVol > 0;
 
             if (row) {
+                // Update Height
+                row.style.height = `${rowHeight}px`;
+
                 // Update
                 const putBar = row.querySelector('.gamma-bar-put');
                 const callBar = row.querySelector('.gamma-bar-call');
@@ -1757,12 +1828,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (label) label.remove();
                 }
 
-                // === Apply Most Unusual Wall Styling ===
-                if (isMostUnusual) {
-                    row.classList.add('most-unusual-wall');
-                } else {
-                    row.classList.remove('most-unusual-wall');
-                }
+                // === Apply Max Wall Pulse ===
+                // Update Max Wall styling
+                if (isMaxPut) putBar.classList.add('gamma-max-wall');
+                else putBar.classList.remove('gamma-max-wall');
+                if (isMaxCall) callBar.classList.add('gamma-max-wall');
+                else callBar.classList.remove('gamma-max-wall');
+
+                // Re-append to maintain correct order (High → Low)
+                gammaChartBars.appendChild(row);
 
                 existingRows.delete(strikeData.strike);
             } else {
@@ -1770,6 +1844,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 row = document.createElement('div');
                 row.className = 'gamma-row';
                 row.dataset.strike = strikeData.strike;
+                row.style.height = `${rowHeight}px`; // Apply Dynamic Height
+
                 if (isZeroGamma) {
                     row.classList.add('zero-gamma-row');
                     const label = document.createElement('div');
@@ -1778,10 +1854,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     row.appendChild(label);
                 }
 
-                // === Apply Most Unusual Wall Styling (New Rows) ===
-                if (isMostUnusual) {
-                    row.classList.add('most-unusual-wall');
-                }
+                // === Apply Max Wall Pulse (New Rows) ===
+                const putClass = isMaxPut ? 'gamma-bar-put gamma-max-wall' : 'gamma-bar-put';
+                const callClass = isMaxCall ? 'gamma-bar-call gamma-max-wall' : 'gamma-bar-call';
 
                 // Format volume labels (only show if bar is significant - at least 5% width)
                 const putVolLabel = putWidth >= 5 ? `<span class="gamma-vol-label put-label">${formatVol(strikeData.put_vol)}</span>` : '';
@@ -1790,11 +1865,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 row.innerHTML = `
                     <div class="gamma-put-side">
                         ${putVolLabel}
-                        <div class="gamma-bar-put" style="width: ${putWidth}%"></div>
+                        <div class="${putClass}" style="width: 0%"></div>
                     </div>
                     <div class="gamma-strike">${strikeData.strike.toFixed(1)}</div>
                     <div class="gamma-call-side">
-                        <div class="gamma-bar-call" style="width: ${callWidth}%"></div>
+                        <div class="${callClass}" style="width: 0%"></div>
                         ${callVolLabel}
                     </div>
                 `;
@@ -1802,12 +1877,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Re-attach event listeners (simplified)
                 const putBar = row.querySelector('.gamma-bar-put');
                 const callBar = row.querySelector('.gamma-bar-call');
-                putBar.onmouseenter = (e) => showTooltip(e, strikeData, 'PUT', tooltip);
-                putBar.onmousemove = (e) => moveTooltip(e, tooltip);
-                putBar.onmouseleave = () => hideTooltip(tooltip);
-                callBar.onmouseenter = (e) => showTooltip(e, strikeData, 'CALL', tooltip);
-                callBar.onmousemove = (e) => moveTooltip(e, tooltip);
-                callBar.onmouseleave = () => hideTooltip(tooltip);
+
+                // Trigger growth animation
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        putBar.style.width = `${putWidth}%`;
+                        callBar.style.width = `${callWidth}%`;
+                    });
+                });
+
+                putBar.onmouseenter = (e) => showTooltip(e, strikeData, 'PUT', gammaTooltip);
+                putBar.onmousemove = (e) => moveTooltip(e, gammaTooltip);
+                putBar.onmouseleave = () => hideTooltip(gammaTooltip);
+                callBar.onmouseenter = (e) => showTooltip(e, strikeData, 'CALL', gammaTooltip);
+                callBar.onmousemove = (e) => moveTooltip(e, gammaTooltip);
+                callBar.onmouseleave = () => hideTooltip(gammaTooltip);
 
                 gammaChartBars.appendChild(row);
             }
@@ -1832,9 +1916,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const oi = type === 'CALL' ? data.call_oi : data.put_oi;
         const color = type === 'CALL' ? 'var(--bullish-color)' : 'var(--bearish-color)';
 
-        // Estimate notional value: volume × 100 shares × ~$3 avg premium (conservative)
-        // This is a rough estimate since we don't have actual premium data
-        const avgPremium = Math.abs(data.strike - (window.lastGammaPrice || data.strike)) * 0.3 + 2;
+        // Use actual premium from Polygon API (or fallback to estimate)
+        const premium = type === 'CALL' ? (data.call_premium || 0) : (data.put_premium || 0);
+        const avgPremium = premium > 0 ? premium : (Math.abs(data.strike - (window.lastGammaPrice || data.strike)) * 0.3 + 2);
         const notional = vol * 100 * avgPremium;
 
         // Format as currency
@@ -1950,22 +2034,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const colTag = document.createElement('div');
         colTag.className = 'col-tag';
 
-        // Hedge Logic: Index Puts are likely hedges
+        // Hedge Logic: Deep ITM Index Puts are likely hedges (Cheddar Flow standard)
         const isIndex = ['SPY', 'QQQ', 'IWM', 'DIA', 'VIX'].includes(flow.ticker);
-        const isHedge = isIndex && !isCall; // Index Put = Hedge
+        const hasHighDelta = flow.delta !== undefined && Math.abs(flow.delta) > 0.40;
+        const isHedge = isIndex && !isCall && hasHighDelta; // Index Put + Deep ITM
 
         // Priority 1: MEGA
         if (flow.is_mega_whale) {
             colTag.textContent = 'MEGA';
             colTag.classList.add('tag-mega');
         }
-        // Priority 2: HEDGE (Index Puts)
+        // Priority 2: HEDGE (Deep ITM Index Puts only)
         else if (isHedge) {
             colTag.textContent = 'HEDGE';
             colTag.classList.add('tag-hedge');
         }
-        // Priority 3: FRESH (High Volume relative to OI)
-        else if (flow.vol_oi > 5) {
+        // Priority 3: FRESH (Vol/OI > 2.5 = Barchart-inspired threshold)
+        else if (flow.vol_oi > 2.5) {
             colTag.textContent = 'FRESH';
             colTag.classList.add('tag-fresh');
         }
@@ -1986,6 +2071,37 @@ document.addEventListener('DOMContentLoaded', () => {
             moneySpan.className = flow.moneyness === 'ITM' ? 'tag-itm' : 'tag-otm';
             // Insert before the main tag
             colTag.insertBefore(moneySpan, colTag.firstChild);
+        }
+
+        // Delta Progress Bar: Tiny red/green bar showing speculation level
+        if (flow.delta !== undefined && flow.delta !== 0) {
+            const deltaVal = Math.abs(flow.delta);
+            const deltaPercent = Math.round(deltaVal * 100);
+
+            // Create wrapper for label + bar
+            const deltaWrapper = document.createElement('div');
+            deltaWrapper.className = 'delta-wrapper';
+
+            // Small decimal label to the left
+            const deltaLabel = document.createElement('span');
+            deltaLabel.className = 'delta-label';
+            deltaLabel.textContent = deltaVal.toFixed(2).replace(/^0/, '');  // Remove leading zero (0.45 → .45)
+
+            // Create bar container
+            const deltaBar = document.createElement('div');
+            deltaBar.className = 'delta-bar-mini';
+
+            // Green fill (width = delta percentage)
+            const deltaFill = document.createElement('div');
+            deltaFill.className = 'delta-bar-fill';
+            deltaFill.style.width = `${deltaPercent}%`;
+
+            deltaBar.appendChild(deltaFill);
+            deltaWrapper.appendChild(deltaLabel);
+            deltaWrapper.appendChild(deltaBar);
+
+            // Insert at beginning so bar is on left, tags on right
+            colTag.insertBefore(deltaWrapper, colTag.firstChild);
         }
 
         row.appendChild(colTicker);
@@ -2264,8 +2380,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Helper: LocalStorage cache for Gamma Wall (TTL 2 minutes)
     const GAMMA_CACHE_TTL = 2 * 60 * 1000;
+    const GAMMA_CACHE_VERSION = 2;  // Increment when sorting/logic changes
+
     function getGammaCache(ticker) {
-        const key = `gamma_cache_${ticker}`;
+        const key = `gamma_cache_v${GAMMA_CACHE_VERSION}_${ticker}`;
         const raw = localStorage.getItem(key);
         if (!raw) return null;
         try {
@@ -2280,7 +2398,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     function setGammaCache(ticker, data) {
-        const key = `gamma_cache_${ticker}`;
+        const key = `gamma_cache_v${GAMMA_CACHE_VERSION}_${ticker}`;
         const payload = { timestamp: Date.now(), data };
         localStorage.setItem(key, JSON.stringify(payload));
     }

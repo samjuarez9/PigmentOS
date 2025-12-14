@@ -22,6 +22,9 @@ except:
 import pandas as pd
 import statistics
 import os
+from dotenv import load_dotenv
+load_dotenv()  # Load .env file for POLYGON_API_KEY and other secrets
+
 import ssl
 import calendar
 from datetime import datetime, date
@@ -52,7 +55,7 @@ from flask_limiter.util import get_remote_address
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["200 per day", "50 per hour"],
+    default_limits=["20000 per day", "5000 per hour"],
     storage_uri="memory://"
 )
 
@@ -144,6 +147,10 @@ MARKETDATA_MIN_INTERVAL = 0.25  # 250ms between requests
 # Polygon.io API Key (primary options data source - unlimited calls)
 POLYGON_API_KEY = os.environ.get("POLYGON_API_KEY")
 
+# Price cache to reduce redundant API calls (TTL: 60 seconds)
+PRICE_CACHE = {}  # {symbol: {"price": float, "timestamp": float}}
+PRICE_CACHE_TTL = 60  # seconds
+
 # === WHALE CACHE PERSISTENCE ===
 WHALE_CACHE_FILE = "/tmp/pigmentos_whale_cache.json"
 WHALE_CACHE_LAST_CLEAR = 0  # Track when we last cleared
@@ -206,6 +213,44 @@ def mark_whale_cache_cleared():
     global WHALE_CACHE_LAST_CLEAR
     WHALE_CACHE_LAST_CLEAR = time.time()
 
+def get_cached_price(symbol):
+    """Get price from cache or fetch from Polygon if stale/missing."""
+    global PRICE_CACHE
+    
+    now = time.time()
+    
+    # Check cache
+    if symbol in PRICE_CACHE:
+        cached = PRICE_CACHE[symbol]
+        if now - cached["timestamp"] < PRICE_CACHE_TTL:
+            return cached["price"]
+    
+    # Fetch from Polygon
+    if not POLYGON_API_KEY:
+        return None
+    
+    try:
+        price_url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev"
+        price_resp = requests.get(price_url, params={"apiKey": POLYGON_API_KEY}, timeout=5)
+        
+        if price_resp.status_code == 200:
+            price_data = price_resp.json()
+            if price_data.get("results"):
+                price = price_data["results"][0].get("c", 0)
+                if price:
+                    PRICE_CACHE[symbol] = {"price": price, "timestamp": now}
+                    return price
+        else:
+            # Rate limited or error - return cached if available (even if stale)
+            if symbol in PRICE_CACHE:
+                return PRICE_CACHE[symbol]["price"]
+    except Exception as e:
+        print(f"Price fetch error ({symbol}): {e}")
+        if symbol in PRICE_CACHE:
+            return PRICE_CACHE[symbol]["price"]
+    
+    return None
+
 def fetch_options_chain_polygon(symbol, strike_limit=40):
     """
     Fetch options chain snapshot from Polygon.io API.
@@ -217,15 +262,18 @@ def fetch_options_chain_polygon(symbol, strike_limit=40):
         return None
     
     try:
-        # First, get current price to filter strikes around ATM
-        import yfinance as yf
+        # Get current price from cache (shared with whale detection)
         from datetime import timedelta
-        ticker = yf.Ticker(symbol)
-        current_price = ticker.fast_info.last_price or 500
         
-        # Calculate strike range (±7% of current price - tighter for more relevant data)
-        strike_low = int(current_price * 0.93)
-        strike_high = int(current_price * 1.07)
+        current_price = get_cached_price(symbol)
+        
+        if not current_price:
+            print(f"Polygon: Could not get price for {symbol}, skipping gamma fetch")
+            return None
+        
+        # Calculate strike range (±20% of current price - focused on ATM action)
+        strike_low = int(current_price * 0.80)
+        strike_high = int(current_price * 1.20)
         
         # Smart expiration selection for SPY/QQQ/IWM/DIA:
         # - Weekend: use Monday
@@ -253,7 +301,7 @@ def fetch_options_chain_polygon(symbol, strike_limit=40):
         
         if is_weekend:
             if has_daily:
-                # Weekend + daily ticker: use next Monday
+                # Weekend + daily ticker: use next Monday (Polygon has Monday options ready)
                 days_until_monday = (7 - today_weekday) % 7
                 if days_until_monday == 0:
                     days_until_monday = 1
@@ -297,7 +345,7 @@ def fetch_options_chain_polygon(symbol, strike_limit=40):
         
         params = {
             "apiKey": POLYGON_API_KEY,
-            "limit": 250,
+            "limit": 250,  # Polygon max is 250
             "strike_price.gte": strike_low,
             "strike_price.lte": strike_high,
             "expiration_date": expiry_date,
@@ -322,7 +370,6 @@ def fetch_options_chain_polygon(symbol, strike_limit=40):
         if resp.status_code == 403:
             print(f"Polygon Auth Error - check API key")
             return None
-            
         print(f"Polygon Error ({symbol}): Status {resp.status_code}")
         return None
         
@@ -351,14 +398,9 @@ def parse_polygon_to_gamma_format(polygon_data, current_price=None):
         except:
             pass
     
-    # If still no price, use yfinance as fallback
+    # If still no price, return with a sensible fallback (no yfinance)
     if not underlying_price:
-        try:
-            import yfinance as yf
-            ticker = yf.Ticker("SPY")
-            underlying_price = ticker.fast_info.last_price
-        except:
-            underlying_price = 600  # Fallback default
+        underlying_price = 600  # Fallback default for SPY
     
     for contract in polygon_data.get("results", []):
         details = contract.get("details", {})
@@ -369,18 +411,21 @@ def parse_polygon_to_gamma_format(polygon_data, current_price=None):
             continue
         
         if strike not in gamma_data:
-            gamma_data[strike] = {"call_vol": 0, "put_vol": 0, "call_oi": 0, "put_oi": 0}
+            gamma_data[strike] = {"call_vol": 0, "put_vol": 0, "call_oi": 0, "put_oi": 0, "call_premium": 0, "put_premium": 0}
         
         day_data = contract.get("day", {})
         vol = int(day_data.get("volume", 0) or 0)
         oi = int(contract.get("open_interest", 0) or 0)
+        price = float(day_data.get("close", 0) or day_data.get("vwap", 0) or 0)  # Contract price
         
         if side == "call":
             gamma_data[strike]["call_vol"] += vol
             gamma_data[strike]["call_oi"] += oi
+            gamma_data[strike]["call_premium"] = max(gamma_data[strike]["call_premium"], price)  # Track highest premium
         else:
             gamma_data[strike]["put_vol"] += vol
             gamma_data[strike]["put_oi"] += oi
+            gamma_data[strike]["put_premium"] = max(gamma_data[strike]["put_premium"], price)
     
     return gamma_data, underlying_price
 
@@ -394,13 +439,13 @@ def fetch_unusual_options_polygon(symbol):
         return None
     
     try:
-        import yfinance as yf
         from datetime import timedelta
         
-        # Get current price
-        ticker_yf = yf.Ticker(symbol)
-        current_price = ticker_yf.fast_info.last_price or 0
+        # Get current price from cache (reduces API calls)
+        current_price = get_cached_price(symbol)
+        
         if not current_price:
+            print(f"Polygon: Could not get price for {symbol}, skipping whale scan")
             return None
         
         # Calculate strike range (±10% for whale detection - wider range)
@@ -569,7 +614,7 @@ def refresh_single_whale_polygon(symbol):
             updated_data = other_data + new_whales
             updated_data.sort(key=lambda x: x['timestamp'], reverse=True)
             # Keep only top 50 trades for a clean feed
-            CACHE["whales"]["data"] = updated_data[:50]
+            CACHE["whales"]["data"] = updated_data[:100]
             CACHE["whales"]["timestamp"] = time.time()
         
         if new_whales:
@@ -1175,7 +1220,17 @@ def api_whales_stream():
             # Send immediately on connect
             data = CACHE["whales"]["data"]
             yield f"data: {json.dumps({'data': data, 'stale': False, 'timestamp': int(CACHE['whales']['timestamp'])})}\n\n"
-            time.sleep(5) # Check for updates every 5s (lightweight)
+            # Optimization: Slow down stream when market is closed
+            tz_eastern = pytz.timezone('US/Eastern')
+            now = datetime.now(tz_eastern)
+            # Options trade 9:30 AM - 4:15 PM ET
+            is_market_hours = (now.weekday() < 5) and (
+                (now.hour > 9 or (now.hour == 9 and now.minute >= 30)) and 
+                (now.hour < 16 or (now.hour == 16 and now.minute < 15))
+            )
+            
+            sleep_time = 5 if is_market_hours else 60
+            time.sleep(sleep_time)
 
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
@@ -1726,7 +1781,7 @@ def refresh_gamma_logic(symbol="SPY"):
             
             # Polygon API already filters strikes to ±10% of ATM
             # Just apply minimal volume filter to remove dead strikes
-            MIN_VOLUME = 1  # Very low to show all strikes with any activity
+            MIN_VOLUME = 200  # Show only strikes with significant activity
             
             final_data = []
             for strike, data in gamma_data.items():
@@ -1739,19 +1794,40 @@ def refresh_gamma_logic(symbol="SPY"):
                     "call_vol": data["call_vol"],
                     "put_vol": data["put_vol"],
                     "call_oi": data["call_oi"],
-                    "put_oi": data["put_oi"]
+                    "put_oi": data["put_oi"],
+                    "call_premium": data.get("call_premium", 0),
+                    "put_premium": data.get("put_premium", 0)
                 })
             
-            final_data.sort(key=lambda x: x['strike'])
+            final_data.sort(key=lambda x: x['strike'], reverse=True)  # High → Low (pre-sorted for client)
             
-            # No artificial cap - show all strikes in the ±7% range
+            # No artificial cap - show all strikes in the ±20% range
+            
+            # Determine time period for badge display
+            # market_hours = 9:30-16:00, after_hours = 16:00-20:00, evening = 20:00-midnight
+            # pre_market = 4:00-9:30, weekend = Sat/Sun
+            tz_eastern = pytz.timezone('US/Eastern')
+            now_et = datetime.now(tz_eastern)
+            hour = now_et.hour
+            minute = now_et.minute
+            
+            if is_weekend:
+                time_period = "weekend"  # Show "MON" in orange
+            elif 9 <= hour < 16 or (hour == 9 and minute >= 30):
+                time_period = "market"  # No badge (live)
+            elif 16 <= hour < 24:
+                time_period = "after_hours"  # Show "TODAY" in green
+            elif 4 <= hour < 9 or (hour == 9 and minute < 30):
+                time_period = "pre_market"  # Show "TODAY" in yellow
+            else:
+                time_period = "overnight"  # Show "TODAY" in dim
             
             result = {
                 "symbol": symbol,
                 "current_price": current_price,
                 "expiry": "Weekly",
                 "strikes": final_data,
-                "is_weekend_data": is_weekend,
+                "time_period": time_period,  # For smart badge display
                 "source": "polygon.io"
             }
             
@@ -1763,211 +1839,9 @@ def refresh_gamma_logic(symbol="SPY"):
         except Exception as e:
             print(f"Gamma Polygon Parse Error ({symbol}): {e}")
     
-    # === PRIORITY 2: MarketData.app (100k credits/day limit) ===
-    md_data = fetch_options_chain_marketdata(
-        symbol, 
-        dte=7, 
-        strike_limit=40, 
-        min_volume=100
-    )
-    
-    if md_data and md_data.get("strike"):
-        try:
-            print(f"Gamma: Using MarketData.app for {symbol}")
-            
-            # Get current price from response
-            underlying_prices = md_data.get("underlyingPrice", [])
-            current_price = underlying_prices[0] if underlying_prices else 0
-            
-            if not current_price:
-                raise ValueError("No underlying price in MarketData response")
-            
-            # Get expiration from response  
-            expirations = md_data.get("expiration", [])
-            expiry_ts = expirations[0] if expirations else None
-            expiry = datetime.fromtimestamp(expiry_ts).strftime("%Y-%m-%d") if expiry_ts else "N/A"
-            
-            # Parse arrays into strike data
-            strikes_arr = md_data.get("strike", [])
-            volumes_arr = md_data.get("volume", [])
-            ois_arr = md_data.get("openInterest", [])
-            sides_arr = md_data.get("side", [])
-            
-            # Aggregate by strike
-            gamma_data = {}
-            for i in range(len(strikes_arr)):
-                strike = float(strikes_arr[i])
-                vol = int(volumes_arr[i]) if i < len(volumes_arr) and volumes_arr[i] else 0
-                oi = int(ois_arr[i]) if i < len(ois_arr) and ois_arr[i] else 0
-                side = sides_arr[i] if i < len(sides_arr) else "call"
-                
-                if strike not in gamma_data:
-                    gamma_data[strike] = {"call_vol": 0, "put_vol": 0, "call_oi": 0, "put_oi": 0}
-                
-                if side == "call":
-                    gamma_data[strike]["call_vol"] += vol
-                    gamma_data[strike]["call_oi"] += oi
-                else:
-                    gamma_data[strike]["put_vol"] += vol
-                    gamma_data[strike]["put_oi"] += oi
-            
-            # Filter for relevant range (+/- 20% of current price)
-            lower_bound = current_price * 0.80
-            upper_bound = current_price * 1.20
-            
-            final_data = []
-            for strike, data in gamma_data.items():
-                if lower_bound <= strike <= upper_bound:
-                    final_data.append({
-                        "strike": strike,
-                        "call_vol": data["call_vol"],
-                        "put_vol": data["put_vol"],
-                        "call_oi": data["call_oi"],
-                        "put_oi": data["put_oi"]
-                    })
-            
-            final_data.sort(key=lambda x: x['strike'])
-            
-            result = {
-                "symbol": symbol,
-                "current_price": current_price,
-                "expiry": expiry,
-                "strikes": final_data,
-                "is_weekend_data": is_weekend,
-                "source": "marketdata.app"
-            }
-            
-            cache_key = f"gamma_{symbol}"
-            CACHE[cache_key] = {"data": result, "timestamp": time.time()}
-            SERVICE_STATUS["GAMMA"] = {"status": "ONLINE", "last_updated": time.time()}
-            return
-            
-        except Exception as e:
-            print(f"MarketData.app Parse Error ({symbol}): {e}")
-            # Fall through to yfinance
-    
-    # Fallback to yfinance
-    try:
-        print(f"Gamma: Falling back to yfinance for {symbol}")
-        ticker = yf.Ticker(symbol)
-        
-        # Get Current Price
-        try:
-            current_price = ticker.fast_info.last_price
-        except:
-            current_price = ticker.info.get('regularMarketPrice', 0)
-            
-        if not current_price:
-            print(f"Gamma Scan Failed: No price for {symbol}")
-            SERVICE_STATUS["GAMMA"] = {"status": "OFFLINE", "last_updated": time.time()}
-            return
-            
-        # Get Nearest Expiration
-        expirations = ticker.options
-        if not expirations:
-            print(f"Gamma Scan Failed: No options for {symbol}")
-            SERVICE_STATUS["GAMMA"] = {"status": "OFFLINE", "last_updated": time.time()}
-            return
-            
-        # Use the first expiration (0DTE/Weekly)
-        expiry = expirations[0]
-
-        # Fetch Chain
-        opts = ticker.option_chain(expiry)
-        calls = opts.calls
-        puts = opts.puts
-        
-        # Aggregate Volume and Open Interest by Strike
-        gamma_data = {}
-        
-        # Weekend Logic
-        allowed_date = today_date
-        if is_weekend:
-            days_back = 1 if weekday == 5 else 2
-            allowed_date = today_date - timedelta(days=days_back)
-            print(f"Gamma: Weekend Mode ({weekday}). Using data from {allowed_date}")
-
-        def is_valid_trade_date(ts):
-            if pd.isna(ts): return False
-            if ts.tzinfo is None: ts = pytz.utc.localize(ts)
-            trade_date = ts.astimezone(tz_eastern).date()
-            
-            if is_weekend:
-                return trade_date == allowed_date
-            else:
-                return trade_date == today_date
-
-        # Process Calls
-        for _, row in calls.iterrows():
-            strike = float(row['strike'])
-            vol = int(row['volume']) if (not pd.isna(row['volume']) and is_valid_trade_date(row['lastTradeDate'])) else 0
-            oi = int(row['openInterest']) if not pd.isna(row['openInterest']) else 0
-            
-            if strike not in gamma_data: gamma_data[strike] = {"call_vol": 0, "put_vol": 0, "call_oi": 0, "put_oi": 0}
-            gamma_data[strike]["call_vol"] += vol
-            gamma_data[strike]["call_oi"] += oi
-            
-        # Process Puts
-        for _, row in puts.iterrows():
-            strike = float(row['strike'])
-            vol = int(row['volume']) if (not pd.isna(row['volume']) and is_valid_trade_date(row['lastTradeDate'])) else 0
-            oi = int(row['openInterest']) if not pd.isna(row['openInterest']) else 0
-            
-            if strike not in gamma_data: gamma_data[strike] = {"call_vol": 0, "put_vol": 0, "call_oi": 0, "put_oi": 0}
-            gamma_data[strike]["put_vol"] += vol
-            gamma_data[strike]["put_oi"] += oi
-            
-        # Industry-standard filtering (matching MarketData.app)
-        # - Strike range: ±10% of current price (tighter than before)
-        # - Min volume: 100 (filter dead strikes)
-        # - Max strikes: ~40 (centered on ATM)
-        lower_bound = current_price * 0.90
-        upper_bound = current_price * 1.10
-        MIN_VOLUME = 100
-        
-        final_data = []
-        for strike, data in gamma_data.items():
-            # Apply strike range filter
-            if not (lower_bound <= strike <= upper_bound):
-                continue
-            
-            # Apply volume filter (at least 100 contracts traded)
-            total_vol = data["call_vol"] + data["put_vol"]
-            if total_vol < MIN_VOLUME:
-                continue
-                
-            final_data.append({
-                "strike": strike,
-                "call_vol": data["call_vol"],
-                "put_vol": data["put_vol"],
-                "call_oi": data["call_oi"],
-                "put_oi": data["put_oi"]
-            })
-                
-        final_data.sort(key=lambda x: x['strike'])
-        
-        # Limit to ~40 strikes centered on ATM (industry standard)
-        if len(final_data) > 40:
-            mid = len(final_data) // 2
-            final_data = final_data[mid-20:mid+20]
-        
-        result = {
-            "symbol": symbol,
-            "current_price": current_price,
-            "expiry": expiry,
-            "strikes": final_data,
-            "is_weekend_data": is_weekend,
-            "source": "yfinance"
-        }
-        
-        cache_key = f"gamma_{symbol}"
-        CACHE[cache_key] = {"data": result, "timestamp": time.time()}
-        SERVICE_STATUS["GAMMA"] = {"status": "ONLINE", "last_updated": time.time()}
-        SERVICE_STATUS["YFIN"] = {"status": "ONLINE", "last_updated": time.time()}
-
-    except Exception as e:
-        print(f"Gamma Scan Failed ({symbol}): {e}")
-        SERVICE_STATUS["GAMMA"] = {"status": "OFFLINE", "last_updated": time.time()}
+    # No fallbacks - if Polygon fails, mark as OFFLINE
+    print(f"Gamma: No data available for {symbol} (Polygon failed)")
+    SERVICE_STATUS["GAMMA"] = {"status": "OFFLINE", "last_updated": time.time()}
 
 @app.route('/api/gamma')
 def api_gamma():
@@ -2067,15 +1941,29 @@ def api_heatmap():
 def start_background_worker():
     def hydrate_on_startup():
 
-        # 1. Fetch Whales Sequentially (Fix for Gevent/Threading Conflict)
-        # ThreadPoolExecutor causes KeyError in gevent-patched environments
-        for symbol in WHALE_WATCHLIST:
-            try:
-                refresh_single_whale(symbol)
-            except Exception as e:
-                print(f"Startup Whale Error ({symbol}): {e}")
+        # Check if market is closed (skip heavy whale fetching on weekends)
+        tz_eastern = pytz.timezone('US/Eastern')
+        now_et = datetime.now(tz_eastern)
+        is_weekend = now_et.weekday() >= 5
+        is_market_hours = 4 <= now_et.hour < 20  # Extended hours: 4am-8pm
         
-        # 2. Fetch Gamma & Heatmap
+        if is_weekend:
+            print("📅 Weekend - skipping whale fetch (using cached data)")
+            print(f"   Cached whale trades available: {len(CACHE.get('whales', {}).get('data', []))}")
+        elif not is_market_hours:
+            print("🌙 Market closed - minimal startup (using cached data)")
+        else:
+            # Market hours - do full whale refresh with rate limiting
+            print("📈 Market hours - fetching live whale data...")
+            for symbol in WHALE_WATCHLIST[:5]:  # First 5 most important on startup
+                try:
+                    get_cached_price(symbol)  # Warm cache
+                    time.sleep(1)
+                    refresh_single_whale(symbol)
+                except Exception as e:
+                    print(f"Startup Whale Error ({symbol}): {e}")
+        
+        # 2. Fetch Gamma & Heatmap (lightweight on weekends)
         try: refresh_gamma_logic()
         except: pass
         try: refresh_heatmap_logic()
@@ -2110,39 +1998,48 @@ def start_background_worker():
                 (now.hour > 4 or (now.hour == 4 and now.minute >= 0)) and 
                 (now.hour < 20)
             )
-            # Core Market Hours for Options (Whales/Gamma): 9:30 AM - 4:00 PM ET
+            # Core Market Hours for Options (Whales/Gamma): 9:30 AM - 4:15 PM ET (ETFs trade til 4:15)
             is_market_open = is_weekday and (
                 (now.hour > 9 or (now.hour == 9 and now.minute >= 30)) and 
-                (now.hour < 16)
+                (now.hour < 16 or (now.hour == 16 and now.minute < 15))
             )
+            
+            # News Slowdown: After 9 PM ET or Weekends
+            is_late_night = now.hour >= 21 or now.hour < 4
+            is_slow_news_time = (not is_weekday) or is_late_night
 
-            # 1. Heatmap (Runs in Extended Hours) - THROTTLED TO 5 MINS (was 10)
+            # 1. Heatmap (Runs in Extended Hours)
+            # Core Hours: 5 mins (300s) | Extended Hours: 15 mins (900s)
+            heatmap_interval = 300 if is_market_open else 900
+            
             # Force hydration if cache is empty (e.g. server restart at night)
             heatmap_needs_hydration = not CACHE.get("heatmap", {}).get("data")
             
-            if (is_extended_hours or heatmap_needs_hydration) and (time.time() - last_heatmap_update > 300):
+            if (is_extended_hours or heatmap_needs_hydration) and (time.time() - last_heatmap_update > heatmap_interval):
                 try: 
                     refresh_heatmap_logic()
                     last_heatmap_update = time.time()
                 except Exception as e: print(f"Worker Error (Heatmap): {e}")
                 time.sleep(0.2)  # Polygon: unlimited API - faster polling
             
-            # 2. News (Always Runs, but slower at night) - THROTTLED TO 5 MINS
-            if time.time() - last_news_update > 300:
-                try: 
-                    refresh_news_logic()
-                    # Check if we actually got news
-                    news_data = CACHE.get("news", {}).get("data", [])
-                    if news_data:
-                        last_news_update = time.time() # Success: Wait 5 mins
-                    else:
-                        print("⚠️ News Fetch Empty - Retrying in 60s", flush=True)
-                        last_news_update = time.time() - 240 # Failure: Wait only 60s (300 - 240 = 60)
-                except Exception as e: 
-                    print(f"Worker Error (News): {e}")
-                    last_news_update = time.time() - 240 # Error: Wait only 60s
-                time.sleep(0.2)  # Polygon: unlimited API - faster polling
+            # 2. News (Always Runs, but slower at night)
+            # Normal: 5 mins (300s) | Slow: 15 mins (900s)
+            news_interval = 900 if is_slow_news_time else 300
             
+            if time.time() - last_news_update > news_interval:
+                    try: 
+                        refresh_news_logic()
+                        # Check if we actually got news
+                        news_data = CACHE.get("news", {}).get("data", [])
+                        if news_data:
+                            last_news_update = time.time()
+                        else:
+                            print("⚠️ News Fetch Empty - Retrying in 60s", flush=True)
+                            last_news_update = time.time() - (news_interval - 60)
+                    except Exception as e: 
+                        print(f"Worker Error (News): {e}")
+                        last_news_update = time.time() - (news_interval - 60)
+                
             # 3. Gamma (Market Hours OR Empty Cache) - THROTTLED TO 2 MINS (was 5)
             # If cache is empty (server restart), we MUST fetch data even if closed
             gamma_needs_hydration = not CACHE.get("gamma_SPY", {}).get("data")
@@ -2163,8 +2060,14 @@ def start_background_worker():
                     except Exception as e: print(f"Worker Error (Whale {symbol}): {e}")
                     time.sleep(0.2)  # Polygon: unlimited API - faster polling
             else:
-                # If market closed AND cache populated, sleep longer
-                time.sleep(60)
+                # If market closed AND cache populated, stop polling whales/gamma
+                # Just sleep and check News/Heatmap occasionally
+                
+                # PRE-MARKET WAKEUP: If it's 9:25-9:30 AM, sleep only 1s to catch the open
+                is_pre_market_wakeup = is_weekday and (now.hour == 9 and now.minute >= 25)
+                
+                sleep_time = 1 if is_pre_market_wakeup else 60
+                time.sleep(sleep_time)
 
     t = threading.Thread(target=worker, daemon=True)
     t.start()

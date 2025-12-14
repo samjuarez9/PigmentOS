@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gamma Wall Growth Demo</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .demo-container {
+            width: 400px;
+            height: 600px;
+            border: 2px solid #333;
+            background: #050505;
+            padding: 10px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* OVERRIDES FOR DEMO */
+        .gamma-bar-put,
+        .gamma-bar-call {
+            /* ENABLE TRANSITIONS */
+            transition: width 0.8s cubic-bezier(0.4, 0.0, 0.2, 1) !important;
+            will-change: width;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        button:hover {
+            background: #444;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="demo-container">
+        <div class="widget-header">
+            <h2>GAMMA WALL DEMO</h2>
+        </div>
+        <div id="gamma-chart-bars">
+            <!-- Bars will be injected here -->
+        </div>
+    </div>
+
+    <div class="controls">
+        <button onclick="simulateData()">Simulate Update</button>
+        <button onclick="resetDemo()">Reset</button>
+    </div>
+
+    <script>
+        const container = document.getElementById('gamma-chart-bars');
+        let currentData = [];
+
+        // Mock Data Generator
+        function generateData() {
+            const strikes = [];
+            const center = 500;
+            for (let i = -5; i <= 5; i++) {
+                strikes.push({
+                    strike: center + (i * 5),
+                    call_vol: Math.random() * 1000,
+                    put_vol: Math.random() * 1000
+                });
+            }
+            return strikes;
+        }
+
+        function render(data) {
+            // Find max for scaling
+            let maxVol = 0;
+            data.forEach(s => {
+                maxVol = Math.max(maxVol, s.call_vol, s.put_vol);
+            });
+            if (maxVol === 0) maxVol = 1;
+
+            // Sort high to low strike
+            data.sort((a, b) => b.strike - a.strike);
+
+            // Re-use existing rows or create new ones
+            data.forEach(d => {
+                let row = Array.from(container.children).find(r => parseFloat(r.dataset.strike) === d.strike);
+
+                const putWidth = (d.put_vol / maxVol) * 100;
+                const callWidth = (d.call_vol / maxVol) * 100;
+
+                if (row) {
+                    // Update existing
+                    const putBar = row.querySelector('.gamma-bar-put');
+                    const callBar = row.querySelector('.gamma-bar-call');
+
+                    putBar.style.width = `${putWidth}%`;
+                    callBar.style.width = `${callWidth}%`;
+                } else {
+                    // Create New
+                    row = document.createElement('div');
+                    row.className = 'gamma-row';
+                    row.dataset.strike = d.strike;
+
+                    row.innerHTML = `
+                        <div class="gamma-put-side">
+                            <div class="gamma-bar-put" style="width: 0%"></div>
+                        </div>
+                        <div class="gamma-strike">${d.strike}</div>
+                        <div class="gamma-call-side">
+                            <div class="gamma-bar-call" style="width: 0%"></div>
+                        </div>
+                    `;
+                    container.appendChild(row);
+
+                    // Trigger growth animation
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            row.querySelector('.gamma-bar-put').style.width = `${putWidth}%`;
+                            row.querySelector('.gamma-bar-call').style.width = `${callWidth}%`;
+                        });
+                    });
+                }
+            });
+        }
+
+        function simulateData() {
+            const newData = generateData();
+            render(newData);
+        }
+
+        function resetDemo() {
+            container.innerHTML = '';
+        }
+
+        // Initial Load
+        simulateData();
+
+        // Auto-update every 2 seconds
+        setInterval(simulateData, 2000);
+
+    </script>
+</body>
+
+</html>

@@ -741,6 +741,7 @@ h1 {
     /* Prevent overflow */
     display: -webkit-box;
     -webkit-line-clamp: 3;
+    line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
@@ -837,7 +838,8 @@ h1 {
     /* Thick border */
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: 1 1 0;
+    min-height: 0;
     overflow: hidden;
     position: relative;
     padding: 0;
@@ -1275,9 +1277,6 @@ td {
 }
 
 /* TFI Widget - Clean Terminal Style */
-#trader-fear-index {
-    /* Inherits standard widget border */
-}
 
 .tfi-value {
     font-family: 'Courier New', Courier, monospace;
@@ -1867,8 +1866,7 @@ td {
     text-shadow: 0 0 8px #00CCFF;
     border: 1px solid #00CCFF;
     border-radius: 4px;
-    animation: humPulse 3s infinite ease-in-out;
-    /* The Hum */
+    /* animation: humPulse 3s infinite ease-in-out; REMOVED */
 }
 
 .zero-gamma-label {
@@ -1879,8 +1877,7 @@ td {
     opacity: 0.8;
     font-weight: bold;
     pointer-events: none;
-    animation: humPulse 3s infinite ease-in-out;
-    /* The Hum */
+    /* animation: humPulse 3s infinite ease-in-out; REMOVED */
 }
 
 /* === UNUSUAL GAMMA WALL - Red All-Around Border (PizzINT Style) === */
@@ -1890,7 +1887,7 @@ td {
     border: 1px solid rgba(255, 51, 102, 0.8);
     border-radius: 4px;
     box-shadow: 0 0 8px rgba(255, 51, 102, 0.4), inset 0 0 4px rgba(255, 51, 102, 0.1);
-    animation: pizzint-pulse 2.5s ease-in-out infinite;
+    /* animation: pizzint-pulse 2.5s ease-in-out infinite; REMOVED */
 }
 
 @keyframes pizzint-pulse {
@@ -2954,7 +2951,8 @@ td {
 #flow-feed-container {
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
+    overflow-y: scroll;
+    /* Force scrollbar to prevent jitter */
     height: 100%;
     padding: 0;
 }
@@ -3173,17 +3171,16 @@ td {
     /* Tags on right */
 }
 
-/* Delta Mini Progress Bar */
+/* Delta Mini Progress Bar - 16-bit Retro Style */
 .delta-bar-mini {
-    width: 32px;
-    height: 12px;
+    width: 36px;
+    height: 10px;
     background: #ff4444;
-    border-radius: 2px;
+    border: 1px solid #333;
     position: relative;
     overflow: hidden;
     margin-right: 6px;
     order: -1;
-    /* Ensures it appears first (leftmost) in flex container */
 }
 
 .delta-bar-mini .delta-bar-fill {
@@ -3192,18 +3189,21 @@ td {
     top: 0;
     height: 100%;
     background: #00ff88;
-    border-radius: 2px 0 0 2px;
 }
 
-.delta-bar-mini .delta-bar-text {
-    position: absolute;
-    width: 100%;
-    text-align: center;
-    font-size: 8px;
-    font-weight: bold;
-    color: #fff;
-    line-height: 12px;
-    text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+/* Delta Wrapper - label + bar side by side */
+.delta-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    order: -1;
+}
+
+.delta-label {
+    font-size: 9px;
+    color: #888;
+    font-family: 'VT323', monospace;
+    min-width: 24px;
 }
 
 .tag-hedge {
@@ -4251,12 +4251,13 @@ td {
     flex: 1;
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
+    justify-content: center;
+    overflow-y: scroll;
+    /* Force scrollbar to prevent jitter */
     gap: 2px;
     padding-right: 5px;
-    padding-top: 35px;
-    /* Space from title - scrolls with content */
-    /* Ensure scrollable area doesn't overflow widget */
+    padding-top: 10px;
+    padding-bottom: 10px;
 }
 
 /* Scrollbar for chart */
@@ -4296,6 +4297,24 @@ td {
     box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
 }
 
+/* Tiny Loading Bar for Gamma Wall */
+.gamma-loading-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 2px;
+    background: #00CCFF;
+    width: 0%;
+    transition: width 0.3s ease-out;
+    z-index: 10;
+    box-shadow: 0 0 5px #00CCFF;
+}
+
+.gamma-loading-bar.loading {
+    width: 100%;
+    transition: width 1.5s ease-in-out;
+}
+
 .gamma-tooltip.put-tooltip {
     border-color: var(--bearish-color);
     box-shadow: 0 0 10px rgba(255, 0, 153, 0.2);
@@ -4331,11 +4350,14 @@ td {
 .gamma-row {
     display: flex;
     align-items: center;
-    height: 12px;
-    /* Reduced from 18px */
+    height: 14px;
     width: 100%;
     font-family: 'VT323', monospace;
     font-size: 12px;
+    transform: translateZ(0);
+    /* Promote to composite layer */
+    will-change: transform;
+    /* Hint to browser */
 }
 
 .gamma-put-side,
@@ -4361,18 +4383,17 @@ td {
 }
 
 .gamma-strike {
-    width: 40px;
-    /* Reduced from 50px */
+    width: 48px;
     text-align: center;
-    color: #888;
+    color: #bbb;
     font-weight: bold;
-    font-size: 10px;
-    /* Reduced from 12px (inherited) */
+    font-size: 11px;
+    font-family: 'VT323', monospace;
+    letter-spacing: 0.5px;
 }
 
 .gamma-bar-put {
-    height: 8px;
-    /* Reduced from 14px */
+    height: 10px;
     /* Fixed height to prevent collapse */
     background: var(--bearish-color);
     /* Solid color, no gradient */
@@ -4380,15 +4401,13 @@ td {
     /* Slight transparency for retro feel */
     border-right: 2px solid var(--bearish-color);
     /* box-shadow removed to stop glow */
-    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-    /* Fluid Motion */
-    min-width: 2px;
-    /* Reduced from 4px */
+    transition: width 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
+    will-change: width;
+    min-width: 1%;
 }
 
 .gamma-bar-call {
-    height: 8px;
-    /* Reduced from 14px */
+    height: 10px;
     /* Fixed height to prevent collapse */
     background: var(--bullish-color);
     /* Solid color, no gradient */
@@ -4396,19 +4415,72 @@ td {
     /* Slight transparency for retro feel */
     border-left: 2px solid var(--bullish-color);
     /* Reduced from 4px */
-    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-    /* Fluid Motion */
+    transition: width 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
+    will-change: width;
+    min-width: 1%;
+}
+
+@keyframes gamma-pulse {
+    0% {
+        opacity: 0.8;
+        box-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+    }
+
+    50% {
+        opacity: 1.0;
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.8), 0 0 30px rgba(255, 255, 255, 0.4);
+    }
+
+    100% {
+        opacity: 0.8;
+        box-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+    }
+}
+
+.gamma-max-wall {
+    animation: gamma-pulse 1.5s infinite ease-in-out;
+    will-change: opacity, box-shadow;
+    z-index: 10;
+    border: 1px solid rgba(255, 255, 255, 0.6) !important;
 }
 
 .gamma-axis-label {
     display: flex;
     justify-content: space-between;
     padding: 5px 20px;
-    font-family: 'Inter', sans-serif;
-    font-size: 9px;
-    color: #444;
+    font-family: 'VT323', monospace;
+    font-size: 10px;
+    color: #555;
     border-top: 1px solid #222;
     margin-top: 5px;
+}
+
+.gamma-axis-top {
+    border-top: none;
+    border-bottom: 1px solid #222;
+    margin-top: 0;
+    margin-bottom: 5px;
+    color: #888;
+    font-size: 11px;
+}
+
+.gamma-axis-top span:first-child {
+    color: #ff6666;
+}
+
+.gamma-axis-top span:last-child {
+    color: #66ff88;
+}
+
+.gamma-price-badge {
+    background: #1a1a1a;
+    border: 1px solid #00CCFF;
+    color: #00CCFF;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-weight: bold;
+    font-size: 12px;
+    text-shadow: 0 0 5px #00CCFF;
 }
 
 /* Current Price Indicator */
@@ -4488,6 +4560,62 @@ td {
     margin-left: 8px;
     vertical-align: middle;
     border: 1px solid #555;
+    font-weight: normal;
+    letter-spacing: 0.5px;
+}
+
+/* Monday Preview Badge (Caution Orange) */
+.monday-badge {
+    font-size: 0.7em;
+    background: rgba(255, 152, 0, 0.15);
+    color: #FF9800;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+    vertical-align: middle;
+    border: 1px solid rgba(255, 152, 0, 0.4);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* Today Badge - Green (After Hours) */
+.today-badge-green {
+    font-size: 0.7em;
+    background: rgba(76, 175, 80, 0.15);
+    color: #4CAF50;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+    vertical-align: middle;
+    border: 1px solid rgba(76, 175, 80, 0.4);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* Today Badge - Purple (Pre-Market) */
+.today-badge-purple {
+    font-size: 0.7em;
+    background: rgba(156, 39, 176, 0.15);
+    color: #E040FB;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+    vertical-align: middle;
+    border: 1px solid rgba(156, 39, 176, 0.4);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* Today Badge - Dim (Overnight) */
+.today-badge-dim {
+    font-size: 0.7em;
+    background: rgba(255, 255, 255, 0.1);
+    color: #888;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+    vertical-align: middle;
+    border: 1px solid rgba(255, 255, 255, 0.2);
     font-weight: normal;
     letter-spacing: 0.5px;
 }
