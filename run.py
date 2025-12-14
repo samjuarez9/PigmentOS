@@ -1780,7 +1780,7 @@ def refresh_news_logic():
         print(f"News Update Failed: {e}")
         CACHE["news"]["last_error"] = str(e)
 
-@app.route('/api/debug/news')
+@app.route('/api/debug/force-news')
 def debug_news():
     try:
         refresh_news_logic()
