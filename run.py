@@ -1783,12 +1783,48 @@ def refresh_news_logic():
 @app.route('/api/debug/force-news')
 def debug_news():
     try:
+        # Capture stdout to see print logs
+        import io
+        import sys
+        old_stdout = sys.stdout
+        new_stdout = io.StringIO()
+        sys.stdout = new_stdout
+        
         refresh_news_logic()
+        
+        sys.stdout = old_stdout
+        logs = new_stdout.getvalue()
+        
         return jsonify({
             "status": "success",
             "count": len(CACHE["news"]["data"]),
             "data": CACHE["news"]["data"],
-            "last_error": CACHE["news"]["last_error"]
+            "last_error": CACHE["news"]["last_error"],
+            "logs": logs
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/debug/force-heatmap')
+def debug_heatmap():
+    try:
+        # Capture stdout
+        import io
+        import sys
+        old_stdout = sys.stdout
+        new_stdout = io.StringIO()
+        sys.stdout = new_stdout
+        
+        refresh_heatmap_logic()
+        
+        sys.stdout = old_stdout
+        logs = new_stdout.getvalue()
+        
+        return jsonify({
+            "status": "success",
+            "count": len(CACHE["heatmap"]["data"]),
+            "data": CACHE["heatmap"]["data"],
+            "logs": logs
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
