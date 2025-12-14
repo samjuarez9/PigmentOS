@@ -495,6 +495,13 @@ def refresh_single_whale_polygon(symbol):
         if val >= 1_000: return f"${val/1_000:.0f}k"
         return f"${val:.0f}"
     
+    # Check for daily reset (if server runs overnight)
+    global WHALE_CACHE_LAST_CLEAR
+    if should_clear_whale_cache(WHALE_CACHE_LAST_CLEAR):
+        print("🧹 Clearing stale whale history (new trading day)")
+        WHALE_HISTORY.clear()
+        mark_whale_cache_cleared()
+    
     new_whales = []
     
     try:
@@ -954,6 +961,24 @@ def subscription_status():
         
         if not user_email:
             return jsonify({'error': 'No email in token'}), 401
+            
+        # 3. CHECK VIP/ADMIN LIST (Bypass all checks)
+        ADMIN_EMAILS = ['sam.juarez092678@gmail.com', 'jaxnailedit@gmail.com', 'Gtmichael9218@gmail.com']
+        if user_email in ADMIN_EMAILS:
+            return jsonify({
+                'status': 'active',
+                'has_access': True,
+                'is_vip': True
+            })
+            
+        # 3. CHECK VIP/ADMIN LIST (Bypass all checks)
+        ADMIN_EMAILS = ['sam.juarez092678@gmail.com', 'jaxnailedit@gmail.com', 'Gtmichael9218@gmail.com']
+        if user_email in ADMIN_EMAILS:
+            return jsonify({
+                'status': 'active',
+                'has_access': True,
+                'is_vip': True
+            })
         
         # 2. FETCH TRIAL DATE FROM FIRESTORE (don't trust client-sent date)
         trial_start_date = None
