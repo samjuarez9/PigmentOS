@@ -3164,6 +3164,48 @@ td {
     margin-right: 4px;
 }
 
+/* Tag Column - Flexbox for side-by-side meter + tags */
+.col-tag {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    justify-content: flex-end;
+    /* Tags on right */
+}
+
+/* Delta Mini Progress Bar */
+.delta-bar-mini {
+    width: 32px;
+    height: 12px;
+    background: #ff4444;
+    border-radius: 2px;
+    position: relative;
+    overflow: hidden;
+    margin-right: 6px;
+    order: -1;
+    /* Ensures it appears first (leftmost) in flex container */
+}
+
+.delta-bar-mini .delta-bar-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    background: #00ff88;
+    border-radius: 2px 0 0 2px;
+}
+
+.delta-bar-mini .delta-bar-text {
+    position: absolute;
+    width: 100%;
+    text-align: center;
+    font-size: 8px;
+    font-weight: bold;
+    color: #fff;
+    line-height: 12px;
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+}
+
 .tag-hedge {
     color: #E0E0E0;
     /* White/Grey for Hedge (Neutral/Protection) */
@@ -4212,7 +4254,8 @@ td {
     overflow-y: auto;
     gap: 2px;
     padding-right: 5px;
-    max-height: 350px;
+    padding-top: 35px;
+    /* Space from title - scrolls with content */
     /* Ensure scrollable area doesn't overflow widget */
 }
 
@@ -4301,6 +4344,7 @@ td {
     display: flex;
     align-items: center;
     height: 100%;
+    overflow: visible;
     /* Ensure side containers fill the row height */
 }
 

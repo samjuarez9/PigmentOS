@@ -141,6 +141,444 @@ MARKETDATA_TOKEN = os.environ.get("MARKETDATA_TOKEN")
 MARKETDATA_LAST_REQUEST = 0
 MARKETDATA_MIN_INTERVAL = 0.25  # 250ms between requests
 
+# Polygon.io API Key (primary options data source - unlimited calls)
+POLYGON_API_KEY = os.environ.get("POLYGON_API_KEY")
+
+# === WHALE CACHE PERSISTENCE ===
+WHALE_CACHE_FILE = "/tmp/pigmentos_whale_cache.json"
+WHALE_CACHE_LAST_CLEAR = 0  # Track when we last cleared
+
+def save_whale_cache():
+    """Save whale data to file for persistence across restarts."""
+    try:
+        with CACHE_LOCK:
+            data = {
+                "whales": CACHE["whales"]["data"],
+                "timestamp": CACHE["whales"]["timestamp"],
+                "last_clear": WHALE_CACHE_LAST_CLEAR
+            }
+        with open(WHALE_CACHE_FILE, 'w') as f:
+            json.dump(data, f)
+    except Exception as e:
+        print(f"Failed to save whale cache: {e}")
+
+def load_whale_cache():
+    """Load whale data from file on startup."""
+    global WHALE_CACHE_LAST_CLEAR
+    try:
+        if os.path.exists(WHALE_CACHE_FILE):
+            with open(WHALE_CACHE_FILE, 'r') as f:
+                data = json.load(f)
+            
+            # Check if we should clear (pre-market of next trading day)
+            if should_clear_whale_cache(data.get("last_clear", 0)):
+                print("🧹 Clearing stale whale cache (pre-market)")
+                return
+            
+            with CACHE_LOCK:
+                CACHE["whales"]["data"] = data.get("whales", [])
+                CACHE["whales"]["timestamp"] = data.get("timestamp", 0)
+            WHALE_CACHE_LAST_CLEAR = data.get("last_clear", 0)
+            print(f"📂 Loaded {len(data.get('whales', []))} whale trades from cache")
+    except Exception as e:
+        print(f"Failed to load whale cache: {e}")
+
+def should_clear_whale_cache(last_clear_ts):
+    """
+    Clear whale cache during pre-market (4 AM - 9:30 AM ET) on weekdays.
+    Returns True if we're in pre-market and should show scanner animation.
+    """
+    tz_eastern = pytz.timezone('US/Eastern')
+    now_et = datetime.now(tz_eastern)
+    
+    # Only clear on weekdays
+    if now_et.weekday() >= 5:  # Saturday or Sunday
+        return False
+    
+    # Pre-market is 4:00 AM - 9:30 AM ET
+    current_time = now_et.hour + now_et.minute / 60
+    is_premarket = 4.0 <= current_time < 9.5
+    
+    return is_premarket
+
+def mark_whale_cache_cleared():
+    """Mark the current time as when we cleared the cache."""
+    global WHALE_CACHE_LAST_CLEAR
+    WHALE_CACHE_LAST_CLEAR = time.time()
+
+def fetch_options_chain_polygon(symbol, strike_limit=40):
+    """
+    Fetch options chain snapshot from Polygon.io API.
+    Returns data formatted for Gamma Wall or None if failed.
+    
+    Polygon Starter: Unlimited API calls, 15-min delayed, Greeks included.
+    """
+    if not POLYGON_API_KEY:
+        return None
+    
+    try:
+        # First, get current price to filter strikes around ATM
+        import yfinance as yf
+        from datetime import timedelta
+        ticker = yf.Ticker(symbol)
+        current_price = ticker.fast_info.last_price or 500
+        
+        # Calculate strike range (±7% of current price - tighter for more relevant data)
+        strike_low = int(current_price * 0.93)
+        strike_high = int(current_price * 1.07)
+        
+        # Smart expiration selection for SPY/QQQ/IWM/DIA:
+        # - Weekend: use Monday
+        # - Pre-market (4am-9:30am): use TODAY (plan for today)
+        # - Market hours (9:30am-4pm): use TODAY (0DTE)
+        # - Post-market (4pm-8pm): use TOMORROW (preview next day)
+        # Other tickers always use next Friday
+        tz_eastern = pytz.timezone('US/Eastern')
+        now_et = datetime.now(tz_eastern)
+        today_weekday = now_et.weekday()  # 0=Mon, 4=Fri, 5=Sat, 6=Sun
+        
+        pre_market_start = now_et.replace(hour=4, minute=0, second=0, microsecond=0)
+        market_open = now_et.replace(hour=9, minute=30, second=0, microsecond=0)
+        market_close = now_et.replace(hour=16, minute=0, second=0, microsecond=0)
+        post_market_end = now_et.replace(hour=20, minute=0, second=0, microsecond=0)
+        
+        is_weekend = today_weekday >= 5
+        is_pre_market = pre_market_start <= now_et < market_open
+        is_market_hours = market_open <= now_et <= market_close
+        is_post_market = market_close < now_et <= post_market_end
+        
+        # Tickers with daily expirations (0DTE available)
+        daily_expiry_tickers = ['SPY', 'QQQ', 'IWM', 'DIA']
+        has_daily = symbol.upper() in daily_expiry_tickers
+        
+        if is_weekend:
+            if has_daily:
+                # Weekend + daily ticker: use next Monday
+                days_until_monday = (7 - today_weekday) % 7
+                if days_until_monday == 0:
+                    days_until_monday = 1
+                expiry_date = (now_et + timedelta(days=days_until_monday)).strftime("%Y-%m-%d")
+                print(f"Polygon: Weekend - using Monday {expiry_date} for {symbol}")
+            else:
+                # Weekend + non-daily ticker: use next Friday
+                days_until_friday = (4 - today_weekday + 7) % 7
+                if days_until_friday == 0:
+                    days_until_friday = 7
+                expiry_date = (now_et + timedelta(days=days_until_friday)).strftime("%Y-%m-%d")
+                print(f"Polygon: Weekend - using Friday {expiry_date} for {symbol}")
+        elif has_daily:
+            if is_pre_market or is_market_hours:
+                # Pre-market or market hours: use TODAY
+                expiry_date = now_et.strftime("%Y-%m-%d")
+                mode = "0DTE" if is_market_hours else "Pre-market"
+                print(f"Polygon: {mode} - using today {expiry_date} for {symbol}")
+            elif is_post_market:
+                # Post-market: use TOMORROW (or Monday if Friday)
+                if today_weekday == 4:  # Friday
+                    days_ahead = 3  # Skip to Monday
+                else:
+                    days_ahead = 1
+                expiry_date = (now_et + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
+                print(f"Polygon: Post-market - using tomorrow {expiry_date} for {symbol}")
+            else:
+                # Late night / early morning: use next trading day
+                expiry_date = now_et.strftime("%Y-%m-%d")
+                print(f"Polygon: Off-hours - using today {expiry_date} for {symbol}")
+        else:
+            # Non-daily tickers: always use next Friday
+            days_until_friday = (4 - today_weekday) % 7
+            if days_until_friday == 0 and now_et.hour >= 16:
+                days_until_friday = 7
+            expiry_date = (now_et + timedelta(days=days_until_friday)).strftime("%Y-%m-%d")
+            print(f"Polygon: Using Friday {expiry_date} for {symbol}")
+        
+        # Polygon options chain snapshot endpoint
+        url = f"https://api.polygon.io/v3/snapshot/options/{symbol}"
+        
+        params = {
+            "apiKey": POLYGON_API_KEY,
+            "limit": 250,
+            "strike_price.gte": strike_low,
+            "strike_price.lte": strike_high,
+            "expiration_date": expiry_date,
+            "order": "asc",
+            "sort": "strike_price"
+        }
+        
+        resp = requests.get(url, params=params, timeout=15)
+        
+        # No fallback - if no data, return None (status light will indicate issue)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("status") == "OK" and data.get("results"):
+                print(f"Polygon: Fetched {len(data['results'])} contracts for {symbol} (exp: {expiry_date})")
+                data["_current_price"] = current_price
+                data["_expiry_date"] = expiry_date  # Include expiry in response
+                return data
+            else:
+                print(f"Polygon: No data for {symbol} exp:{expiry_date}")
+                return None
+        
+        if resp.status_code == 403:
+            print(f"Polygon Auth Error - check API key")
+            return None
+            
+        print(f"Polygon Error ({symbol}): Status {resp.status_code}")
+        return None
+        
+    except Exception as e:
+        print(f"Polygon Fetch Failed ({symbol}): {e}")
+        return None
+
+def parse_polygon_to_gamma_format(polygon_data, current_price=None):
+    """
+    Convert Polygon options snapshot to Gamma Wall format.
+    Groups contracts by strike and aggregates call/put volume.
+    """
+    gamma_data = {}
+    underlying_price = current_price
+    
+    # Get underlying price from Polygon stocks API if not provided
+    if not underlying_price and POLYGON_API_KEY:
+        try:
+            # Use Polygon previous close endpoint for price
+            price_url = f"https://api.polygon.io/v2/aggs/ticker/SPY/prev"
+            price_resp = requests.get(price_url, params={"apiKey": POLYGON_API_KEY}, timeout=5)
+            if price_resp.status_code == 200:
+                price_data = price_resp.json()
+                if price_data.get("results"):
+                    underlying_price = price_data["results"][0].get("c", 0)  # close price
+        except:
+            pass
+    
+    # If still no price, use yfinance as fallback
+    if not underlying_price:
+        try:
+            import yfinance as yf
+            ticker = yf.Ticker("SPY")
+            underlying_price = ticker.fast_info.last_price
+        except:
+            underlying_price = 600  # Fallback default
+    
+    for contract in polygon_data.get("results", []):
+        details = contract.get("details", {})
+        strike = details.get("strike_price")
+        side = details.get("contract_type", "").lower()  # "call" or "put"
+        
+        if not strike or not side:
+            continue
+        
+        if strike not in gamma_data:
+            gamma_data[strike] = {"call_vol": 0, "put_vol": 0, "call_oi": 0, "put_oi": 0}
+        
+        day_data = contract.get("day", {})
+        vol = int(day_data.get("volume", 0) or 0)
+        oi = int(contract.get("open_interest", 0) or 0)
+        
+        if side == "call":
+            gamma_data[strike]["call_vol"] += vol
+            gamma_data[strike]["call_oi"] += oi
+        else:
+            gamma_data[strike]["put_vol"] += vol
+            gamma_data[strike]["put_oi"] += oi
+    
+    return gamma_data, underlying_price
+
+
+def fetch_unusual_options_polygon(symbol):
+    """
+    Fetch options data from Polygon and detect unusual activity (whale trades).
+    Returns list of whale trades meeting criteria.
+    """
+    if not POLYGON_API_KEY:
+        return None
+    
+    try:
+        import yfinance as yf
+        from datetime import timedelta
+        
+        # Get current price
+        ticker_yf = yf.Ticker(symbol)
+        current_price = ticker_yf.fast_info.last_price or 0
+        if not current_price:
+            return None
+        
+        # Calculate strike range (±10% for whale detection - wider range)
+        strike_low = int(current_price * 0.90)
+        strike_high = int(current_price * 1.10)
+        
+        # Polygon snapshot endpoint
+        url = f"https://api.polygon.io/v3/snapshot/options/{symbol}"
+        params = {
+            "apiKey": POLYGON_API_KEY,
+            "limit": 250,
+            "strike_price.gte": strike_low,
+            "strike_price.lte": strike_high
+        }
+        
+        resp = requests.get(url, params=params, timeout=15)
+        
+        if resp.status_code != 200:
+            print(f"Polygon Whale Error ({symbol}): Status {resp.status_code}")
+            return None
+        
+        data = resp.json()
+        if not data.get("results"):
+            return None
+        
+        # Store current price for moneyness calculation
+        data["_current_price"] = current_price
+        return data
+        
+    except Exception as e:
+        print(f"Polygon Whale Fetch Failed ({symbol}): {e}")
+        return None
+
+
+def refresh_single_whale_polygon(symbol):
+    """
+    Fetch unusual options activity for a single ticker using Polygon.io.
+    Drop-in replacement for yfinance version with same output format.
+    """
+    global CACHE, WHALE_HISTORY
+    
+    tz_eastern = pytz.timezone('US/Eastern')
+    now_et = datetime.now(tz_eastern)
+    
+    def format_money(val):
+        if val >= 1_000_000: return f"${val/1_000_000:.1f}M"
+        if val >= 1_000: return f"${val/1_000:.0f}k"
+        return f"${val:.0f}"
+    
+    new_whales = []
+    
+    try:
+        polygon_data = fetch_unusual_options_polygon(symbol)
+        
+        if not polygon_data or not polygon_data.get("results"):
+            print(f"Polygon: No data for {symbol}, skipping")
+            return
+        
+        current_price = polygon_data.get("_current_price", 0)
+        
+        # Thresholds (same as yfinance version)
+        vol_oi_multiplier = 4 if symbol.upper() in ['SPY', 'QQQ', 'IWM'] else 3
+        min_whale_val = 5_000_000 if symbol.upper() in ['SPY', 'QQQ', 'IWM'] else 500_000
+        
+        for contract in polygon_data.get("results", []):
+            details = contract.get("details", {})
+            day_data = contract.get("day", {})
+            greeks = contract.get("greeks", {})
+            
+            volume = int(day_data.get("volume", 0) or 0)
+            open_interest = int(contract.get("open_interest", 0) or 0)
+            last_price = float(day_data.get("close", 0) or 0)
+            strike = float(details.get("strike_price", 0))
+            contract_type = details.get("contract_type", "").upper()  # "CALL" or "PUT"
+            expiry = details.get("expiration_date", "")
+            ticker_symbol = details.get("ticker", "")
+            
+            # Skip if no volume
+            if volume == 0 or last_price == 0:
+                continue
+            
+            # Calculate premium (notional value)
+            notional = volume * last_price * 100
+            
+            # Vol/OI ratio - KEY indicator of unusual activity
+            vol_oi_ratio = volume / open_interest if open_interest > 0 else 999
+            
+            # INDUSTRY-STANDARD FILTERS (aligned with Unusual Whales, Cheddar Flow)
+            # 1. Vol/OI > 1.05 = Fresh positioning exceeds existing open interest
+            # 2. Premium > $100,000 = Institutional-size trade (not retail)
+            # 3. Volume > 500 = Block-level contract count
+            # 4. DTE <= 7 = Short-term conviction (industry standard for flow detection)
+            
+            is_unusual = vol_oi_ratio > 1.05
+            is_significant_premium = notional >= 100_000
+            is_meaningful_volume = volume >= 500
+            
+            # Calculate DTE (Days to Expiration)
+            try:
+                exp_date = datetime.strptime(expiry, "%Y-%m-%d").date()
+                dte = (exp_date - now_et.date()).days
+                is_short_term = 0 <= dte <= 7
+            except:
+                is_short_term = False
+            
+            # Must pass ALL criteria to be "unusual"
+            if not (is_unusual and is_significant_premium and is_meaningful_volume and is_short_term):
+                continue
+            
+            # Moneyness calculation
+            is_call = contract_type == "CALL"
+            if is_call:
+                moneyness = "ITM" if current_price > strike else "OTM"
+            else:
+                moneyness = "ITM" if current_price < strike else "OTM"
+            
+            # Get delta from Greeks
+            delta_val = greeks.get("delta", 0) or 0
+            iv_val = contract.get("implied_volatility", 0) or 0
+            
+            # Trade time (from last_updated)
+            last_updated = day_data.get("last_updated", 0)
+            if last_updated:
+                trade_time_obj = datetime.fromtimestamp(last_updated / 1_000_000_000, tz=tz_eastern)
+                trade_time_str = trade_time_obj.strftime("%H:%M:%S")
+                timestamp_val = trade_time_obj.timestamp()
+            else:
+                trade_time_str = now_et.strftime("%H:%M:%S")
+                timestamp_val = now_et.timestamp()
+            
+            # Volume tracking (same as yfinance version)
+            contract_id = ticker_symbol
+            current_vol = volume
+            last_vol = WHALE_HISTORY.get(contract_id, 0)
+            delta = current_vol - last_vol
+            
+            whale_data = {
+                "baseSymbol": symbol,
+                "symbol": ticker_symbol,
+                "strikePrice": strike,
+                "expirationDate": expiry,
+                "putCall": 'C' if is_call else 'P',
+                "openInterest": open_interest,
+                "lastPrice": last_price,
+                "tradeTime": trade_time_str,
+                "timestamp": timestamp_val,
+                "vol_oi": round(vol_oi_ratio, 1),
+                "premium": format_money(notional),
+                "notional_value": notional,
+                "moneyness": moneyness,
+                "is_mega_whale": notional > MEGA_WHALE_THRESHOLD,
+                "delta": round(delta_val, 2),
+                "iv": round(iv_val, 2),
+                "source": "polygon"
+            }
+            
+            if last_vol == 0 or delta >= VOLUME_THRESHOLD:
+                WHALE_HISTORY[contract_id] = current_vol
+                whale_data["volume"] = current_vol
+                new_whales.append(whale_data)
+        
+        # Update cache
+        with CACHE_LOCK:
+            current_data = CACHE["whales"]["data"]
+            other_data = [w for w in current_data if w['baseSymbol'] != symbol]
+            updated_data = other_data + new_whales
+            updated_data.sort(key=lambda x: x['timestamp'], reverse=True)
+            # Keep only top 50 trades for a clean feed
+            CACHE["whales"]["data"] = updated_data[:50]
+            CACHE["whales"]["timestamp"] = time.time()
+        
+        if new_whales:
+            print(f"Polygon Whales: {len(new_whales)} unusual trades for {symbol} (cache: {len(CACHE['whales']['data'])})")
+            save_whale_cache()  # Persist to file
+        
+    except Exception as e:
+        print(f"Polygon Whale Scan Failed ({symbol}): {e}")
+
 def fetch_options_chain_marketdata(symbol, expiry=None, dte=None, strike_limit=None, min_volume=None):
     """
     Fetch options chain from MarketData.app API.
@@ -205,9 +643,18 @@ WHALE_HISTORY = {}
 VOLUME_THRESHOLD = 100 # Only show update if volume increases by this much
 
 def refresh_single_whale(symbol):
-    """Fetch unusual options activity for a single ticker using yfinance."""
+    """
+    Fetch unusual options activity for a single ticker.
+    Uses Polygon.io if API key is set, otherwise falls back to yfinance.
+    """
     global CACHE
     
+    # Use Polygon if available (preferred - unlimited API calls, includes Greeks)
+    if POLYGON_API_KEY:
+        refresh_single_whale_polygon(symbol)
+        return
+    
+    # Fallback to yfinance if no Polygon key
     tz_eastern = pytz.timezone('US/Eastern')
     today_date = datetime.now(tz_eastern).date()
     
@@ -676,6 +1123,7 @@ def stripe_webhook():
 
 @app.route('/api/whales')
 def api_whales():
+    from datetime import timedelta
     global CACHE
     limit = int(request.args.get('limit', 25))
     offset = int(request.args.get('offset', 0))
@@ -689,13 +1137,23 @@ def api_whales():
     # We filter it here to ensure the frontend sees a clean slate.
     raw_data = CACHE["whales"]["data"]
     tz_eastern = pytz.timezone('US/Eastern')
-    today_date = datetime.now(tz_eastern).date()
+    now_et = datetime.now(tz_eastern)
+    today_date = now_et.date()
+    weekday = now_et.weekday()
+    
+    # On weekends, show Friday's trades; on weekdays show today's trades
+    if weekday == 5:  # Saturday
+        target_date = today_date - timedelta(days=1)  # Friday
+    elif weekday == 6:  # Sunday
+        target_date = today_date - timedelta(days=2)  # Friday
+    else:
+        target_date = today_date
     
     clean_data = []
     for whale in raw_data:
         # 'timestamp' is unix epoch
         trade_dt = datetime.fromtimestamp(whale['timestamp'], tz_eastern)
-        if trade_dt.date() == today_date:
+        if trade_dt.date() == target_date:
             clean_data.append(whale)
             
     sliced = clean_data[offset:offset+limit]
@@ -1251,10 +1709,61 @@ def refresh_gamma_logic(symbol="SPY"):
     weekday = today_date.weekday()
     is_weekend = weekday >= 5
     
-    # Try MarketData.app first with industry-standard filters
-    # dte=7: Weekly expiration (most liquid, highest gamma impact)
-    # strikeLimit=40: ~20 strikes on each side of ATM
-    # minVolume=100: Filter out dead strikes
+    # === PRIORITY 1: Polygon.io (Unlimited API calls, 15-min delayed) ===
+    polygon_data = fetch_options_chain_polygon(symbol, strike_limit=40)
+    
+    if polygon_data and polygon_data.get("results"):
+        try:
+            print(f"Gamma: Using Polygon.io for {symbol}")
+            
+            # Parse Polygon response to gamma format
+            # Get current price from fetch response (already queried)
+            fetched_price = polygon_data.get("_current_price")
+            gamma_data, current_price = parse_polygon_to_gamma_format(polygon_data, fetched_price)
+            
+            if not current_price or not gamma_data:
+                raise ValueError("Failed to parse Polygon response")
+            
+            # Polygon API already filters strikes to ±10% of ATM
+            # Just apply minimal volume filter to remove dead strikes
+            MIN_VOLUME = 1  # Very low to show all strikes with any activity
+            
+            final_data = []
+            for strike, data in gamma_data.items():
+                # Skip strikes with zero total volume
+                total_vol = data["call_vol"] + data["put_vol"]
+                if total_vol < MIN_VOLUME:
+                    continue
+                final_data.append({
+                    "strike": strike,
+                    "call_vol": data["call_vol"],
+                    "put_vol": data["put_vol"],
+                    "call_oi": data["call_oi"],
+                    "put_oi": data["put_oi"]
+                })
+            
+            final_data.sort(key=lambda x: x['strike'])
+            
+            # No artificial cap - show all strikes in the ±7% range
+            
+            result = {
+                "symbol": symbol,
+                "current_price": current_price,
+                "expiry": "Weekly",
+                "strikes": final_data,
+                "is_weekend_data": is_weekend,
+                "source": "polygon.io"
+            }
+            
+            cache_key = f"gamma_{symbol}"
+            CACHE[cache_key] = {"data": result, "timestamp": time.time()}
+            SERVICE_STATUS["GAMMA"] = {"status": "ONLINE", "last_updated": time.time()}
+            return
+            
+        except Exception as e:
+            print(f"Gamma Polygon Parse Error ({symbol}): {e}")
+    
+    # === PRIORITY 2: MarketData.app (100k credits/day limit) ===
     md_data = fetch_options_chain_marketdata(
         symbol, 
         dte=7, 
@@ -1607,16 +2116,16 @@ def start_background_worker():
                 (now.hour < 16)
             )
 
-            # 1. Heatmap (Runs in Extended Hours) - THROTTLED TO 10 MINS
+            # 1. Heatmap (Runs in Extended Hours) - THROTTLED TO 5 MINS (was 10)
             # Force hydration if cache is empty (e.g. server restart at night)
             heatmap_needs_hydration = not CACHE.get("heatmap", {}).get("data")
             
-            if (is_extended_hours or heatmap_needs_hydration) and (time.time() - last_heatmap_update > 600):
+            if (is_extended_hours or heatmap_needs_hydration) and (time.time() - last_heatmap_update > 300):
                 try: 
                     refresh_heatmap_logic()
                     last_heatmap_update = time.time()
                 except Exception as e: print(f"Worker Error (Heatmap): {e}")
-                time.sleep(3)
+                time.sleep(0.2)  # Polygon: unlimited API - faster polling
             
             # 2. News (Always Runs, but slower at night) - THROTTLED TO 5 MINS
             if time.time() - last_news_update > 300:
@@ -1632,18 +2141,18 @@ def start_background_worker():
                 except Exception as e: 
                     print(f"Worker Error (News): {e}")
                     last_news_update = time.time() - 240 # Error: Wait only 60s
-                time.sleep(3)
+                time.sleep(0.2)  # Polygon: unlimited API - faster polling
             
-            # 3. Gamma (Market Hours OR Empty Cache) - THROTTLED TO 5 MINS
+            # 3. Gamma (Market Hours OR Empty Cache) - THROTTLED TO 2 MINS (was 5)
             # If cache is empty (server restart), we MUST fetch data even if closed
             gamma_needs_hydration = not CACHE.get("gamma_SPY", {}).get("data")
             
-            if (is_market_open or gamma_needs_hydration) and (time.time() - last_gamma_update > 300):
+            if (is_market_open or gamma_needs_hydration) and (time.time() - last_gamma_update > 120):
                 try: 
                     refresh_gamma_logic()
                     last_gamma_update = time.time()
                 except Exception as e: print(f"Worker Error (Gamma): {e}")
-                time.sleep(3)
+                time.sleep(0.2)  # Polygon: unlimited API - faster polling
             
             # 4. Whales (Market Hours OR Empty Cache)
             whales_needs_hydration = not CACHE.get("whales", {}).get("data")
@@ -1652,7 +2161,7 @@ def start_background_worker():
                 for symbol in WHALE_WATCHLIST:
                     try: refresh_single_whale(symbol)
                     except Exception as e: print(f"Worker Error (Whale {symbol}): {e}")
-                    time.sleep(3)
+                    time.sleep(0.2)  # Polygon: unlimited API - faster polling
             else:
                 # If market closed AND cache populated, sleep longer
                 time.sleep(60)
@@ -1663,6 +2172,8 @@ def start_background_worker():
 # Start the background worker immediately on import
 # Guard ensures it only runs once even if module is imported multiple times
 if not hasattr(start_background_worker, '_started'):
+    load_whale_cache()  # Restore persisted whale data
+    mark_whale_cache_cleared()  # Mark this session's start time
     start_background_worker()
     start_background_worker._started = True
 

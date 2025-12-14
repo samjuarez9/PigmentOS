@@ -19,6 +19,14 @@ echo ""
 # Navigate to script directory
 cd "$(dirname "$0")"
 
+# Load environment variables from .env file if it exists
+if [ -f ".env" ]; then
+    echo -e "${YELLOW}Loading environment from .env...${NC}"
+    set -a
+    source .env
+    set +a
+fi
+
 # Check if server is already running
 echo -e "${YELLOW}[1/3]${NC} Checking server status..."
 if lsof -Pi :8001 -sTCP:LISTEN -t >/dev/null 2>&1; then
