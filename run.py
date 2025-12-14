@@ -1728,6 +1728,8 @@ def refresh_news_logic():
                 if not feed.entries:
                     print(f"⚠️ Feed Empty {url}", flush=True)
                     continue
+                
+                print(f"✅ Feed Success {url}: Found {len(feed.entries)} entries", flush=True)
 
                 for entry in feed.entries[:5]:
                     pub_ts = int(time.time())
@@ -1777,6 +1779,19 @@ def refresh_news_logic():
     except Exception as e:
         print(f"News Update Failed: {e}")
         CACHE["news"]["last_error"] = str(e)
+
+@app.route('/api/debug/news')
+def debug_news():
+    try:
+        refresh_news_logic()
+        return jsonify({
+            "status": "success",
+            "count": len(CACHE["news"]["data"]),
+            "data": CACHE["news"]["data"],
+            "last_error": CACHE["news"]["last_error"]
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 
