@@ -2034,7 +2034,7 @@ def start_background_worker():
             
             # Market Hours: 9:30 AM - 4:00 PM ET, Mon-Fri
             is_weekday = now.weekday() < 5
-            # Extended Hours for Heatmap/News: 4:00 AM - 8:00 PM ET (Weekdays) OR Anytime if cache empty
+            # Extended Hours for Heatmap/News: 4:00 AM - 8:00 PM ET (Weekdays)
             is_extended_hours = (is_weekday and (
                 (now.hour > 4 or (now.hour == 4 and now.minute >= 0)) and 
                 (now.hour < 20)
@@ -2049,14 +2049,17 @@ def start_background_worker():
             is_late_night = now.hour >= 21 or now.hour < 4
             is_slow_news_time = (not is_weekday) or is_late_night
 
-            # 1. Heatmap (Runs in Extended Hours)
+            # 1. Heatmap (Runs in Extended Hours OR if cache is empty)
             # Core Hours: 5 mins (300s) | Extended Hours: 15 mins (900s)
             heatmap_interval = 300 if is_market_open else 900
             
-            # Force hydration if cache is empty (e.g. server restart at night)
+            # Force hydration if cache is empty (e.g. server restart at night/weekend)
             heatmap_needs_hydration = not CACHE.get("heatmap", {}).get("data")
             
-            if (is_extended_hours or heatmap_needs_hydration) and (time.time() - last_heatmap_update > heatmap_interval):
+            # LOGIC FIX: If we need hydration, run it regardless of hours!
+            should_run_heatmap = is_extended_hours or heatmap_needs_hydration
+            
+            if should_run_heatmap and (time.time() - last_heatmap_update > heatmap_interval):
                 try: 
                     refresh_heatmap_logic()
                     last_heatmap_update = time.time()
@@ -2067,7 +2070,11 @@ def start_background_worker():
             # Normal: 5 mins (300s) | Slow: 15 mins (900s)
             news_interval = 900 if is_slow_news_time else 300
             
-            if time.time() - last_news_update > news_interval:
+            # Force hydration if cache is empty
+            news_needs_hydration = not CACHE.get("news", {}).get("data")
+            should_run_news = news_needs_hydration or (time.time() - last_news_update > news_interval)
+            
+            if should_run_news:
                     try: 
                         refresh_news_logic()
                         # Check if we actually got news
