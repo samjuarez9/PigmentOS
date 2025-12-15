@@ -141,9 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const optionsBody = document.getElementById('options-body');
     const insiderList = document.getElementById('insider-list');
     const oddsList = document.getElementById('odds-list');
-    const alertsList = document.getElementById('alerts-list');
-    const priceTicker = document.getElementById('price-ticker');
-    const gaugeValue = document.querySelector('.gauge-value');
+
     // === Local Storage Persistence ===
     // Load saved ticker or default to 'QQQ'
     const savedTicker = localStorage.getItem('pigment_current_ticker');
@@ -1530,6 +1528,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let gammaChartBars = document.getElementById('gamma-chart-bars');
     let currentGammaTicker = 'SPY';
 
+
     // Cache DOM references for performance (avoid re-querying every render)
     let gammaTooltip = null;
     let gammaTitle = null;
@@ -1743,7 +1742,19 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update Header with dominance badge (using cached gammaHeader)
         if (gammaHeader) {
             let html = `GAMMA WALL`;
-            if (data.time_period === 'weekend') {
+
+            // Check if we are showing a future expiry (e.g. after 9 PM switch)
+            let isFutureExpiry = false;
+            if (data._expiry_date) {
+                const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+                if (data._expiry_date !== todayStr) {
+                    isFutureExpiry = true;
+                }
+            }
+
+            if (isFutureExpiry) {
+                html += ` <span class="today-badge-orange">TOMORROW</span>`;
+            } else if (data.time_period === 'weekend') {
                 html += ` <span class="monday-badge">MON</span>`;
             } else if (data.time_period === 'after_hours') {
                 html += ` <span class="today-badge-green">TODAY</span>`;

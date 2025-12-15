@@ -4796,3 +4796,164 @@ td {
         visibility: hidden;
     }
 }
+
+/* Orange Badge for Tomorrow's Expiry */
+.today-badge-orange {
+    background: rgba(255, 165, 0, 0.2);
+    color: #FFA500;
+    border: 1px solid #FFA500;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    margin-left: 8px;
+    text-shadow: 0 0 5px rgba(255, 165, 0, 0.5);
+    animation: pulse-orange 2s infinite;
+}
+
+@keyframes pulse-orange {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 165, 0, 0.4);
+    }
+
+    70% {
+        box-shadow: 0 0 0 6px rgba(255, 165, 0, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 165, 0, 0);
+    }
+}
+
+/* Gamma Wall Expiry Toggle */
+.gamma-toggle-container {
+    display: flex;
+    background: #000;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-left: 10px;
+    overflow: hidden;
+}
+
+.gamma-toggle-btn {
+    padding: 4px 8px;
+    font-family: var(--font-pixel);
+    font-size: 10px;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-right: 1px solid var(--border-color);
+}
+
+.gamma-toggle-btn:last-child {
+    border-right: none;
+}
+
+.gamma-toggle-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.gamma-toggle-btn.active {
+    background: var(--accent-cyan);
+    color: #000;
+    font-weight: bold;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+/* Orange active state for Tomorrow */
+.gamma-toggle-btn[data-mode="tomorrow"].active {
+    background: #FFA500;
+    color: #000;
+    box-shadow: 0 0 10px rgba(255, 165, 0, 0.3);
+}
+
+/* Gamma Wall Expiry Toggle */
+.gamma-toggle-container {
+    display: flex;
+    background: #000;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-left: 10px;
+    overflow: hidden;
+}
+
+.gamma-toggle-btn {
+    padding: 2px 6px;
+    /* Smaller padding */
+    font-family: var(--font-pixel);
+    font-size: 9px;
+    /* Smaller font size */
+    color: #666;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-right: 1px solid var(--border-color);
+}
+
+.gamma-toggle-btn:last-child {
+    border-right: none;
+}
+
+.gamma-toggle-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.gamma-toggle-btn.active {
+    background: var(--accent-cyan);
+    color: #000;
+    font-weight: bold;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+/* Orange active state for Tomorrow */
+.gamma-toggle-btn[data-mode="tomorrow"].active {
+    background: #FFA500;
+    color: #000;
+    box-shadow: 0 0 10px rgba(255, 165, 0, 0.3);
+}
+
+/* Smaller Gamma Wall Badges */
+.today-badge-green,
+.today-badge-purple,
+.today-badge-dim,
+.today-badge-orange,
+.monday-badge {
+    font-size: 9px !important;
+    padding: 1px 4px !important;
+    line-height: 1 !important;
+    border-radius: 2px !important;
+    vertical-align: middle !important;
+}
+
+/* Support Text below Sign Out */
+.support-text {
+    position: fixed;
+    top: 110px;
+    /* Below Sign Out button (80px + ~25px height + gap) */
+    left: 20px;
+    font-family: 'VT323', monospace;
+    font-size: 10px;
+    color: #888;
+    z-index: 900;
+    pointer-events: none;
+    letter-spacing: 1px;
+    opacity: 0.7;
+    text-transform: uppercase;
+    text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Financial Disclaimer above Clock */
+.financial-disclaimer {
+    position: absolute;
+    top: 5px;
+    right: 20px;
+    font-family: 'VT323', monospace;
+    font-size: 10px;
+    color: #555;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    opacity: 0.7;
+    pointer-events: none;
+}

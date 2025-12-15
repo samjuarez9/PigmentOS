@@ -264,28 +264,17 @@ def fetch_options_chain_polygon(symbol, strike_limit=40):
         current_price = get_cached_price(symbol)
             
         # FALLBACK: If price fetch fails (Rate Limit/403), use a safe default to allow Gamma Wall to load
-        # This is better than showing nothing.
         if not current_price:
-            print(f"Polygon: Price fetch failed for {symbol}, using fallback for Gamma Wall")
-            # Approximate prices for major tickers (can be updated or made dynamic later)
-            fallbacks = {
-                'SPY': 600, 'QQQ': 500, 'IWM': 220, 'DIA': 440,
-                'NVDA': 130, 'TSLA': 350, 'AAPL': 230, 'AMD': 160,
-                'MSFT': 420, 'AMZN': 210, 'GOOGL': 190, 'GOOG': 190,
-                'META': 580, 'PLTR': 60
-            }
-            current_price = fallbacks.get(symbol.upper(), 100) # Default to 100 if unknown
-        
-        # Calculate strike range (±20% of current price - focused on ATM action)
+            # Try to get from last known good state or hardcoded defaults
+            defaults = {"SPY": 600, "QQQ": 500, "IWM": 220, "DIA": 440}
+            current_price = defaults.get(symbol, 100)
+            print(f"Polygon: Price fetch failed, using fallback {current_price} for {symbol}")
+
+        # Calculate strike range (±5% around ATM)
         strike_low = int(current_price * 0.80)
         strike_high = int(current_price * 1.20)
         
         # Smart expiration selection for SPY/QQQ/IWM/DIA:
-        # - Weekend: use Monday
-        # - Pre-market (4am-9:30am): use TODAY (plan for today)
-        # - Market hours (9:30am-4pm): use TODAY (0DTE)
-        # - Post-market (4pm-8pm): use TOMORROW (preview next day)
-        # Other tickers always use next Friday
         tz_eastern = pytz.timezone('US/Eastern')
         now_et = datetime.now(tz_eastern)
         today_weekday = now_et.weekday()  # 0=Mon, 4=Fri, 5=Sat, 6=Sun
@@ -296,13 +285,15 @@ def fetch_options_chain_polygon(symbol, strike_limit=40):
         post_market_end = now_et.replace(hour=20, minute=0, second=0, microsecond=0)
         
         is_weekend = today_weekday >= 5
-        is_pre_market = pre_market_start <= now_et < market_open
-        is_market_hours = market_open <= now_et <= market_close
-        is_post_market = market_close < now_et <= post_market_end
         
         # Tickers with daily expirations (0DTE available)
         daily_expiry_tickers = ['SPY', 'QQQ', 'IWM', 'DIA']
         has_daily = symbol.upper() in daily_expiry_tickers
+        
+        # Custom Logic: Switch to next expiry at 9:00 PM ET (21:00)
+        # This allows users to see closing data until late evening.
+        switch_hour = 21 
+        current_hour = now_et.hour
         
         if is_weekend:
             if has_daily:
@@ -320,27 +311,24 @@ def fetch_options_chain_polygon(symbol, strike_limit=40):
                 expiry_date = (now_et + timedelta(days=days_until_friday)).strftime("%Y-%m-%d")
                 print(f"Polygon: Weekend - using Friday {expiry_date} for {symbol}")
         elif has_daily:
-            if is_pre_market or is_market_hours:
-                # Pre-market or market hours: use TODAY
+            # For daily tickers (SPY, QQQ, etc.)
+            # Keep showing TODAY's expiry until 9:00 PM
+            if current_hour < switch_hour:
                 expiry_date = now_et.strftime("%Y-%m-%d")
-                mode = "0DTE" if is_market_hours else "Pre-market"
-                print(f"Polygon: {mode} - using today {expiry_date} for {symbol}")
-            elif is_post_market:
-                # Post-market: use TOMORROW (or Monday if Friday)
-                if today_weekday == 4:  # Friday
-                    days_ahead = 3  # Skip to Monday
+                print(f"Polygon: Pre-9PM - using today {expiry_date} for {symbol}")
+            else:
+                # After 9 PM, switch to tomorrow (or Monday if Friday)
+                if today_weekday == 4:  # Friday -> Monday
+                    days_ahead = 3
                 else:
                     days_ahead = 1
                 expiry_date = (now_et + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
-                print(f"Polygon: Post-market - using tomorrow {expiry_date} for {symbol}")
-            else:
-                # Late night / early morning: use next trading day
-                expiry_date = now_et.strftime("%Y-%m-%d")
-                print(f"Polygon: Off-hours - using today {expiry_date} for {symbol}")
+                print(f"Polygon: Post-9PM - using next expiry {expiry_date} for {symbol}")
         else:
             # Non-daily tickers: always use next Friday
             days_until_friday = (4 - today_weekday) % 7
-            if days_until_friday == 0 and now_et.hour >= 16:
+            # If it's Friday and after 9 PM, switch to NEXT Friday
+            if days_until_friday == 0 and current_hour >= switch_hour:
                 days_until_friday = 7
             expiry_date = (now_et + timedelta(days=days_until_friday)).strftime("%Y-%m-%d")
             print(f"Polygon: Using Friday {expiry_date} for {symbol}")
@@ -1570,7 +1558,7 @@ def api_polymarket():
                     "liquidity": c['liquidity'],
                     "outcome_1_label": c['outcome_1_label'],
                     "outcome_1_prob": c['outcome_1_prob'],
-                    "outcome_2_label": c['outcome_2_label'],
+                    "outcome_2_label": c['outcome_2_prob'],
                     "outcome_2_prob": c['outcome_2_prob'],
                     "slug": c['slug'],
                     "delta": c['delta']
@@ -1889,35 +1877,13 @@ def refresh_gamma_logic(symbol="SPY"):
     time_period = "overnight"
     if is_weekend:
         time_period = "weekend"
-    elif (hour > 9 or (hour == 9 and minute >= 30)) and hour < 16:
-        time_period = "market"
-    elif 16 <= hour < 24:
-        time_period = "after_hours"
-    elif 0 <= hour < 9 or (hour == 9 and minute < 30):
+    elif 4 <= hour < 9 or (hour == 9 and minute < 30):
         time_period = "pre_market"
-    
-    # === PREMARKET LOGIC: Return Empty Data (Waiting for Open) ===
-    # User Request: "our gamma wall should be fresh in premarket awaiting open"
-    # Logic: Show empty state until 9:30 AM
-    if time_period == "pre_market":
-        # Still fetch price for the badge
-        current_price = get_cached_price(symbol) or 0
+    elif (hour == 9 and minute >= 30) or (10 <= hour < 16):
+        time_period = "market_hours"
+    elif 16 <= hour < 20:
+        time_period = "after_hours"
         
-        result = {
-            "symbol": symbol,
-            "current_price": current_price,
-            "expiry": "Weekly",
-            "strikes": [], # Empty list triggers "WAITING FOR OPEN"
-            "time_period": time_period,
-            "source": "premarket_wait"
-        }
-        
-        cache_key = f"gamma_{symbol}"
-        CACHE[cache_key] = {"data": result, "timestamp": time.time()}
-        SERVICE_STATUS["GAMMA"] = {"status": "ONLINE", "last_updated": time.time()}
-        print(f"Gamma: Premarket - Waiting for open (9:30 AM ET)")
-        return
-
     # === PRIORITY 1: Polygon.io (Unlimited API calls, 15-min delayed) ===
     polygon_data = fetch_options_chain_polygon(symbol, strike_limit=40)
     
