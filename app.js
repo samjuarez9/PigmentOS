@@ -1638,6 +1638,31 @@ document.addEventListener('DOMContentLoaded', () => {
         const loader = gammaChartBars.querySelector('.intel-loader');
         if (loader) loader.remove();
 
+        // === PREMARKET EMPTY STATE ===
+        // If we have no strikes but a valid response (premarket wait), show waiting message
+        if (data.strikes.length === 0 && data.source === 'premarket_wait') {
+            gammaChartBars.innerHTML = `
+                <div class="gamma-waiting-container">
+                    <div class="gamma-waiting-icon">⏳</div>
+                    <div class="gamma-waiting-text">MARKET CLOSED</div>
+                    <div class="gamma-waiting-sub">AWAITING OPEN (9:30 AM ET)</div>
+                </div>
+            `;
+
+            // Update Header to show we are connected but waiting
+            if (!gammaHeader) gammaHeader = document.querySelector('#gamma-wall .widget-header h2');
+            if (gammaHeader) {
+                gammaHeader.innerHTML = `GAMMA WALL <span class="today-badge-purple">PRE-MKT</span>`;
+            }
+
+            // Update Price Badge if available
+            if (!gammaPriceBadge) gammaPriceBadge = document.getElementById('gamma-current-price');
+            if (gammaPriceBadge && data.current_price) {
+                gammaPriceBadge.textContent = `$${data.current_price.toFixed(2)}`;
+            }
+            return;
+        }
+
         // Create Tooltip once (cached)
         if (!gammaTooltip) {
             gammaTooltip = document.getElementById('gamma-tooltip');

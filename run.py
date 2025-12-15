@@ -230,17 +230,43 @@ def get_cached_price(symbol):
         return None
     
     try:
-        price_url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev"
+        # Use Snapshot API for real-time price (includes pre-market/after-hours)
+        price_url = f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/{symbol}"
         price_resp = requests.get(price_url, params={"apiKey": POLYGON_API_KEY}, timeout=5)
         
         if price_resp.status_code == 200:
             price_data = price_resp.json()
-            if price_data.get("results"):
-                price = price_data["results"][0].get("c", 0)
+            # Snapshot response structure: { ticker: { lastTrade: { p: ... }, ... } }
+            if price_data.get("ticker"):
+                ticker_data = price_data["ticker"]
+                # Try lastTrade first (most recent), then min (minute bar), then day (daily bar), then prevDay
+                price = None
+                if ticker_data.get("lastTrade"):
+                    price = ticker_data["lastTrade"].get("p")
+                elif ticker_data.get("min"):
+                    price = ticker_data["min"].get("c")
+                elif ticker_data.get("day"):
+                    price = ticker_data["day"].get("c")
+                elif ticker_data.get("prevDay"):
+                    price = ticker_data["prevDay"].get("c")
+                
                 if price:
                     PRICE_CACHE[symbol] = {"price": price, "timestamp": now}
                     return price
         else:
+            # Fallback to Previous Close if Snapshot fails
+            print(f"Snapshot failed for {symbol}, trying prev close...")
+            price_url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev"
+            price_resp = requests.get(price_url, params={"apiKey": POLYGON_API_KEY}, timeout=5)
+            
+            if price_resp.status_code == 200:
+                price_data = price_resp.json()
+                if price_data.get("results"):
+                    price = price_data["results"][0].get("c", 0)
+                    if price:
+                        PRICE_CACHE[symbol] = {"price": price, "timestamp": now}
+                        return price
+
             # Rate limited or error - return cached if available (even if stale)
             if symbol in PRICE_CACHE:
                 return PRICE_CACHE[symbol]["price"]
@@ -577,11 +603,17 @@ def refresh_single_whale_polygon(symbol):
             last_updated = day_data.get("last_updated", 0)
             if last_updated:
                 trade_time_obj = datetime.fromtimestamp(last_updated / 1_000_000_000, tz=tz_eastern)
+                
+                # CRITICAL: Filter out stale trades from previous days
+                # At 9:30 AM, we only want TODAY's trades
+                if trade_time_obj.date() != now_et.date():
+                    continue
+                    
                 trade_time_str = trade_time_obj.strftime("%H:%M:%S")
                 timestamp_val = trade_time_obj.timestamp()
             else:
-                trade_time_str = now_et.strftime("%H:%M:%S")
-                timestamp_val = now_et.timestamp()
+                # If no timestamp, skip it to be safe (or assume now? No, safe is better)
+                continue
             
             # Volume tracking (same as yfinance version)
             contract_id = ticker_symbol
@@ -1841,6 +1873,46 @@ def refresh_gamma_logic(symbol="SPY"):
     weekday = today_date.weekday()
     is_weekend = weekday >= 5
     
+    # Calculate time of day
+    hour = now_eastern.hour
+    minute = now_eastern.minute
+    
+    # Determine Time Period
+    # market_hours = 9:30-16:00, after_hours = 16:00-20:00, evening = 20:00-midnight
+    # pre_market = 4:00-9:30, weekend = Sat/Sun
+    
+    time_period = "overnight"
+    if is_weekend:
+        time_period = "weekend"
+    elif (hour > 9 or (hour == 9 and minute >= 30)) and hour < 16:
+        time_period = "market"
+    elif 16 <= hour < 24:
+        time_period = "after_hours"
+    elif 0 <= hour < 9 or (hour == 9 and minute < 30):
+        time_period = "pre_market"
+    
+    # === PREMARKET LOGIC: Return Empty Data (Waiting for Open) ===
+    # User Request: "our gamma wall should be fresh in premarket awaiting open"
+    # Logic: Show empty state until 9:30 AM
+    if time_period == "pre_market":
+        # Still fetch price for the badge
+        current_price = get_cached_price(symbol) or 0
+        
+        result = {
+            "symbol": symbol,
+            "current_price": current_price,
+            "expiry": "Weekly",
+            "strikes": [], # Empty list triggers "WAITING FOR OPEN"
+            "time_period": time_period,
+            "source": "premarket_wait"
+        }
+        
+        cache_key = f"gamma_{symbol}"
+        CACHE[cache_key] = {"data": result, "timestamp": time.time()}
+        SERVICE_STATUS["GAMMA"] = {"status": "ONLINE", "last_updated": time.time()}
+        print(f"Gamma: Premarket - Waiting for open (9:30 AM ET)")
+        return
+
     # === PRIORITY 1: Polygon.io (Unlimited API calls, 15-min delayed) ===
     polygon_data = fetch_options_chain_polygon(symbol, strike_limit=40)
     
@@ -1877,27 +1949,6 @@ def refresh_gamma_logic(symbol="SPY"):
                 })
             
             final_data.sort(key=lambda x: x['strike'], reverse=True)  # High → Low (pre-sorted for client)
-            
-            # No artificial cap - show all strikes in the ±20% range
-            
-            # Determine time period for badge display
-            # market_hours = 9:30-16:00, after_hours = 16:00-20:00, evening = 20:00-midnight
-            # pre_market = 4:00-9:30, weekend = Sat/Sun
-            tz_eastern = pytz.timezone('US/Eastern')
-            now_et = datetime.now(tz_eastern)
-            hour = now_et.hour
-            minute = now_et.minute
-            
-            if is_weekend:
-                time_period = "weekend"  # Show "MON" in orange
-            elif 9 <= hour < 16 or (hour == 9 and minute >= 30):
-                time_period = "market"  # No badge (live)
-            elif 16 <= hour < 24:
-                time_period = "after_hours"  # Show "TODAY" in green
-            elif 4 <= hour < 9 or (hour == 9 and minute < 30):
-                time_period = "pre_market"  # Show "TODAY" in yellow
-            else:
-                time_period = "overnight"  # Show "TODAY" in dim
             
             result = {
                 "symbol": symbol,
