@@ -18,6 +18,7 @@
 <body style="visibility: hidden;">
     <!-- Loading Screen (Retro 16-bit style) -->
     <div id="loading-screen" style="
+        visibility: visible;
         position: fixed;
         top: 0;
         left: 0;
@@ -259,7 +260,7 @@
 
                 <div class="widget" id="trader-fear-index">
                     <div class="widget-header">
-                        <h2>TRADER FEAR INDEX</h2>
+                        <h2>🎭 TRADER FEAR INDEX</h2>
                         <div class="status-container" id="status-tfi">
                             <span class="status-dot">●</span>
                             <span class="status-text">LIVE</span>
@@ -412,7 +413,7 @@
             // Admin/Owner Bypass
             const adminEmails = ['sam.juarez092678@gmail.com', 'jaxnailedit@gmail.com', 'gtmichael9218@gmail.com'];
             const userEmailLower = user.email.toLowerCase().trim();
-            
+
             if (adminEmails.map(e => e.toLowerCase()).includes(userEmailLower)) {
                 console.log('Admin user logged in - bypassing trial check');
                 hideLoadingScreen();
@@ -449,7 +450,7 @@
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${idToken}`
                     },
-                    body: JSON.stringify({})  // No longer sending email/date - server fetches from Firestore
+                    body: JSON.stringify({ email: user.email })  // Send email for local dev fallback
                 });
 
                 const status = await response.json();

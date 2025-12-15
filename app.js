@@ -1331,7 +1331,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const marketState = getMarketState();
 
         // Show Radar ONLY in Pre-Market (not when data is empty during market hours)
-        if (marketState.isPreMarket) {
+        // CRITICAL FIX: Don't wipe existing trades if we have them!
+        const existingTrades = document.querySelectorAll('.flow-item');
+        if (marketState.isPreMarket && existingTrades.length === 0) {
             // Clear all tracking caches for fresh start at market open
             seenTrades.clear();
             tradeFirstSeen.clear();
