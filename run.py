@@ -416,21 +416,35 @@ def parse_polygon_to_gamma_format(polygon_data, current_price=None):
             continue
         
         if strike not in gamma_data:
-            gamma_data[strike] = {"call_vol": 0, "put_vol": 0, "call_oi": 0, "put_oi": 0, "call_premium": 0, "put_premium": 0}
+            gamma_data[strike] = {
+                "call_vol": 0, "put_vol": 0, 
+                "call_oi": 0, "put_oi": 0, 
+                "call_premium": 0, "put_premium": 0,
+                "call_gex": 0, "put_gex": 0  # GEX per strike
+            }
         
         day_data = contract.get("day", {})
+        greeks = contract.get("greeks", {})
+        
         vol = int(day_data.get("volume", 0) or 0)
         oi = int(contract.get("open_interest", 0) or 0)
         price = float(day_data.get("close", 0) or day_data.get("vwap", 0) or 0)  # Contract price
+        gamma_val = float(greeks.get("gamma", 0) or 0)
+        
+        # GEX Formula: Gamma × OI × 100 shares × Spot² / 100 (normalized to dollars)
+        # Calls = positive GEX (MM buys dips), Puts = negative GEX (MM sells dips)
+        gex = gamma_val * oi * 100 * (underlying_price ** 2) / 100 if gamma_val and oi else 0
         
         if side == "call":
             gamma_data[strike]["call_vol"] += vol
             gamma_data[strike]["call_oi"] += oi
-            gamma_data[strike]["call_premium"] = max(gamma_data[strike]["call_premium"], price)  # Track highest premium
+            gamma_data[strike]["call_premium"] = max(gamma_data[strike]["call_premium"], price)
+            gamma_data[strike]["call_gex"] += gex  # Positive (bullish hedging)
         else:
             gamma_data[strike]["put_vol"] += vol
             gamma_data[strike]["put_oi"] += oi
             gamma_data[strike]["put_premium"] = max(gamma_data[strike]["put_premium"], price)
+            gamma_data[strike]["put_gex"] -= gex  # Negative (bearish hedging)
     
     return gamma_data, underlying_price
 
@@ -1799,7 +1813,9 @@ def refresh_gamma_logic(symbol="SPY"):
                     "call_oi": data["call_oi"],
                     "put_oi": data["put_oi"],
                     "call_premium": data.get("call_premium", 0),
-                    "put_premium": data.get("put_premium", 0)
+                    "put_premium": data.get("put_premium", 0),
+                    "call_gex": data.get("call_gex", 0),
+                    "put_gex": data.get("put_gex", 0)
                 })
             
             final_data.sort(key=lambda x: x['strike'], reverse=True)  # High → Low (pre-sorted for client)

@@ -1781,12 +1781,23 @@ document.addEventListener('DOMContentLoaded', () => {
         let maxCallVol = 0;
         let maxPutVol = 0;
 
+        // Find the strike with largest absolute GEX (the "magnet" level)
+        let maxGexStrike = null;
+        let maxAbsGex = 0;
+
         data.strikes.forEach(s => {
             if ((s.call_vol || 0) > maxCallVol) maxCallVol = s.call_vol;
             if ((s.put_vol || 0) > maxPutVol) maxPutVol = s.put_vol;
 
             const strikeMax = Math.max(s.call_vol || 0, s.put_vol || 0);
             if (strikeMax > currentMaxVol) currentMaxVol = strikeMax;
+
+            // Track max GEX strike (use net GEX = call_gex + put_gex, absolute value)
+            const netGex = Math.abs((s.call_gex || 0) + (s.put_gex || 0));
+            if (netGex > maxAbsGex) {
+                maxAbsGex = netGex;
+                maxGexStrike = s.strike;
+            }
         });
 
         // High Water Mark: Scale only grows (prevents jitter), but reset if max drops significantly
@@ -1831,6 +1842,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Is this the Largest Put Wall?
             const isMaxPut = (strikeData.put_vol || 0) === maxPutVol && maxPutVol > 0;
 
+            // Is this the Max GEX strike (magnet level)?
+            const isMaxGex = strikeData.strike === maxGexStrike && maxAbsGex > 0;
+
             if (row) {
                 // Update Height
                 row.style.height = `${rowHeight}px`;
@@ -1856,6 +1870,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     row.classList.remove('zero-gamma-row');
                     const label = row.querySelector('.zero-gamma-label');
                     if (label) label.remove();
+                }
+
+                // Update magnet emoji for max GEX strike
+                const strikeLabel = row.querySelector('.gamma-strike');
+                if (strikeLabel) {
+                    const magnetPrefix = '🧲 ';
+                    const currentText = strikeLabel.textContent;
+                    const hassMagnet = currentText.startsWith(magnetPrefix);
+
+                    if (isMaxGex && !hassMagnet) {
+                        strikeLabel.textContent = magnetPrefix + strikeData.strike.toFixed(1);
+                        strikeLabel.classList.add('max-gex-strike');
+                    } else if (!isMaxGex && hassMagnet) {
+                        strikeLabel.textContent = strikeData.strike.toFixed(1);
+                        strikeLabel.classList.remove('max-gex-strike');
+                    }
                 }
 
                 // === Apply Max Wall Pulse ===
@@ -1888,16 +1918,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const putClass = isMaxPut ? 'gamma-bar-put gamma-max-wall' : 'gamma-bar-put';
                 const callClass = isMaxCall ? 'gamma-bar-call gamma-max-wall' : 'gamma-bar-call';
 
-                // Format volume labels (only show if bar is significant - at least 5% width)
                 const putVolLabel = putWidth >= 5 ? `<span class="gamma-vol-label put-label">${formatVol(strikeData.put_vol)}</span>` : '';
                 const callVolLabel = callWidth >= 5 ? `<span class="gamma-vol-label call-label">${formatVol(strikeData.call_vol)}</span>` : '';
+
+                // Add magnet emoji if this is max GEX strike
+                const strikeDisplay = isMaxGex ? `🧲 ${strikeData.strike.toFixed(1)}` : strikeData.strike.toFixed(1);
+                const strikeClass = isMaxGex ? 'gamma-strike max-gex-strike' : 'gamma-strike';
 
                 row.innerHTML = `
                     <div class="gamma-put-side">
                         ${putVolLabel}
                         <div class="${putClass}" style="width: 0%"></div>
                     </div>
-                    <div class="gamma-strike">${strikeData.strike.toFixed(1)}</div>
+                    <div class="${strikeClass}">${strikeDisplay}</div>
                     <div class="gamma-call-side">
                         <div class="${callClass}" style="width: 0%"></div>
                         ${callVolLabel}
@@ -1944,6 +1977,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function showTooltip(e, data, type, tooltip) {
         const vol = type === 'CALL' ? data.call_vol : data.put_vol;
         const oi = type === 'CALL' ? data.call_oi : data.put_oi;
+        const gex = type === 'CALL' ? (data.call_gex || 0) : (data.put_gex || 0);
         const color = type === 'CALL' ? 'var(--bullish-color)' : 'var(--bearish-color)';
 
         // Use actual premium from Polygon API (or fallback to estimate)
@@ -1953,10 +1987,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Format as currency
         const formatMoney = (val) => {
-            if (val >= 1000000) return '$' + (val / 1000000).toFixed(1) + 'M';
-            if (val >= 1000) return '$' + (val / 1000).toFixed(0) + 'K';
+            if (Math.abs(val) >= 1000000) return '$' + (val / 1000000).toFixed(1) + 'M';
+            if (Math.abs(val) >= 1000) return '$' + (val / 1000).toFixed(0) + 'K';
             return '$' + val.toFixed(0);
         };
+
+        // GEX color: green for positive (bullish support), red for negative (bearish pressure)
+        const gexColor = gex >= 0 ? '#00d97e' : '#ff4757';
+        const gexSign = gex >= 0 ? '+' : '';
+        const gexDisplay = gex !== 0 ? `
+            <div class="tooltip-row">
+                <span class="tooltip-label">🧲 GAMMA EXP:</span>
+                <span class="tooltip-value" style="color: ${gexColor}">${gexSign}${formatMoney(gex)}</span>
+            </div>
+        ` : '';
 
         tooltip.className = `gamma-tooltip ${type === 'CALL' ? 'call-tooltip' : 'put-tooltip'}`;
         tooltip.innerHTML = `
@@ -1972,6 +2016,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="tooltip-label">OPEN INT:</span>
                 <span class="tooltip-value">${oi ? oi.toLocaleString() : 'N/A'}</span>
             </div>
+            ${gexDisplay}
         `;
 
         tooltip.style.opacity = '1';

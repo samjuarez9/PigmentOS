@@ -1869,6 +1869,13 @@ td {
     /* animation: humPulse 3s infinite ease-in-out; REMOVED */
 }
 
+/* Max GEX Strike (Magnet Level) */
+.max-gex-strike {
+    color: #FFD700 !important;
+    font-weight: bold;
+    text-shadow: 0 0 6px rgba(255, 215, 0, 0.6);
+}
+
 .zero-gamma-label {
     position: absolute;
     right: 10px;
