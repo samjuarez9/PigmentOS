@@ -520,7 +520,7 @@ def refresh_single_whale_polygon(symbol):
         
         # Thresholds (same as yfinance version)
         vol_oi_multiplier = 4 if symbol.upper() in ['SPY', 'QQQ', 'IWM'] else 3
-        min_whale_val = 5_000_000 if symbol.upper() in ['SPY', 'QQQ', 'IWM'] else 500_000
+        min_whale_val = 3_000_000 if symbol.upper() in ['SPY', 'QQQ', 'IWM'] else 500_000
         
         for contract in polygon_data.get("results", []):
             details = contract.get("details", {})
@@ -708,138 +708,13 @@ VOLUME_THRESHOLD = 100 # Only show update if volume increases by this much
 def refresh_single_whale(symbol):
     """
     Fetch unusual options activity for a single ticker.
-    Uses Polygon.io if API key is set, otherwise falls back to yfinance.
+    Uses Polygon.io exclusively for whale detection.
     """
-    global CACHE
-    
-    # Use Polygon if available (preferred - unlimited API calls, includes Greeks)
-    if POLYGON_API_KEY:
-        refresh_single_whale_polygon(symbol)
+    if not POLYGON_API_KEY:
+        print("Whale scan requires POLYGON_API_KEY - skipping")
         return
     
-    # Fallback to yfinance if no Polygon key
-    tz_eastern = pytz.timezone('US/Eastern')
-    today_date = datetime.now(tz_eastern).date()
-    
-    def format_money(val):
-        if val >= 1_000_000: return f"${val/1_000_000:.1f}M"
-        if val >= 1_000: return f"${val/1_000:.0f}k"
-        return f"${val:.0f}"
-    
-    new_whales = []
-    
-    try:
-        ticker = yf.Ticker(symbol)
-        
-        try:
-            current_price = ticker.fast_info.last_price
-        except:
-            current_price = ticker.info.get('regularMarketPrice', 0)
-        
-        if not current_price: return
-
-        expirations = ticker.options
-        if not expirations: return
-            
-        target_expirations = expirations[:2]
-        
-        for expiry in target_expirations:
-            try:
-                if symbol in ['SPY', 'QQQ', 'IWM']:
-                    expiry_date = datetime.strptime(expiry, "%Y-%m-%d").date()
-                    if expiry_date <= today_date:
-                        continue
-
-                opts = ticker.option_chain(expiry)
-                calls = opts.calls; calls['type'] = 'CALL'
-                puts = opts.puts; puts['type'] = 'PUT'
-                chain = pd.concat([calls, puts])
-                
-                vol_oi_multiplier = 4 if symbol in ['SPY', 'QQQ', 'IWM'] else 3
-                unusual = chain[
-                    (chain['volume'] > (chain['openInterest'] * vol_oi_multiplier)) & 
-                    (chain['volume'] > 500) & 
-                    (chain['lastPrice'] > 0.10)
-                ]
-                
-                for _, row in unusual.iterrows():
-                    notional = row['volume'] * row['lastPrice'] * 100
-                    
-                    min_whale_val = 500_000
-                    if symbol in ['SPY', 'QQQ', 'IWM']: min_whale_val = 5_000_000
-                        
-                    if notional < min_whale_val: continue
-
-                    trade_ts = row['lastTradeDate']
-                    if trade_ts.tzinfo is None: trade_ts = pytz.utc.localize(trade_ts)
-                    
-                    if trade_ts.astimezone(tz_eastern).date() != today_date:
-                        continue
-                    
-                    strike = float(row['strike'])
-                    is_call = row['type'] == 'CALL'
-                    
-                    price_diff_pct = abs(strike - current_price) / current_price
-                    if price_diff_pct > 0.10:
-                        continue
-                    
-                    moneyness = "ITM" if (is_call and current_price > strike) or (not is_call and current_price < strike) else "OTM"
-                    
-                    trade_time_obj = row['lastTradeDate']
-                    if hasattr(trade_time_obj, 'strftime'):
-                        trade_time_str = trade_time_obj.strftime("%H:%M:%S")
-                        timestamp_val = trade_time_obj.timestamp()
-                    else:
-                        trade_time_str = str(trade_time_obj)
-                        timestamp_val = time.time()
-
-                    contract_id = row['contractSymbol']
-                    current_vol = int(row['volume'])
-                    last_vol = WHALE_HISTORY.get(contract_id, 0)
-                    delta = current_vol - last_vol
-                    
-                    whale_data = {
-                        "baseSymbol": symbol,
-                        "symbol": row['contractSymbol'],
-                        "strikePrice": strike,
-                        "expirationDate": expiry,
-                        "putCall": 'C' if is_call else 'P',
-                        "openInterest": int(row['openInterest']),
-                        "lastPrice": float(row['lastPrice']),
-                        "tradeTime": trade_time_str,
-                        "timestamp": timestamp_val,
-                        "vol_oi": round(row['volume'] / (row['openInterest'] if row['openInterest'] > 0 else 1), 1),
-                        "premium": format_money(notional),
-                        "notional_value": notional,
-                        "moneyness": moneyness, 
-                        "is_mega_whale": notional > MEGA_WHALE_THRESHOLD,
-                        "delta": 0,
-                        "iv": row['impliedVolatility']
-                    }
-
-                    if last_vol == 0 or delta >= VOLUME_THRESHOLD:
-                        WHALE_HISTORY[contract_id] = current_vol
-                        whale_data["volume"] = current_vol
-                        new_whales.append(whale_data)
-                    else:
-                        whale_data["volume"] = last_vol
-                        whale_data["premium"] = format_money(last_vol * row['lastPrice'] * 100)
-                        whale_data["notional_value"] = last_vol * row['lastPrice'] * 100
-                        whale_data["is_mega_whale"] = whale_data["notional_value"] > MEGA_WHALE_THRESHOLD
-                        new_whales.append(whale_data)
-
-            except Exception: continue
-
-        with CACHE_LOCK:
-            current_data = CACHE["whales"]["data"]
-            other_data = [w for w in current_data if w['baseSymbol'] != symbol]
-            updated_data = other_data + new_whales
-            updated_data.sort(key=lambda x: x['timestamp'], reverse=True)
-            CACHE["whales"]["data"] = updated_data
-            CACHE["whales"]["timestamp"] = time.time()
-
-    except Exception as e:
-        print(f"Whale Scan Failed ({symbol}): {e}")
+    refresh_single_whale_polygon(symbol)
 
 def refresh_heatmap_logic():
     global CACHE
