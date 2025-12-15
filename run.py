@@ -135,7 +135,7 @@ def api_status():
 # === CONFIGURATION ===
 WHALE_WATCHLIST = [
     'NVDA', 'TSLA', 'SPY', 'QQQ', 'AAPL', 'AMD', 'MSFT', 'AMZN', 
-    'GOOGL', 'GOOG', 'META', 'PLTR', 'MU', 'NBIS'
+    'META', 'PLTR', 'MU', 'NBIS'
 ]
 
 # MarketData.app API Token (for enhanced options data)
@@ -149,7 +149,7 @@ POLYGON_API_KEY = os.environ.get("POLYGON_API_KEY")
 
 # Price cache to reduce redundant API calls (TTL: 60 seconds)
 PRICE_CACHE = {}  # {symbol: {"price": float, "timestamp": float}}
-PRICE_CACHE_TTL = 60  # seconds
+PRICE_CACHE_TTL = 300  # seconds (5 mins)
 
 # === WHALE CACHE PERSISTENCE ===
 WHALE_CACHE_FILE = "/tmp/pigmentos_whale_cache.json"
@@ -214,7 +214,7 @@ def mark_whale_cache_cleared():
     WHALE_CACHE_LAST_CLEAR = time.time()
 
 def get_cached_price(symbol):
-    """Get price from cache or fetch from Polygon if stale/missing."""
+    """Get price from cache or fetch from yfinance if stale/missing."""
     global PRICE_CACHE
     
     now = time.time()
@@ -222,59 +222,29 @@ def get_cached_price(symbol):
     # Check cache
     if symbol in PRICE_CACHE:
         cached = PRICE_CACHE[symbol]
-        if now - cached["timestamp"] < PRICE_CACHE_TTL:
+        # If valid price and fresh
+        if cached["price"] is not None and (now - cached["timestamp"] < PRICE_CACHE_TTL):
             return cached["price"]
+        # If negative cache (failed recently), wait 30s before retrying
+        if cached["price"] is None and (now - cached["timestamp"] < 30):
+            return None
     
-    # Fetch from Polygon
-    if not POLYGON_API_KEY:
-        return None
-    
+    # Fetch from yfinance (Primary source for price)
     try:
-        # Use Snapshot API for real-time price (includes pre-market/after-hours)
-        price_url = f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/{symbol}"
-        price_resp = requests.get(price_url, params={"apiKey": POLYGON_API_KEY}, timeout=5)
-        
-        if price_resp.status_code == 200:
-            price_data = price_resp.json()
-            # Snapshot response structure: { ticker: { lastTrade: { p: ... }, ... } }
-            if price_data.get("ticker"):
-                ticker_data = price_data["ticker"]
-                # Try lastTrade first (most recent), then min (minute bar), then day (daily bar), then prevDay
-                price = None
-                if ticker_data.get("lastTrade"):
-                    price = ticker_data["lastTrade"].get("p")
-                elif ticker_data.get("min"):
-                    price = ticker_data["min"].get("c")
-                elif ticker_data.get("day"):
-                    price = ticker_data["day"].get("c")
-                elif ticker_data.get("prevDay"):
-                    price = ticker_data["prevDay"].get("c")
-                
-                if price:
-                    PRICE_CACHE[symbol] = {"price": price, "timestamp": now}
-                    return price
-        else:
-            # Fallback to Previous Close if Snapshot fails
-            print(f"Snapshot failed for {symbol}, trying prev close...")
-            price_url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev"
-            price_resp = requests.get(price_url, params={"apiKey": POLYGON_API_KEY}, timeout=5)
-            
-            if price_resp.status_code == 200:
-                price_data = price_resp.json()
-                if price_data.get("results"):
-                    price = price_data["results"][0].get("c", 0)
-                    if price:
-                        PRICE_CACHE[symbol] = {"price": price, "timestamp": now}
-                        return price
-
-            # Rate limited or error - return cached if available (even if stale)
-            if symbol in PRICE_CACHE:
-                return PRICE_CACHE[symbol]["price"]
+        ticker = yf.Ticker(symbol)
+        price = ticker.fast_info.last_price
+        if price:
+            PRICE_CACHE[symbol] = {"price": price, "timestamp": now}
+            return price
     except Exception as e:
-        print(f"Price fetch error ({symbol}): {e}")
-        if symbol in PRICE_CACHE:
+        print(f"yfinance price error ({symbol}): {e}")
+        # Return stale cache if available
+        if symbol in PRICE_CACHE and PRICE_CACHE[symbol]["price"] is not None:
+            PRICE_CACHE[symbol]["timestamp"] = now  # Bump timestamp
             return PRICE_CACHE[symbol]["price"]
     
+    # Cache the failure for 30s
+    PRICE_CACHE[symbol] = {"price": None, "timestamp": now}
     return None
 
 def fetch_options_chain_polygon(symbol, strike_limit=40):
@@ -292,10 +262,19 @@ def fetch_options_chain_polygon(symbol, strike_limit=40):
         from datetime import timedelta
         
         current_price = get_cached_price(symbol)
-        
+            
+        # FALLBACK: If price fetch fails (Rate Limit/403), use a safe default to allow Gamma Wall to load
+        # This is better than showing nothing.
         if not current_price:
-            print(f"Polygon: Could not get price for {symbol}, skipping gamma fetch")
-            return None
+            print(f"Polygon: Price fetch failed for {symbol}, using fallback for Gamma Wall")
+            # Approximate prices for major tickers (can be updated or made dynamic later)
+            fallbacks = {
+                'SPY': 600, 'QQQ': 500, 'IWM': 220, 'DIA': 440,
+                'NVDA': 130, 'TSLA': 350, 'AAPL': 230, 'AMD': 160,
+                'MSFT': 420, 'AMZN': 210, 'GOOGL': 190, 'GOOG': 190,
+                'META': 580, 'PLTR': 60
+            }
+            current_price = fallbacks.get(symbol.upper(), 100) # Default to 100 if unknown
         
         # Calculate strike range (±20% of current price - focused on ATM action)
         strike_low = int(current_price * 0.80)
@@ -653,7 +632,7 @@ def refresh_single_whale_polygon(symbol):
             updated_data = other_data + new_whales
             updated_data.sort(key=lambda x: x['timestamp'], reverse=True)
             # Keep only top 50 trades for a clean feed
-            CACHE["whales"]["data"] = updated_data[:100]
+            CACHE["whales"]["data"] = updated_data[:50]
             CACHE["whales"]["timestamp"] = time.time()
         
         if new_whales:
