@@ -6,8 +6,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // === GLOBAL CONFIGURATION ===
     const IS_FILE_PROTOCOL = window.location.protocol === 'file:';
-    const API_BASE_URL = IS_FILE_PROTOCOL ? 'http://localhost:8001' : '';
+    const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:8001' : '';
 
+    // === ANALYTICS HELPER ===
+    function trackEvent(eventName, params = {}) {
+        if (window.pigmentAnalytics && window.pigmentAnalytics.logEvent) {
+            // console.log(`[Analytics] Tracking: ${eventName}`, params);
+            window.pigmentAnalytics.logEvent(window.pigmentAnalytics.analytics, eventName, params);
+        }
+    }
+
+    function setUserProperty(properties = {}) {
+        if (window.pigmentAnalytics && window.pigmentAnalytics.setUserProperties) {
+            window.pigmentAnalytics.setUserProperties(window.pigmentAnalytics.analytics, properties);
+        }
+    }
+
+    // === GLOBAL STATE ===
     // === CHECK FOR SPRING ANIMATION ===
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('anim') === 'spring') {
@@ -28,6 +43,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (latencyEl) {
                         latencyEl.textContent = `${latency} ms`;
+
+                        // Sample latency (track every ~10th check to avoid spam)
+                        if (Math.random() < 0.1) {
+                            trackEvent('performance_metric', { metric: 'api_latency', value: latency });
+                        }
                         if (latency < 100) latencyEl.style.color = 'var(--primary-color)';
                         else if (latency < 300) latencyEl.style.color = 'var(--warning-color)';
                         else latencyEl.style.color = '#ff3333';
@@ -676,6 +696,8 @@ document.addEventListener('DOMContentLoaded', () => {
         currentTicker = ticker;
         localStorage.setItem('pigment_current_ticker', currentTicker);
 
+        trackEvent('chart_ticker_change', { ticker: currentTicker });
+
         // Update Dropdown
         const tickerSelect = document.getElementById('ticker-select'); // If using native select
         if (tickerSelect) tickerSelect.value = currentTicker;
@@ -884,6 +906,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const nextIndex = (currentIndex + 1) % SECTOR_VIEWS.length;
             currentSectorView = SECTOR_VIEWS[nextIndex];
 
+            trackEvent('market_map_view_change', { view: currentSectorView });
+
             // Update Button Text
             if (sectorBtnText) {
                 sectorBtnText.textContent = `VIEW: ${currentSectorView}`;
@@ -1012,10 +1036,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const flowFeedContainer = document.getElementById('flow-feed-container');
     let isFlowPaused = false;
 
-    // Pause on Hover
+    // Pause on Hover & Analytics
     if (flowFeedContainer) {
         flowFeedContainer.addEventListener('mouseenter', () => { isFlowPaused = true; });
         flowFeedContainer.addEventListener('mouseleave', () => { isFlowPaused = false; });
+
+        // Track Scroll
+        let lastScrollTime = 0;
+        flowFeedContainer.addEventListener('scroll', () => {
+            const now = Date.now();
+            if (now - lastScrollTime > 2000) { // Debounce 2s
+                trackEvent('whale_feed_interaction', { action: 'scroll' });
+                lastScrollTime = now;
+            }
+        });
+
+        // Track Clicks on Rows
+        flowFeedContainer.addEventListener('click', (e) => {
+            const row = e.target.closest('.whale-row');
+            if (row) {
+                trackEvent('whale_feed_interaction', { action: 'click', ticker: row.querySelector('.ticker-cell')?.textContent });
+            }
+        });
     }
 
     // Intel Feed Auto-Scroll Logic - Moved to startNewsTicker for sync
@@ -1542,6 +1584,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gammaSelector.value = currentGammaTicker;
             gammaSelector.addEventListener('change', (e) => {
                 currentGammaTicker = e.target.value;
+                trackEvent('gamma_ticker_change', { ticker: currentGammaTicker });
                 fetchGammaWall(currentGammaTicker);
             });
         }
@@ -2429,6 +2472,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fn();
         } catch (error) {
             console.error(`[CRITICAL] ${widgetName} Crashed: `, error);
+            trackEvent('app_error', { source: widgetName, message: error.message });
             // Optional: Update UI to show "OFFLINE" for this specific widget?
         }
     }
@@ -2495,6 +2539,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
+
+    // === ANALYTICS TRACKING FOR STATIC ELEMENTS ===
+    const xBtn = document.getElementById('x-link-btn');
+    if (xBtn) {
+        xBtn.addEventListener('click', () => trackEvent('social_click', { platform: 'X' }));
+    }
+
+    const discordBtn = document.getElementById('discord-link-btn');
+    if (discordBtn) {
+        discordBtn.addEventListener('click', () => trackEvent('social_click', { platform: 'Discord' }));
+    }
+
+    const signOutBtn = document.getElementById('sign-out-btn');
+    if (signOutBtn) {
+        signOutBtn.addEventListener('click', () => trackEvent('sign_out'));
+    }
 
     // Initial Fetch & Interval
     safeExecute('News Feed', fetchNews);

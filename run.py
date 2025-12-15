@@ -857,6 +857,18 @@ def subscription_status():
             if not user_email:
                 return jsonify({'error': 'No email in token'}), 401
         
+        # Track login count in Firestore
+        login_count = 1
+        if firestore_db and user_uid:
+            try:
+                user_ref = firestore_db.collection('users').document(user_uid)
+                user_ref.set({'login_count': firestore.Increment(1)}, merge=True)
+                user_doc = user_ref.get()
+                if user_doc.exists:
+                    login_count = user_doc.to_dict().get('login_count', 1)
+            except Exception as e:
+                print(f"Login count update failed: {e}")
+        
         # If we bypassed, we need to get email/uid from request body as fallback
         if not firestore_db:
             data = request.get_json() or {}
@@ -918,7 +930,8 @@ def subscription_status():
                         return jsonify({
                             'status': sub.status,
                             'days_remaining': max(0, days_left),
-                            'has_access': True
+                            'has_access': True,
+                            'login_count': login_count
                         })
                     else:
                         # Hard Lockout for expired/bad status
@@ -968,7 +981,8 @@ def subscription_status():
             return jsonify({
                 'status': 'trialing',
                 'days_remaining': TRIAL_DAYS,
-                'has_access': True
+                'has_access': True,
+                'login_count': login_count
             })
 
         except Exception as stripe_e:
