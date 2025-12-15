@@ -1330,9 +1330,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Get market state early
         const marketState = getMarketState();
 
-        // Show Radar if Pre-Market OR if no data available (e.g. fresh weekend start)
-        if (marketState.isPreMarket || !data || data.length === 0) {
-            // Clear all tracking caches
+        // Show Radar ONLY in Pre-Market (not when data is empty during market hours)
+        if (marketState.isPreMarket) {
+            // Clear all tracking caches for fresh start at market open
             seenTrades.clear();
             tradeFirstSeen.clear();
             previousSnapshotTradeIds.clear();
@@ -1349,7 +1349,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <div class="status-message">
                             <span style="color: #888; font-size: 11px; font-family: var(--font-mono);">
-                                ${marketState.isPreMarket ? 'STATUS: PRE-MARKET. Monitoring for block orders...' : 'STATUS: SCANNING. Waiting for market data...'}
+                                STATUS: PRE-MARKET. Monitoring for block orders...
                             </span>
                         </div>
                     </div>
@@ -1377,16 +1377,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!flowFeedContainer) return;
 
         // Handle empty data (only reached during market hours / after hours)
+        // IMPORTANT: Don't clear existing trades! Just wait for more data.
         if (!hasData) {
+            // If there are already trades displayed, just keep them and wait for more
+            const existingTrades = flowFeedContainer.querySelectorAll('.flow-item');
+            if (existingTrades.length > 0) {
+                return; // Keep existing trades, don't clear
+            }
 
-            // Clear existing items
-            flowFeedContainer.innerHTML = '';
-
+            // Only show waiting message if truly empty (first load)
             if (isSystemHealthy) {
-                // MARKET HOURS or AFTER HOURS: Show waiting message
                 const waitingDiv = document.createElement('div');
                 waitingDiv.className = 'placeholder-item';
                 waitingDiv.textContent = 'Waiting for trade...';
+                flowFeedContainer.innerHTML = ''; // Clear only if no existing trades
                 flowFeedContainer.appendChild(waitingDiv);
             }
             return;
