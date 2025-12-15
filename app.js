@@ -2044,8 +2044,11 @@ document.addEventListener('DOMContentLoaded', () => {
             row.classList.add('new-row');
         }
 
-        // Add MEGA pulse animation ONLY for >$40M elite trades
-        if (flow.notional_value && flow.notional_value >= 40000000) {
+        // Add MEGA pulse animation for:
+        // 1. >$40M elite trades
+        // 2. High delta trades (>0.80 = deep ITM, likely institutional)
+        const isDeepITM = flow.delta !== undefined && Math.abs(flow.delta) > 0.80;
+        if ((flow.notional_value && flow.notional_value >= 40000000) || isDeepITM) {
             row.classList.add('mega-row');
         }
 
