@@ -534,7 +534,7 @@ def refresh_single_whale_polygon(symbol):
         
         # Thresholds (same as yfinance version)
         vol_oi_multiplier = 4 if symbol.upper() in ['SPY', 'QQQ', 'IWM'] else 3
-        min_whale_val = 3_000_000 if symbol.upper() in ['SPY', 'QQQ', 'IWM'] else 500_000
+        min_whale_val = 3_000_000 if symbol.upper() in ['SPY', 'QQQ'] else 500_000
         
         for contract in polygon_data.get("results", []):
             details = contract.get("details", {})
@@ -566,7 +566,7 @@ def refresh_single_whale_polygon(symbol):
             # 4. DTE <= 7 = Short-term conviction (industry standard for flow detection)
             
             is_unusual = vol_oi_ratio > 1.05
-            is_significant_premium = notional >= 100_000
+            is_significant_premium = notional >= min_whale_val  # Use ticker-specific threshold
             is_meaningful_volume = volume >= 500
             
             # Calculate DTE (Days to Expiration)
