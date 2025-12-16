@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        .flow-item {
+            border: 1px solid black;
+            margin: 2px;
+            padding: 2px;
+        }
+
+        .new-row {
+            background-color: yellow;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="flow-feed-container"></div>
+    <script>
+        const flowFeedContainer = document.getElementById('flow-feed-container');
+        let seenTrades = new Set();
+        let previousSnapshotTradeIds = new Set();
+
+        function createFlowElement(flow, id, isNew) {
+            const div = document.createElement('div');
+            div.className = 'flow-item';
+            div.textContent = `${id} (New: ${isNew})`;
+            if (isNew) div.classList.add('new-row');
+            return div;
+        }
+
+        function renderWhaleFeed(trades) {
+            const currentSnapshotTradeIds = new Set();
+            const tradesToRender = [];
+
+            // Simulate the reverse loop from app.js
+            [...trades].reverse().forEach(flow => {
+                const id = flow.id;
+                currentSnapshotTradeIds.add(id);
+
+                if (seenTrades.has(id)) return;
+                seenTrades.add(id);
+
+                const isNew = !previousSnapshotTradeIds.has(id);
+                tradesToRender.push({ flow, id, isNew });
+            });
+
+            previousSnapshotTradeIds = currentSnapshotTradeIds;
+
+            tradesToRender.forEach(({ flow, id, isNew }) => {
+                const div = createFlowElement(flow, id, isNew);
+                flowFeedContainer.insertBefore(div, flowFeedContainer.firstChild);
+
+                if (flowFeedContainer.children.length > 5) { // Limit to 5 for test
+                    flowFeedContainer.lastChild.remove();
+                }
+            });
+        }
+
+        // Test Scenario
+        const initialData = [
+            { id: 'T1' }, { id: 'T2' }, { id: 'T3' }
+        ]; // Newest is T1 (index 0) if backend sends sorted? 
+        // Wait, app.js assumes data is sorted Newest First.
+        // So T1 is newest.
+
+        console.log("--- Initial Render ---");
+        renderWhaleFeed(initialData);
+        // Expected: T1, T2, T3 in DOM (T1 at top)
+
+        setTimeout(() => {
+            console.log("--- Update (2 New Trades) ---");
+            const updateData = [
+                { id: 'T-New1' }, { id: 'T-New2' },
+                { id: 'T1' }, { id: 'T2' }, { id: 'T3' }
+            ];
+            renderWhaleFeed(updateData);
+            // Expected: T-New1, T-New2, T1, T2, T3 (Limit 5)
+        }, 2000);
+
+    </script>
+</body>
+
+</html>

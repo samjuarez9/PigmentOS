@@ -1373,7 +1373,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Show Radar ONLY in Pre-Market (not when data is empty during market hours)
         // CRITICAL FIX: Don't wipe existing trades if we have them!
-        const existingTrades = document.querySelectorAll('.flow-item');
+        const existingTrades = document.querySelectorAll('.whale-row');
         if (marketState.isPreMarket && existingTrades.length === 0) {
             // Clear all tracking caches for fresh start at market open
             seenTrades.clear();
@@ -1423,7 +1423,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // IMPORTANT: Don't clear existing trades! Just wait for more data.
         if (!hasData) {
             // If there are already trades displayed, just keep them and wait for more
-            const existingTrades = flowFeedContainer.querySelectorAll('.flow-item');
+            const existingTrades = flowFeedContainer.querySelectorAll('.whale-row');
             if (existingTrades.length > 0) {
                 return; // Keep existing trades, don't clear
             }
@@ -1544,19 +1544,26 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update previous snapshot for the next incoming data
         previousSnapshotTradeIds = currentSnapshotTradeIds;
 
-        // Now render the collected trades
-        tradesToRender.forEach(({ flow, id, isNew }) => {
-            const div = createFlowElement(flow, id, isNew);
-            // div.setAttribute('data-id', id); // Track ID for badge cleanup
-            div.dataset.tradeId = id;
+        // === THROTTLED RENDERING ===
+        // Instead of rendering all at once, drip them in one-by-one with delay
+        const RENDER_DELAY_MS = 200; // 200ms between each trade
+        const MAX_BATCH_SIZE = 10; // Max trades to animate per cycle (prevents runaway)
 
-            // Prepend new items (Slide In Animation handled by CSS)
-            flowFeedContainer.insertBefore(div, flowFeedContainer.firstChild);
+        const batchToRender = tradesToRender.slice(0, MAX_BATCH_SIZE);
 
-            // Limit to 50 items to prevent DOM bloat
-            if (flowFeedContainer.children.length > 50) {
-                flowFeedContainer.lastChild.remove();
-            }
+        batchToRender.forEach(({ flow, id, isNew }, index) => {
+            setTimeout(() => {
+                const div = createFlowElement(flow, id, isNew);
+                div.dataset.tradeId = id;
+
+                // Prepend new items (Slide In Animation handled by CSS)
+                flowFeedContainer.insertBefore(div, flowFeedContainer.firstChild);
+
+                // Limit to 50 items to prevent DOM bloat
+                if (flowFeedContainer.children.length > 50) {
+                    flowFeedContainer.lastChild.remove();
+                }
+            }, index * RENDER_DELAY_MS);
         });
 
         // Optional: Prune seenTrades set to keep memory low (if needed)

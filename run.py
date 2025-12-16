@@ -1310,8 +1310,29 @@ def api_whales_stream():
         # Just yield the cache periodically
         while True:
             # Send immediately on connect
-            data = CACHE["whales"]["data"]
-            yield f"data: {json.dumps({'data': data, 'stale': False, 'timestamp': int(CACHE['whales']['timestamp'])})}\n\n"
+            # FILTER: Ensure we only show TODAY'S trades (Server-side safety)
+            raw_data = CACHE["whales"]["data"]
+            tz_eastern = pytz.timezone('US/Eastern')
+            now_et = datetime.now(tz_eastern)
+            today_date = now_et.date()
+            weekday = now_et.weekday()
+            
+            # On weekends, show Friday's trades; on weekdays show today's trades
+            if weekday == 5:  # Saturday
+                target_date = today_date - timedelta(days=1)  # Friday
+            elif weekday == 6:  # Sunday
+                target_date = today_date - timedelta(days=2)  # Friday
+            else:
+                target_date = today_date
+            
+            clean_data = []
+            for whale in raw_data:
+                # 'timestamp' is unix epoch
+                trade_dt = datetime.fromtimestamp(whale['timestamp'], tz_eastern)
+                if trade_dt.date() == target_date:
+                    clean_data.append(whale)
+
+            yield f"data: {json.dumps({'data': clean_data, 'stale': False, 'timestamp': int(CACHE['whales']['timestamp'])})}\n\n"
             # Optimization: Slow down stream when market is closed
             tz_eastern = pytz.timezone('US/Eastern')
             now = datetime.now(tz_eastern)

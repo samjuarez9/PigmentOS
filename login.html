@@ -1052,6 +1052,18 @@
 
     <!-- Firebase SDKs -->
     <script type="module">
+        // DEV BYPASS: Auto-redirect on localhost for testing
+        if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+            console.log('🔧 DEV MODE: Bypassing login for local testing');
+            localStorage.setItem('devMode', 'true');
+            localStorage.setItem('devUser', JSON.stringify({
+                email: 'dev@pigmentos.local',
+                displayName: 'Dev User',
+                uid: 'dev-local-testing'
+            }));
+            window.location.href = 'index.html';
+        }
+
         // Import Firebase SDKs
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -1103,6 +1115,10 @@
                         subscriptionStatus: "trialing"
                     });
                     logEvent(analytics, 'sign_up', { method: 'Google' });
+                    logEvent(analytics, 'trial_started', {
+                        method: 'Google',
+                        source: 'login_page'
+                    });
                 } else {
                     logEvent(analytics, 'login', { method: 'Google' });
                 }

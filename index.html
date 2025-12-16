@@ -401,6 +401,7 @@
         const signOutBtn = document.getElementById('sign-out-btn');
         if (signOutBtn) {
             signOutBtn.addEventListener('click', () => {
+                logEvent(analytics, 'sign_out', { location: 'dashboard' });
                 signOut(auth).then(() => {
                     window.location.href = '/login.html';
                 }).catch((error) => {
@@ -461,6 +462,8 @@
                 const status = await response.json();
 
                 if (!status.has_access) {
+                    logEvent(analytics, 'trial_expired', { user_email_domain: user.email.split('@')[1] });
+                    logEvent(analytics, 'paywall_hit', { source: 'dashboard', reason: 'trial_expired' });
                     window.location.href = '/upgrade.html';
                     return;
                 }
