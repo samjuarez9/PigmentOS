@@ -49,6 +49,22 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
+# Timeout wrapper for external calls (prevents hanging)
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+TIMEOUT_EXECUTOR = ThreadPoolExecutor(max_workers=4)
+
+def with_timeout(func, timeout_seconds=5):
+    """Run a function with a timeout. Returns None if timeout."""
+    try:
+        future = TIMEOUT_EXECUTOR.submit(func)
+        return future.result(timeout=timeout_seconds)
+    except FuturesTimeoutError:
+        print(f"⏰ Timeout after {timeout_seconds}s: {func}")
+        return None
+    except Exception as e:
+        print(f"⚠️ Error in with_timeout: {e}")
+        return None
+
 # Rate Limiting
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -229,10 +245,13 @@ def get_cached_price(symbol):
         if cached["price"] is None and (now - cached["timestamp"] < 30):
             return None
     
-    # Fetch from yfinance (Primary source for price)
+    # Fetch from yfinance with timeout (Primary source for price)
     try:
-        ticker = yf.Ticker(symbol)
-        price = ticker.fast_info.last_price
+        def fetch_price():
+            t = yf.Ticker(symbol)
+            return t.fast_info.last_price
+        
+        price = with_timeout(fetch_price, timeout_seconds=5)
         if price:
             PRICE_CACHE[symbol] = {"price": price, "timestamp": now}
             return price
@@ -753,7 +772,15 @@ def refresh_heatmap_logic():
     
     try:
         heatmap_data = []
-        tickers_obj = yf.Tickers(" ".join(HEATMAP_TICKERS.keys()))
+        
+        # Wrap yf.Tickers to prevent hanging
+        def fetch_tickers():
+            return yf.Tickers(" ".join(HEATMAP_TICKERS.keys()))
+        
+        tickers_obj = with_timeout(fetch_tickers, timeout_seconds=10)
+        if not tickers_obj:
+            print("⏰ Heatmap tickers fetch timed out")
+            return
         
         for symbol, meta in HEATMAP_TICKERS.items():
             try:
@@ -1683,7 +1710,15 @@ def api_movers():
     
     try:
         movers = []
-        tickers_obj = yf.Tickers(" ".join(MOVERS_TICKERS))
+        
+        # Wrap yf.Tickers to prevent hanging
+        def fetch_movers_tickers():
+            return yf.Tickers(" ".join(MOVERS_TICKERS))
+        
+        tickers_obj = with_timeout(fetch_movers_tickers, timeout_seconds=10)
+        if not tickers_obj:
+            print("⏰ Movers tickers fetch timed out")
+            return
         
         def fetch_ticker_data(symbol):
             try:
