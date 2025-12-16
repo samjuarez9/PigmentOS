@@ -1039,8 +1039,9 @@
             </div>
         </div>
 
-        <!-- reCAPTCHA container (invisible) -->
-        <div id="recaptcha-container"></div>
+
+
+
     </div>
 
     <!-- Footer Links -->
@@ -1049,24 +1050,13 @@
             href="/privacy.html">Privacy</a>
     </div>
 
-    <!-- Forgot Password Modal -->
-    <div id="forgot-password-modal" class="modal-overlay" onclick="closeForgotPasswordModal(event)">
-        <div class="modal-box" onclick="event.stopPropagation()">
-            <div class="modal-header">🔐 Reset Password</div>
-            <input type="email" id="reset-email" class="modal-input" placeholder="Enter your email">
-            <div class="modal-buttons">
-                <button class="modal-btn" onclick="sendPasswordReset()">SEND RESET</button>
-                <button class="modal-btn cancel" onclick="closeForgotPasswordModal()">CANCEL</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Firebase SDKs -->
     <script type="module">
         // Import Firebase SDKs
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, signInWithPopup, GoogleAuthProvider, signInWithPhoneNumber, RecaptchaVerifier, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, setPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
 
         // Firebase configuration
         const firebaseConfig = {
@@ -1083,10 +1073,9 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-
-        // Initialize Analytics
-        import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
         const analytics = getAnalytics(app);
+
+        // Log page view
         logEvent(analytics, 'page_view', { page_title: 'Login' });
 
         // Make analytics available globally
@@ -1094,17 +1083,13 @@
 
         // Make functions available globally
         window.signInWithGoogle = signInWithGoogle;
-        window.signInWithPhone = signInWithPhone;
-        window.verifyPhoneCode = verifyPhoneCode;
-        window.handleEmailLogin = handleEmailLogin;
 
         // Google Sign-In
         async function signInWithGoogle() {
             const provider = new GoogleAuthProvider();
             try {
-                // Set persistence based on "Remember me" checkbox
-                const rememberMe = document.getElementById('remember-me').checked;
-                await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+                // Always use persistent local storage (remember user)
+                await setPersistence(auth, browserLocalPersistence);
 
                 const result = await signInWithPopup(auth, provider);
                 console.log("Google Sign-In successful:", result.user);
@@ -1129,194 +1114,12 @@
             }
         }
 
-        // Phone Auth - Step 1: Send verification code
-        let confirmationResult;
-        async function signInWithPhone() {
-            let phoneNumber = document.getElementById('phone-input').value.trim();
-            if (!phoneNumber) {
-                alert("Please enter a phone number");
-                return;
-            }
-
-            // Auto-format: Remove all non-numeric characters
-            phoneNumber = phoneNumber.replace(/\D/g, '');
-
-            // If it's 10 digits (US number without country code), prepend +1
-            if (phoneNumber.length === 10) {
-                phoneNumber = '+1' + phoneNumber;
-            }
-            // If it's 11 digits starting with 1, prepend +
-            else if (phoneNumber.length === 11 && phoneNumber.startsWith('1')) {
-                phoneNumber = '+' + phoneNumber;
-            }
-            // Otherwise, prepend + if missing
-            else if (!phoneNumber.startsWith('+')) {
-                phoneNumber = '+' + phoneNumber;
-            }
-
-            try {
-                // Set up reCAPTCHA
-                if (!window.recaptchaVerifier) {
-                    window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-                        'size': 'invisible'
-                    });
-                }
-
-                confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, window.recaptchaVerifier);
-
-                // Show code input
-                document.getElementById('phone-step-1').style.display = 'none';
-                document.getElementById('phone-step-2').style.display = 'block';
-            } catch (error) {
-                console.error("Phone auth error:", error);
-                alert("Failed to send SMS: " + error.message);
-            }
-        }
-
-        // Phone Auth - Step 2: Verify code
-        async function verifyPhoneCode() {
-            const code = document.getElementById('code-input').value;
-            if (!code) {
-                alert("Please enter the verification code");
-                return;
-            }
-
-            try {
-                const result = await confirmationResult.confirm(code);
-                console.log("Phone verification successful:", result.user);
-                redirectToDashboard();
-            } catch (error) {
-                console.error("Code verification error:", error);
-                alert("Invalid code: " + error.message);
-            }
-        }
-
-        // Email/Password Login
-        async function handleEmailLogin(e) {
-            e.preventDefault();
-            const email = document.getElementById('email-input').value.trim();
-            const password = document.getElementById('password-input').value;
-
-            if (!email || !password) {
-                alert("Please enter email and password");
-                return;
-            }
-
-            const btn = document.querySelector('.btn-login');
-            const originalText = btn.textContent;
-            btn.textContent = "LOADING...";
-            btn.classList.add('btn-loading');
-            btn.style.background = "#00FF41";
-            btn.style.color = "#000";
-
-            try {
-                // Set persistence based on "Remember me" checkbox
-                const rememberMe = document.getElementById('remember-me').checked;
-                await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
-
-                // Try to sign in first
-                await signInWithEmailAndPassword(auth, email, password);
-                console.log("Email sign-in successful");
-                logEvent(analytics, 'login', { method: 'Email' });
-                redirectToDashboard();
-            } catch (error) {
-                if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-                    // User doesn't exist (or wrong password), try to create account
-                    try {
-                        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                        console.log("Account created successfully");
-
-                        // Store trial start date in Firestore
-                        await setDoc(doc(db, "users", userCredential.user.uid), {
-                            email: email,
-                            trialStartDate: serverTimestamp(),
-                            subscriptionStatus: "trialing"
-                        });
-
-                        logEvent(analytics, 'sign_up', { method: 'Email' });
-                        redirectToDashboard();
-                    } catch (createError) {
-                        console.error("Account creation error:", createError);
-                        alert("Failed to create account: " + createError.message);
-                        btn.textContent = "LOGIN";
-                        btn.classList.remove('btn-loading');
-                        btn.style.background = "#9D4EDD";
-                        btn.style.color = "#FFF";
-                    }
-                } else {
-                    console.error("Email sign-in error:", error);
-                    alert("Login failed: " + error.message);
-                    btn.textContent = "LOGIN";
-                    btn.classList.remove('btn-loading');
-                    btn.style.background = "#9D4EDD";
-                    btn.style.color = "#FFF";
-                }
-            }
-        }
-
         // Redirect to dashboard
         function redirectToDashboard() {
             window.location.href = 'index.html?anim=spring';
         }
-
-        // Password visibility toggle
-        window.togglePasswordVisibility = function () {
-            const passwordInput = document.getElementById('password-input');
-            const eyeIcon = document.getElementById('eye-icon');
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                eyeIcon.textContent = 'HIDE';
-            } else {
-                passwordInput.type = 'password';
-                eyeIcon.textContent = 'SHOW';
-            }
-        };
-
-        // Toggle between email and phone auth
-        window.togglePhoneAuth = function () {
-            const emailForm = document.getElementById('email-form');
-            const phoneForm = document.getElementById('phone-form');
-            if (phoneForm.style.display === 'none') {
-                emailForm.style.display = 'none';
-                phoneForm.style.display = 'block';
-            } else {
-                emailForm.style.display = 'block';
-                phoneForm.style.display = 'none';
-            }
-        };
-
-        // Forgot Password Modal Functions
-        window.showForgotPasswordModal = function () {
-            document.getElementById('forgot-password-modal').style.display = 'flex';
-        };
-
-        window.closeForgotPasswordModal = function (event) {
-            // Close if clicking overlay or cancel button
-            if (!event || event.target.id === 'forgot-password-modal' || event.target.classList.contains('cancel')) {
-                document.getElementById('forgot-password-modal').style.display = 'none';
-                document.getElementById('reset-email').value = '';
-            }
-        };
-
-        window.sendPasswordReset = async function () {
-            const email = document.getElementById('reset-email').value.trim();
-            if (!email) {
-                alert('Please enter your email address');
-                return;
-            }
-
-            try {
-                await sendPasswordResetEmail(auth, email);
-                alert('Password reset email sent! Check your inbox.');
-                closeForgotPasswordModal();
-            } catch (error) {
-                console.error('Password reset error:', error);
-                alert('Error: ' + error.message);
-            }
-        };
     </script>
 
 </body>
 
 </html>
-```
