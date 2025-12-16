@@ -2113,12 +2113,15 @@ def start_background_worker():
                 except Exception as e:
                     print(f"Startup Whale Error ({symbol}): {e}")
         
-        # 2. Fetch Gamma & Heatmap (lightweight on weekends)
-        try: refresh_gamma_logic()
+        # 2. Fetch Gamma & Heatmap (lightweight on weekends) - WITH TIMEOUT
+        try: 
+            with_timeout(refresh_gamma_logic, timeout_seconds=15)
         except: pass
-        try: refresh_heatmap_logic()
+        try: 
+            with_timeout(refresh_heatmap_logic, timeout_seconds=15)
         except: pass
-        try: refresh_news_logic()
+        try: 
+            with_timeout(refresh_news_logic, timeout_seconds=15)
         except: pass
         
 
@@ -2170,7 +2173,7 @@ def start_background_worker():
             
             if should_run_heatmap and (time.time() - last_heatmap_update > heatmap_interval):
                 try: 
-                    refresh_heatmap_logic()
+                    with_timeout(refresh_heatmap_logic, timeout_seconds=15)
                     last_heatmap_update = time.time()
                 except Exception as e: print(f"Worker Error (Heatmap): {e}")
                 time.sleep(0.2)  # Polygon: unlimited API - faster polling
@@ -2185,7 +2188,7 @@ def start_background_worker():
             
             if should_run_news:
                     try: 
-                        refresh_news_logic()
+                        with_timeout(refresh_news_logic, timeout_seconds=15)
                         # Check if we actually got news
                         news_data = CACHE.get("news", {}).get("data", [])
                         if news_data:
@@ -2203,7 +2206,7 @@ def start_background_worker():
             
             if (is_market_open or gamma_needs_hydration) and (time.time() - last_gamma_update > 120):
                 try: 
-                    refresh_gamma_logic()
+                    with_timeout(refresh_gamma_logic, timeout_seconds=15)
                     last_gamma_update = time.time()
                 except Exception as e: print(f"Worker Error (Gamma): {e}")
                 time.sleep(0.2)  # Polygon: unlimited API - faster polling
