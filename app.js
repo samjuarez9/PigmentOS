@@ -383,7 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ];
 
             const isMultiChoice = multiChoicePatterns.some(pattern => pattern.test(market.event)) &&
-                label2.toLowerCase() === 'no';
+                label2 && typeof label2 === 'string' && label2.toLowerCase() === 'no';
 
             // If multi-choice, replace "No" with "Others"
             if (isMultiChoice) {
@@ -1242,6 +1242,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let tradeFirstSeen = new Map();
     // let seenItems = new Set(); // Deprecated
     const MAX_FEED_AGE_MS = 20 * 60 * 1000; // 20 minutes
+    const NEW_BADGE_DURATION = 10 * 60 * 1000; // 10 minutes
 
     // SSE Stream Setup
     function initWhaleStream() {
