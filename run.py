@@ -108,7 +108,7 @@ def preview_page():
 
 # Watchlist for "Whale" Scan
 WATCHLIST = [
-    "NVDA", "TSLA", "AAPL", "MSFT", "AMZN", "META", "GOOGL",
+    "NVDA", "TSLA", "AAPL", "MSFT", "AMZN", "META", "GOOGL", "GOOG",
     "AMD", "AVGO", "ARM", "SMCI", "MU", "INTC",
     "PLTR", "SOFI", "RKLB",
     "SPY", "QQQ", "IWM"
@@ -855,7 +855,7 @@ def create_checkout_session():
         return jsonify({'error': str(e)}), 400
 
 @app.route('/api/subscription-status', methods=['POST'])
-@limiter.limit("10 per minute")
+@limiter.limit("30 per minute")
 def subscription_status():
     """Check if user has active subscription or valid trial - SERVER-SIDE VERIFIED"""
     try:

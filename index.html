@@ -423,69 +423,75 @@
             if (adminEmails.map(e => e.toLowerCase()).includes(userEmailLower)) {
                 console.log('Admin user logged in - bypassing trial check');
                 hideLoadingScreen();
-                document.body.style.visibility = 'visible'; // Show dashboard
+                document.body.style.visibility = 'visible';
                 showVipAnimation();
                 return;
             }
 
-            try {
-                const userDoc = await getDoc(doc(db, "users", user.uid));
+            // OPTIMISTIC ACCESS: Show dashboard IMMEDIATELY, verify in background
+            // This prevents long loading times and incorrect lockouts
+            hideLoadingScreen();
+            document.body.style.visibility = 'visible';
 
-                if (!userDoc.exists()) {
-                    console.log("Creating trial for new user");
-                    await setDoc(doc(db, "users", user.uid), {
-                        email: user.email,
-                        trialStartDate: serverTimestamp(),
-                        subscriptionStatus: "trialing"
-                    });
-                    hideLoadingScreen();
-                    document.body.style.visibility = 'visible'; // Show dashboard!
-                    showTrialBanner(14);
-                    return;
-                }
+            // Background subscription check (non-blocking)
+            setTimeout(async () => {
+                try {
+                    const userDoc = await getDoc(doc(db, "users", user.uid));
 
-                const userData = userDoc.data();
-                const trialStart = userData.trialStartDate?.toDate();
-
-                // Get Firebase ID token for server-side verification
-                const idToken = await user.getIdToken();
-
-                const response = await fetch('/api/subscription-status', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${idToken}`
-                    },
-                    body: JSON.stringify({ email: user.email })  // Send email for local dev fallback
-                });
-
-                const status = await response.json();
-
-                if (!status.has_access) {
-                    logEvent(analytics, 'trial_expired', { user_email_domain: user.email.split('@')[1] });
-                    logEvent(analytics, 'paywall_hit', { source: 'dashboard', reason: 'trial_expired' });
-                    window.location.href = '/upgrade.html';
-                    return;
-                }
-
-                // User has access - show dashboard
-                hideLoadingScreen();
-                document.body.style.visibility = 'visible';
-
-                if (status.status === 'trialing') {
-                    showTrialBanner(status.days_remaining);
-
-                    // Show price notification for returning users
-                    if (status.login_count > 1) {
-                        showPriceNotification();
+                    if (!userDoc.exists()) {
+                        console.log("Creating trial for new user");
+                        await setDoc(doc(db, "users", user.uid), {
+                            email: user.email,
+                            trialStartDate: serverTimestamp(),
+                            subscriptionStatus: "trialing"
+                        });
+                        showTrialBanner(14);
+                        return;
                     }
-                }
 
-            } catch (error) {
-                console.error('Subscription check error:', error);
-                // Fail-closed: redirect to upgrade page on error (prevents free access)
-                window.location.href = '/upgrade.html';
-            }
+                    // Get Firebase ID token for server-side verification
+                    const idToken = await user.getIdToken();
+
+                    // Use AbortController for timeout
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+
+                    const response = await fetch('/api/subscription-status', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${idToken}`
+                        },
+                        body: JSON.stringify({ email: user.email }),
+                        signal: controller.signal
+                    });
+
+                    clearTimeout(timeoutId);
+                    const status = await response.json();
+
+                    // ONLY redirect if we DEFINITIVELY know they're expired
+                    // (has_access is explicitly false, not undefined or error)
+                    if (status.has_access === false && !status.error) {
+                        logEvent(analytics, 'trial_expired', { user_email_domain: user.email.split('@')[1] });
+                        logEvent(analytics, 'paywall_hit', { source: 'dashboard', reason: 'trial_expired' });
+                        window.location.href = '/upgrade.html';
+                        return;
+                    }
+
+                    // Show appropriate UI based on status
+                    if (status.status === 'trialing') {
+                        showTrialBanner(status.days_remaining || 14);
+
+                        if (status.login_count > 1) {
+                            showPriceNotification();
+                        }
+                    }
+
+                } catch (error) {
+                    // Fail OPEN on any error - user keeps access, we'll check again next time
+                    console.warn('Background subscription check failed (user keeps access):', error.name || error.message);
+                }
+            }, 100); // Slight delay to ensure dashboard renders first
         });
 
         function showTrialBanner(days) {

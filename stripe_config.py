@@ -4,10 +4,10 @@ import os
 
 # Stripe Configuration for PigmentOS
 
-# Test API Keys (Switch to live keys in production)
-STRIPE_PUBLISHABLE_KEY = "pk_test_51ScWFaGu1xj4bsEyDAy1Num3pboKugumy71pJDldH7WcT07NOQqw81WhaRgVH93zofCtzDvXHboqTyKW3CpjM7iQ00YwhDB8Sh"
-# Obfuscated key to avoid GitHub secret scanning (It is a test key)
-STRIPE_SECRET_KEY = base64.b64decode("c2tfdGVzdF81MVNjV0ZhR3UxeGo0YnNFeTlJaWNZR0FaQjF1S3poWWdFRWd5MTFya0lnZVcycnlFZjhiQUU4TUdZQ2FjQnZPZUJhN1N2ODlqV043aDNPR3hSOGJyMVFWUjAwUTgwWDdRbGs=").decode()
+# Live API Keys (Production)
+STRIPE_PUBLISHABLE_KEY = "pk_live_51ScWFSGh2zQhHuerwyHWNhJC1WSoHenIky5sYcd8rPmntuLsnmypY6ob6Pj4J9oRXnQ9EhxPmyNGczqKMJFs4MUA00HBHGHhmm"
+# Secret key from environment variable (set in Render)
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 
 # Webhook Secret (Set in Render env vars after configuring Stripe Dashboard)
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
@@ -16,7 +16,7 @@ STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 FIREBASE_CREDENTIALS_B64 = os.environ.get("FIREBASE_CREDENTIALS_B64", "")
 
 # Product Configuration
-STRIPE_PRICE_ID = "price_1ScWX2Gu1xj4bsEyNWsZGq5X"  # $15/month
+STRIPE_PRICE_ID = "price_1SdWyEGh2zQhHuersehF6t0x"  # $15/month (LIVE)
 
 # Trial Configuration
 TRIAL_DAYS = 14
