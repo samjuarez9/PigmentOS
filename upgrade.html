@@ -124,12 +124,11 @@
 
 <body>
     <div class="upgrade-container">
-        <h1>⚡ Trial Expired</h1>
-        <div class="subtitle">Upgrade to continue trading</div>
+        <h1 id="page-title">🚀 Upgrade to Pro</h1>
+        <div class="subtitle" id="page-subtitle">Unlock the full power of PigmentOS</div>
 
-        <div class="trial-message">
-            Your 14-day free trial has ended.<br>
-            Subscribe to PigmentOS Pro to continue accessing real-time market data.
+        <div class="trial-message" id="trial-message">
+            Lock in your rate and get unlimited access to real-time market intelligence.
         </div>
 
         <div class="price">$15</div>
@@ -147,7 +146,7 @@
         <button class="subscribe-btn" onclick="subscribe()">Subscribe Now</button>
 
         <div class="logout-link">
-            <a href="/login.html">← Logout</a>
+            <a href="/index.html">← Back to Dashboard</a>
         </div>
     </div>
 
@@ -171,8 +170,24 @@
         const auth = getAuth(app);
         const analytics = getAnalytics(app);
 
-        // Track page view
-        logEvent(analytics, 'page_view', { page_title: 'Upgrade' });
+        // Check if user came from expired trial (URL contains marker or referrer check)
+        const urlParams = new URLSearchParams(window.location.search);
+        const isExpired = urlParams.get('expired') === 'true';
+
+        // Update page content based on whether trial is expired
+        if (isExpired) {
+            document.getElementById('page-title').innerHTML = '⚡ Trial Expired';
+            document.getElementById('page-subtitle').textContent = 'Upgrade to continue trading';
+            document.getElementById('trial-message').innerHTML =
+                'Your 14-day free trial has ended.<br>Subscribe to PigmentOS Pro to continue accessing real-time market data.';
+            // Hide back to dashboard link for expired users
+            document.querySelector('.logout-link a').textContent = '← Logout';
+            document.querySelector('.logout-link a').href = '/login.html';
+
+            logEvent(analytics, 'page_view', { page_title: 'Upgrade - Expired' });
+        } else {
+            logEvent(analytics, 'page_view', { page_title: 'Upgrade - Early' });
+        }
 
         const stripe = Stripe('pk_live_51ScWFSGh2zQhHuerwyHWNhJC1WSoHenIky5sYcd8rPmntuLsnmypY6ob6Pj4J9oRXnQ9EhxPmyNGczqKMJFs4MUA00HBHGHhmm');
 
