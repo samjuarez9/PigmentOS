@@ -1582,7 +1582,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Cache DOM references for performance (avoid re-querying every render)
     let gammaTooltip = null;
     let gammaTitle = null;
-    let gammaPriceBadge = null;
     let gammaHeader = null;
 
     // Initialize Gamma Wall
@@ -1711,11 +1710,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 gammaHeader.innerHTML = `GAMMA WALL <span class="today-badge-purple">PRE-MKT</span>`;
             }
 
-            // Update Price Badge if available
-            if (!gammaPriceBadge) gammaPriceBadge = document.getElementById('gamma-current-price');
-            if (gammaPriceBadge && data.current_price) {
-                gammaPriceBadge.textContent = `$${data.current_price.toFixed(2)}`;
-            }
             return;
         }
 
@@ -1735,7 +1729,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Cache DOM references on first render
         if (!gammaTitle) gammaTitle = document.querySelector('.gamma-title');
-        if (!gammaPriceBadge) gammaPriceBadge = document.getElementById('gamma-current-price');
         if (!gammaHeader) gammaHeader = document.querySelector('#gamma-wall .widget-header h2');
 
         // Update Header
@@ -1751,11 +1744,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 html += ` <span class="today-badge-dim">TODAY</span>`;
             }
             gammaTitle.innerHTML = html;
-        }
-
-        // Update Current Price Badge
-        if (gammaPriceBadge && data.current_price) {
-            gammaPriceBadge.textContent = `$${data.current_price.toFixed(2)}`;
         }
 
         let totalCallVol = 0;
@@ -1930,6 +1918,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Is this the TRUE Gamma Flip point (where Net GEX crosses zero)?
             const isGammaFlip = strikeData.strike === gammaFlipStrike;
 
+            // Is this the ATM strike (closest to current price)?
+            const isATM = strikeData.strike === closestStrike;
+
             // Is this the Largest Call Wall?
             const isMaxCall = (strikeData.call_vol || 0) === maxCallVol && maxCallVol > 0;
 
@@ -1950,18 +1941,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (putBar) putBar.style.width = `${putWidth}%`;
                 if (callBar) callBar.style.width = `${callWidth}%`;
 
-                // Apply Gamma Flip Style (true flip point where Net GEX crosses zero)
-                if (isGammaFlip) {
-                    row.classList.add('zero-gamma-row');
-                    // Add label if not exists
+                // Apply ATM (Current Price) styling - Blue indicator
+                if (isATM) {
+                    row.classList.add('atm-row');
+                } else {
+                    row.classList.remove('atm-row');
+                }
+
+                // Apply Gamma Flip label (just text, no full row styling)
+                if (isGammaFlip && !isATM) {
+                    // Only add FLIP label, not the blue row styling
                     if (!row.querySelector('.zero-gamma-label')) {
                         const label = document.createElement('div');
                         label.className = 'zero-gamma-label';
                         label.textContent = "FLIP";
                         row.appendChild(label);
                     }
-                } else {
-                    row.classList.remove('zero-gamma-row');
+                } else if (!isGammaFlip) {
                     const label = row.querySelector('.zero-gamma-label');
                     if (label) label.remove();
                 }
@@ -2000,8 +1996,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 row.dataset.strike = strikeData.strike;
                 row.style.height = `${rowHeight}px`; // Apply Dynamic Height
 
-                if (isGammaFlip) {
-                    row.classList.add('zero-gamma-row');
+                // Apply ATM (Current Price) styling - Blue indicator
+                if (isATM) {
+                    row.classList.add('atm-row');
+                }
+
+                // Apply Gamma Flip label (just text, no full row styling)
+                if (isGammaFlip && !isATM) {
                     const label = document.createElement('div');
                     label.className = 'zero-gamma-label';
                     label.textContent = "FLIP";
