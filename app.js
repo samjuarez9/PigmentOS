@@ -1760,9 +1760,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let totalCallVol = 0;
         let totalPutVol = 0;
+        let totalCallGex = 0;
+        let totalPutGex = 0;
         data.strikes.forEach(s => {
             totalCallVol += s.call_vol || 0;
             totalPutVol += s.put_vol || 0;
+            totalCallGex += s.call_gex || 0;
+            totalPutGex += Math.abs(s.put_gex || 0);  // put_gex is stored negative, use absolute
         });
 
         // Helper: Format volume (42000 → "42K")
@@ -1771,16 +1775,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return vol.toString();
         };
 
-        // === DOMINANCE BADGE ===
-        const totalVolumeAll = totalCallVol + totalPutVol;
+        // === DOMINANCE BADGE (Based on Net GEX, not volume) ===
+        // This reflects actual dealer gamma positioning, not just trading activity
+        const totalGex = totalCallGex + totalPutGex;
         let dominanceBadgeHtml = '';
-        if (totalVolumeAll > 0) {
-            const callPct = (totalCallVol / totalVolumeAll) * 100;
-            const putPct = (totalPutVol / totalVolumeAll) * 100;
-            const diff = Math.abs(callPct - putPct);
+        if (totalGex > 0) {
+            const callGexPct = (totalCallGex / totalGex) * 100;
+            const putGexPct = (totalPutGex / totalGex) * 100;
+            const diff = Math.abs(callGexPct - putGexPct);
 
             if (diff >= 10) {
-                if (callPct > putPct) {
+                if (callGexPct > putGexPct) {
                     dominanceBadgeHtml = `<span class="dominance-badge bullish">📈 CALLS +${Math.round(diff)}%</span>`;
                 } else {
                     dominanceBadgeHtml = `<span class="dominance-badge bearish">📉 PUTS +${Math.round(diff)}%</span>`;
