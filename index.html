@@ -468,6 +468,7 @@
 
                     clearTimeout(timeoutId);
                     const status = await response.json();
+                    console.log('Subscription status response:', status);
 
                     // ONLY redirect if we DEFINITIVELY know they're expired
                     // (has_access is explicitly false, not undefined or error)
@@ -490,6 +491,8 @@
                 } catch (error) {
                     // Fail OPEN on any error - user keeps access, we'll check again next time
                     console.warn('Background subscription check failed (user keeps access):', error.name || error.message);
+                    // Show default trial banner as fallback so users know they're in trial
+                    showTrialBanner(14);
                 }
             }, 100); // Slight delay to ensure dashboard renders first
         });

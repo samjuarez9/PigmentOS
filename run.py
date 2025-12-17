@@ -974,37 +974,51 @@ def subscription_status():
                 
             # AUTO-MIGRATION LOGIC
             # If we are here, the user has NO active subscription.
-            # We create a fresh 14-day trial for them.
+            # Return IMMEDIATELY with trialing status, create Stripe subscription in background
             
-            if not customers.data:
-                customer = stripe.Customer.create(
-                    email=user_email,
-                    metadata={'firebase_uid': user_uid}
-                )
-                print(f"Created new customer for migration: {customer.id}")
-            else:
-                customer = customers.data[0]
-                
-            # Create the trial subscription
-            new_sub = stripe.Subscription.create(
-                customer=customer.id,
-                items=[{'price': STRIPE_PRICE_ID}],
-                trial_period_days=TRIAL_DAYS,
-                payment_behavior='default_incomplete',
-                metadata={'firebase_uid': user_uid, 'source': 'auto_migration'}
-            )
-            print(f"Auto-migrated {user_email} to new trial: {new_sub.id}")
+            def create_stripe_subscription_async(email, uid, cust_data):
+                """Background task to create Stripe customer and subscription"""
+                try:
+                    if cust_data:
+                        customer = cust_data
+                    else:
+                        customer = stripe.Customer.create(
+                            email=email,
+                            metadata={'firebase_uid': uid}
+                        )
+                        print(f"Created new customer for migration: {customer.id}")
+                    
+                    # Create the trial subscription
+                    new_sub = stripe.Subscription.create(
+                        customer=customer.id,
+                        items=[{'price': STRIPE_PRICE_ID}],
+                        trial_period_days=TRIAL_DAYS,
+                        payment_behavior='default_incomplete',
+                        metadata={'firebase_uid': uid, 'source': 'auto_migration'}
+                    )
+                    print(f"Auto-migrated {email} to new trial: {new_sub.id}")
+                    
+                    # Update Firestore
+                    if firestore_db:
+                        firestore_db.collection('users').document(uid).set({
+                            'stripeCustomerId': customer.id,
+                            'stripeSubscriptionId': new_sub.id,
+                            'subscriptionStatus': new_sub.status,
+                            'trialStartDate': firestore.SERVER_TIMESTAMP,
+                            'email': email
+                        }, merge=True)
+                except Exception as e:
+                    print(f"Background Stripe migration error: {e}")
             
-            # Update Firestore
-            if firestore_db:
-                firestore_db.collection('users').document(user_uid).set({
-                    'stripeCustomerId': customer.id,
-                    'stripeSubscriptionId': new_sub.id,
-                    'subscriptionStatus': new_sub.status,
-                    'trialStartDate': firestore.SERVER_TIMESTAMP,
-                    'email': user_email
-                }, merge=True)
+            # Start background thread for Stripe operations
+            existing_customer = customers.data[0] if customers.data else None
+            threading.Thread(
+                target=create_stripe_subscription_async,
+                args=(user_email, user_uid, existing_customer),
+                daemon=True
+            ).start()
             
+            # Return immediately - don't wait for Stripe
             return jsonify({
                 'status': 'trialing',
                 'days_remaining': TRIAL_DAYS,
