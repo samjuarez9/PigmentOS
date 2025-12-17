@@ -1826,7 +1826,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         // Data is pre-sorted High → Low by server
 
-        // Find ATM Strike for Blue Highlight
+        // Find ATM Strike (closest to current price) - used for reference only
         let closestStrike = null;
         let minDiff = Infinity;
         data.strikes.forEach(s => {
@@ -1836,6 +1836,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 closestStrike = s.strike;
             }
         });
+
+        // === TRUE GAMMA FLIP DETECTION ===
+        // Find where Net GEX crosses from positive to negative (or vice versa)
+        // This is the volatility inflection point where dealer behavior changes
+        let gammaFlipStrike = null;
+        for (let i = 0; i < data.strikes.length - 1; i++) {
+            const current = data.strikes[i];
+            const next = data.strikes[i + 1];
+            const currentGex = current.net_gex || 0;
+            const nextGex = next.net_gex || 0;
+
+            // Check if GEX sign changes between adjacent strikes
+            if ((currentGex >= 0 && nextGex < 0) || (currentGex < 0 && nextGex >= 0)) {
+                // Pick the strike closer to zero GEX (the actual flip point)
+                gammaFlipStrike = Math.abs(currentGex) < Math.abs(nextGex)
+                    ? current.strike
+                    : next.strike;
+                break; // Only need the first flip point
+            }
+        }
+
+        // Fallback: If no flip found (all positive or all negative), use ATM
+        if (!gammaFlipStrike) {
+            gammaFlipStrike = closestStrike;
+        }
 
         // Store current price for tooltip calculations
         window.lastGammaPrice = data.current_price;
@@ -1856,8 +1881,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const strikeMax = Math.max(s.call_vol || 0, s.put_vol || 0);
             if (strikeMax > currentMaxVol) currentMaxVol = strikeMax;
 
-            // Track max GEX strike (use net GEX = call_gex + put_gex, absolute value)
-            const netGex = Math.abs((s.call_gex || 0) + (s.put_gex || 0));
+            // Track max GEX strike (use pre-calculated net_gex from server)
+            const netGex = Math.abs(s.net_gex || 0);
             if (netGex > maxAbsGex) {
                 maxAbsGex = netGex;
                 maxGexStrike = s.strike;
@@ -1897,8 +1922,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const putWidth = (strikeData.put_vol / maxVol) * 100;
             const callWidth = (strikeData.call_vol / maxVol) * 100;
 
-            // Is this the "Zero Gamma" (ATM) row?
-            const isZeroGamma = strikeData.strike === closestStrike;
+            // Is this the TRUE Gamma Flip point (where Net GEX crosses zero)?
+            const isGammaFlip = strikeData.strike === gammaFlipStrike;
 
             // Is this the Largest Call Wall?
             const isMaxCall = (strikeData.call_vol || 0) === maxCallVol && maxCallVol > 0;
@@ -1920,8 +1945,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (putBar) putBar.style.width = `${putWidth}%`;
                 if (callBar) callBar.style.width = `${callWidth}%`;
 
-                // Apply Blue Style
-                if (isZeroGamma) {
+                // Apply Gamma Flip Style (true flip point where Net GEX crosses zero)
+                if (isGammaFlip) {
                     row.classList.add('zero-gamma-row');
                     // Add label if not exists
                     if (!row.querySelector('.zero-gamma-label')) {
@@ -1970,7 +1995,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 row.dataset.strike = strikeData.strike;
                 row.style.height = `${rowHeight}px`; // Apply Dynamic Height
 
-                if (isZeroGamma) {
+                if (isGammaFlip) {
                     row.classList.add('zero-gamma-row');
                     const label = document.createElement('div');
                     label.className = 'zero-gamma-label';
@@ -2041,7 +2066,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function showTooltip(e, data, type, tooltip) {
         const vol = type === 'CALL' ? data.call_vol : data.put_vol;
         const oi = type === 'CALL' ? data.call_oi : data.put_oi;
-        const gex = type === 'CALL' ? (data.call_gex || 0) : (data.put_gex || 0);
+        const netGex = data.net_gex || 0;  // Use net GEX (industry standard)
         const color = type === 'CALL' ? 'var(--bullish-color)' : 'var(--bearish-color)';
 
         // Use actual premium from Polygon API (or fallback to estimate)
@@ -2049,20 +2074,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const avgPremium = premium > 0 ? premium : (Math.abs(data.strike - (window.lastGammaPrice || data.strike)) * 0.3 + 2);
         const notional = vol * 100 * avgPremium;
 
-        // Format as currency
+        // Format as currency (supports K, M, B)
         const formatMoney = (val) => {
+            if (Math.abs(val) >= 1000000000) return '$' + (val / 1000000000).toFixed(1) + 'B';
             if (Math.abs(val) >= 1000000) return '$' + (val / 1000000).toFixed(1) + 'M';
             if (Math.abs(val) >= 1000) return '$' + (val / 1000).toFixed(0) + 'K';
             return '$' + val.toFixed(0);
         };
 
-        // GEX color: green for positive (bullish support), red for negative (bearish pressure)
-        const gexColor = gex >= 0 ? '#00d97e' : '#ff4757';
-        const gexSign = gex >= 0 ? '+' : '';
-        const gexDisplay = gex !== 0 ? `
+        // Net GEX color: green for positive (bullish support), red for negative (bearish pressure)
+        const gexColor = netGex >= 0 ? '#00d97e' : '#ff4757';
+        const gexSign = netGex >= 0 ? '+' : '';
+        const gexDisplay = netGex !== 0 ? `
             <div class="tooltip-row">
-                <span class="tooltip-label">🧲 GAMMA EXP:</span>
-                <span class="tooltip-value" style="color: ${gexColor}">${gexSign}${formatMoney(gex)}</span>
+                <span class="tooltip-label">🧲 NET GEX:</span>
+                <span class="tooltip-value" style="color: ${gexColor}">${gexSign}${formatMoney(netGex)}</span>
             </div>
         ` : '';
 

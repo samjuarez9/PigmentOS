@@ -4365,6 +4365,8 @@ td {
     /* Promote to composite layer */
     will-change: transform;
     /* Hint to browser */
+    position: relative;
+    /* Required for FLIP label positioning */
 }
 
 .gamma-put-side,
@@ -4957,6 +4959,7 @@ td {
     opacity: 0.7;
     pointer-events: none;
 }
+
 /* Price Notification Modal */
 .price-modal {
     position: fixed;
