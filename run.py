@@ -546,7 +546,7 @@ def refresh_single_whale_polygon(symbol):
         
         # Thresholds (same as yfinance version)
         vol_oi_multiplier = 4 if symbol.upper() in ['SPY', 'QQQ', 'IWM'] else 3
-        min_whale_val = 3_000_000 if symbol.upper() in ['SPY', 'QQQ'] else 500_000
+        min_whale_val = 8_000_000 if symbol.upper() in ['SPY', 'QQQ'] else 500_000
         
         for contract in polygon_data.get("results", []):
             details = contract.get("details", {})

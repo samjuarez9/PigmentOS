@@ -1863,9 +1863,13 @@ document.addEventListener('DOMContentLoaded', () => {
         let maxCallVol = 0;
         let maxPutVol = 0;
 
-        // Find the strike with largest absolute GEX (the "magnet" level)
-        let maxGexStrike = null;
-        let maxAbsGex = 0;
+        // === SEPARATE MAGNET & TRIGGER TRACKING ===
+        // Magnet (🧲): Max POSITIVE GEX - dealers long gamma, price stabilizes/pins here
+        // Trigger (🚀): Max absolute NEGATIVE GEX - dealers short gamma, price accelerates/launches
+        let magnetStrike = null;  // Max positive GEX (stabilizing)
+        let maxPosGex = 0;
+        let triggerStrike = null; // Max absolute negative GEX (volatile)
+        let maxNegGex = 0;
 
         data.strikes.forEach(s => {
             if ((s.call_vol || 0) > maxCallVol) maxCallVol = s.call_vol;
@@ -1874,11 +1878,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const strikeMax = Math.max(s.call_vol || 0, s.put_vol || 0);
             if (strikeMax > currentMaxVol) currentMaxVol = strikeMax;
 
-            // Track max GEX strike (use pre-calculated net_gex from server)
-            const netGex = Math.abs(s.net_gex || 0);
-            if (netGex > maxAbsGex) {
-                maxAbsGex = netGex;
-                maxGexStrike = s.strike;
+            // Track magnet (positive GEX) and trigger (negative GEX) separately
+            const netGex = s.net_gex || 0;
+            if (netGex > 0 && netGex > maxPosGex) {
+                maxPosGex = netGex;
+                magnetStrike = s.strike;
+            } else if (netGex < 0 && Math.abs(netGex) > maxNegGex) {
+                maxNegGex = Math.abs(netGex);
+                triggerStrike = s.strike;
             }
         });
 
@@ -1927,8 +1934,11 @@ document.addEventListener('DOMContentLoaded', () => {
             // Is this the Largest Put Wall?
             const isMaxPut = (strikeData.put_vol || 0) === maxPutVol && maxPutVol > 0;
 
-            // Is this the Max GEX strike (magnet level)?
-            const isMaxGex = strikeData.strike === maxGexStrike && maxAbsGex > 0;
+            // Is this the Magnet strike (max positive GEX - stabilizing)?
+            const isMagnet = strikeData.strike === magnetStrike && maxPosGex > 0;
+
+            // Is this the Trigger strike (max negative GEX - volatile)?
+            const isTrigger = strikeData.strike === triggerStrike && maxNegGex > 0;
 
             if (row) {
                 // Update Height
@@ -1962,19 +1972,36 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (label) label.remove();
                 }
 
-                // Update magnet emoji for max GEX strike
+                // Update Magnet/Trigger emojis for max GEX strikes
                 const strikeLabel = row.querySelector('.gamma-strike');
                 if (strikeLabel) {
                     const magnetPrefix = '🧲 ';
+                    const triggerPrefix = '🚀 ';
                     const currentText = strikeLabel.textContent;
-                    const hassMagnet = currentText.startsWith(magnetPrefix);
+                    const hasMagnet = currentText.startsWith(magnetPrefix);
+                    const hasTrigger = currentText.startsWith(triggerPrefix);
+                    const baseStrike = strikeData.strike.toFixed(1);
 
-                    if (isMaxGex && !hassMagnet) {
-                        strikeLabel.textContent = magnetPrefix + strikeData.strike.toFixed(1);
-                        strikeLabel.classList.add('max-gex-strike');
-                    } else if (!isMaxGex && hassMagnet) {
-                        strikeLabel.textContent = strikeData.strike.toFixed(1);
-                        strikeLabel.classList.remove('max-gex-strike');
+                    // Determine what prefix should be shown (priority: Magnet > Trigger)
+                    let newPrefix = '';
+                    let newClass = '';
+                    if (isMagnet) {
+                        newPrefix = magnetPrefix;
+                        newClass = 'magnet-strike';
+                    } else if (isTrigger) {
+                        newPrefix = triggerPrefix;
+                        newClass = 'trigger-strike';
+                    }
+
+                    // Update if changed
+                    const hasAnyPrefix = hasMagnet || hasTrigger;
+                    if (newPrefix && !currentText.startsWith(newPrefix)) {
+                        strikeLabel.textContent = newPrefix + baseStrike;
+                        strikeLabel.classList.remove('magnet-strike', 'trigger-strike', 'max-gex-strike');
+                        strikeLabel.classList.add(newClass);
+                    } else if (!newPrefix && hasAnyPrefix) {
+                        strikeLabel.textContent = baseStrike;
+                        strikeLabel.classList.remove('magnet-strike', 'trigger-strike', 'max-gex-strike');
                     }
                 }
 
@@ -2016,9 +2043,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const putVolLabel = putWidth >= 5 ? `<span class="gamma-vol-label put-label">${formatVol(strikeData.put_vol)}</span>` : '';
                 const callVolLabel = callWidth >= 5 ? `<span class="gamma-vol-label call-label">${formatVol(strikeData.call_vol)}</span>` : '';
 
-                // Add magnet emoji if this is max GEX strike
-                const strikeDisplay = isMaxGex ? `🧲 ${strikeData.strike.toFixed(1)}` : strikeData.strike.toFixed(1);
-                const strikeClass = isMaxGex ? 'gamma-strike max-gex-strike' : 'gamma-strike';
+                // Add Magnet (🧲) or Trigger (🚀) emoji based on GEX polarity
+                let strikeDisplay = strikeData.strike.toFixed(1);
+                let strikeClass = 'gamma-strike';
+                if (isMagnet) {
+                    strikeDisplay = `🧲 ${strikeData.strike.toFixed(1)}`;
+                    strikeClass = 'gamma-strike magnet-strike';
+                } else if (isTrigger) {
+                    strikeDisplay = `🚀 ${strikeData.strike.toFixed(1)}`;
+                    strikeClass = 'gamma-strike trigger-strike';
+                }
 
                 row.innerHTML = `
                     <div class="gamma-put-side">

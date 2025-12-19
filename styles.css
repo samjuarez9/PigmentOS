@@ -1869,7 +1869,36 @@ td {
     /* animation: humPulse 3s infinite ease-in-out; REMOVED */
 }
 
-/* Max GEX Strike (Magnet Level) */
+/* Magnet Strike (Max Positive GEX - Stabilizing/Pinning) */
+.magnet-strike {
+    color: #FFD700 !important;
+    /* Gold */
+    font-weight: bold;
+    text-shadow: 0 0 6px rgba(255, 215, 0, 0.6);
+}
+
+/* Trigger Strike (Max Negative GEX - Volatile/Accelerating) */
+.trigger-strike {
+    color: #FF6B35 !important;
+    /* Orange-Red */
+    font-weight: bold;
+    text-shadow: 0 0 8px rgba(255, 107, 53, 0.7);
+    animation: trigger-pulse 2s ease-in-out infinite;
+}
+
+@keyframes trigger-pulse {
+
+    0%,
+    100% {
+        text-shadow: 0 0 8px rgba(255, 107, 53, 0.5);
+    }
+
+    50% {
+        text-shadow: 0 0 14px rgba(255, 107, 53, 0.9), 0 0 20px rgba(255, 60, 0, 0.4);
+    }
+}
+
+/* Legacy class (for backwards compatibility) */
 .max-gex-strike {
     color: #FFD700 !important;
     font-weight: bold;
