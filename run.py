@@ -1989,13 +1989,25 @@ def refresh_gamma_logic(symbol="SPY"):
                 raise ValueError("Failed to parse Polygon response")
             
             # Polygon API already filters strikes to ±10% of ATM
-            # Just apply minimal volume filter to remove dead strikes
-            MIN_VOLUME = 200  # Show only strikes with significant activity
+            # Apply industry-standard filters to remove noise
+            MIN_VOLUME = 100  # Minimum combined volume for visibility
+            # Dynamic OI threshold based on ticker liquidity
+            # Indices = higher bar (extremely liquid), single stocks = lower bar
+            INDEX_ETFS = ['SPY', 'QQQ', 'IWM', 'DIA']
+            MIN_OI = 1000 if symbol.upper() in INDEX_ETFS else 500
             
             final_data = []
             for strike, data in gamma_data.items():
-                # Skip strikes with zero total volume
+                # Calculate totals
                 total_vol = data["call_vol"] + data["put_vol"]
+                total_oi = data["call_oi"] + data["put_oi"]
+                
+                # Skip strikes with low OI (no meaningful gamma impact)
+                # This is the key filter - MMs only hedge significant OI
+                if total_oi < MIN_OI:
+                    continue
+                    
+                # Also skip if no volume today (stale/inactive)
                 if total_vol < MIN_VOLUME:
                     continue
                 final_data.append({
@@ -2019,7 +2031,8 @@ def refresh_gamma_logic(symbol="SPY"):
                 "expiry": "Weekly",
                 "strikes": final_data,
                 "time_period": time_period,  # For smart badge display
-                "source": "polygon.io"
+                "source": "polygon.io",
+                "_expiry_date": polygon_data.get("_expiry_date")  # Pass through for TOMORROW badge
             }
             
             cache_key = f"gamma_{symbol}"

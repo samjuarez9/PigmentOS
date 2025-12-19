@@ -2208,22 +2208,44 @@ document.addEventListener('DOMContentLoaded', () => {
         const colTag = document.createElement('div');
         colTag.className = 'col-tag';
 
-        // Hedge Logic: Deep ITM Index Puts are likely hedges (Cheddar Flow standard)
+        // === HIGH-PRECISION HEDGE DETECTION ===
+        // Goal: Only tag institutional hedges with conviction/size, not routine index puts.
+        // Criteria: Index PUT with EITHER deep ITM (|delta| >= 0.55) OR significant premium.
+        // Rationale: Actual hedges are either deep ITM (portfolio protection) or large notional.
+
+        // Tunable floors (USD) - stricter for high-volume tickers
+        const INDEX_HEDGE_PREMIUM_FLOOR_DEFAULT = 750000;   // $750K for IWM, DIA, VIX
+        const INDEX_HEDGE_PREMIUM_FLOOR_MAJOR = 1000000;    // $1M for SPY, QQQ (higher avg premiums)
+
         const isIndex = ['SPY', 'QQQ', 'IWM', 'DIA', 'VIX'].includes(flow.ticker);
-        const hasHighDelta = flow.delta !== undefined && Math.abs(flow.delta) > 0.40;
-        const isHedge = isIndex && !isCall && hasHighDelta; // Index Put + Deep ITM
+        const isPut = !isCall;
+        const deltaAbs = flow.delta !== undefined ? Math.abs(flow.delta) : null;
+        const notional = flow.notional_value || 0;  // Already in USD from backend
+
+        // Determine premium floor based on ticker
+        const hedgePremiumFloor = ['SPY', 'QQQ'].includes(flow.ticker)
+            ? INDEX_HEDGE_PREMIUM_FLOOR_MAJOR
+            : INDEX_HEDGE_PREMIUM_FLOOR_DEFAULT;
+
+        // FRESH candidate check - new speculative positions shouldn't be labeled HEDGE
+        const isFreshCandidate = flow.vol_oi !== undefined && flow.vol_oi > 2.5;
+
+        // HEDGE if: Index PUT with (deep ITM OR large premium) AND not a fresh opening position
+        const hasDeepDelta = deltaAbs !== null && deltaAbs >= 0.55;
+        const hasSignificantPremium = notional >= hedgePremiumFloor;
+        const isHedge = isIndex && isPut && (hasDeepDelta || hasSignificantPremium) && !isFreshCandidate;
 
         // Priority 1: MEGA
         if (flow.is_mega_whale) {
             colTag.textContent = 'MEGA';
             colTag.classList.add('tag-mega');
         }
-        // Priority 2: HEDGE (Deep ITM Index Puts only)
+        // Priority 2: HEDGE (High-conviction institutional hedges only)
         else if (isHedge) {
             colTag.textContent = 'HEDGE';
             colTag.classList.add('tag-hedge');
         }
-        // Priority 3: FRESH (Vol/OI > 2.5 = Barchart-inspired threshold)
+        // Priority 3: FRESH (Vol/OI > 2.5 = new positioning, Barchart-inspired threshold)
         else if (flow.vol_oi > 2.5) {
             colTag.textContent = 'FRESH';
             colTag.classList.add('tag-fresh');
