@@ -2135,21 +2135,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // Use explicit scroll calculation for reliable centering (scrollIntoView unreliable in nested containers)
         setTimeout(() => {
             const currentRow = gammaChartBars.querySelector('.atm-row');
-            console.log('[Gamma] ATM row found:', currentRow ? 'YES' : 'NO', currentRow);
             if (currentRow && gammaChartBars) {
                 // Calculate scroll position to center the ATM row
                 const containerHeight = gammaChartBars.clientHeight;
                 const rowTop = currentRow.offsetTop;
                 const rowHeight = currentRow.offsetHeight;
+
+                // Center calculation: rowTop - (half container) + (half row)
                 const scrollTarget = rowTop - (containerHeight / 2) + (rowHeight / 2);
 
                 gammaChartBars.scrollTo({
                     top: Math.max(0, scrollTarget),
                     behavior: 'smooth'
                 });
-                console.log('[Gamma] Scrolled to ATM row at position:', scrollTarget.toFixed(0));
+                console.log(`[Gamma] Centered ATM row at strike ${currentRow.dataset.strike} (pos: ${scrollTarget.toFixed(0)})`);
             }
-        }, 300);
+        }, 100); // Reduced delay for snappier feel
     }
 
     function showTooltip(e, data, type, tooltip) {

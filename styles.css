@@ -2215,21 +2215,23 @@ td {
     }
 }
 
-/* Scrollbar */
+/* Scrollbar - HIDDEN */
 ::-webkit-scrollbar {
-    width: 4px;
+    width: 0px;
+    height: 0px;
+    display: none;
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--bg-color);
+    background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--accent-cyan);
+    background: transparent;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--accent-pink);
+    background: transparent;
 }
 
 /* Expiration Date in Whale Feed */
@@ -2301,14 +2303,30 @@ td {
     /* animation: humPulse 3s infinite ease-in-out; REMOVED */
 }
 
-/* ATM Row (Current Price Strike) - Subtle Cyan Blue indicator */
+/* ATM Row (Current Price Strike) - Enhanced Cyan Blue indicator */
 .atm-row {
-    background: rgba(0, 180, 220, 0.12) !important;
-    border-left: 3px solid rgba(0, 180, 220, 0.6) !important;
-    border-right: 3px solid rgba(0, 180, 220, 0.6) !important;
-    box-shadow: inset 0 0 8px rgba(0, 180, 220, 0.15);
-    /* No animation - static for better readability */
+    background: rgba(0, 255, 255, 0.15) !important;
+    border-left: 4px solid var(--electric-cyan) !important;
+    border-right: 4px solid var(--electric-cyan) !important;
+    box-shadow: inset 0 0 15px rgba(0, 255, 255, 0.2);
+    animation: atm-pulse 2s infinite ease-in-out;
+    z-index: 10;
 }
+
+@keyframes atm-pulse {
+
+    0%,
+    100% {
+        background: rgba(0, 255, 255, 0.15) !important;
+        box-shadow: inset 0 0 15px rgba(0, 255, 255, 0.2);
+    }
+
+    50% {
+        background: rgba(0, 255, 255, 0.25) !important;
+        box-shadow: inset 0 0 25px rgba(0, 255, 255, 0.4);
+    }
+}
+
 
 @keyframes atm-glow {
 
@@ -2323,13 +2341,27 @@ td {
 }
 
 .atm-row .gamma-strike {
-    color: #00B4DC;
+    color: var(--electric-cyan);
     font-weight: bold;
-    text-shadow: 0 0 4px rgba(0, 180, 220, 0.5);
-    border: 1px solid rgba(0, 180, 220, 0.5);
-    border-radius: 4px;
-    background: rgba(0, 180, 220, 0.1);
+    text-shadow: 0 0 5px var(--electric-cyan);
+    border: none;
+    background: transparent;
+    position: relative;
 }
+
+.atm-row .gamma-strike::after {
+    content: "CURRENT";
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 7px;
+    color: var(--electric-cyan);
+    letter-spacing: 1.5px;
+    white-space: nowrap;
+    opacity: 0.8;
+}
+
 
 /* === UNUSUAL GAMMA WALL - Red All-Around Border (PizzINT Style) === */
 /* Only applied to the SINGLE most unusual wall */
@@ -3680,8 +3712,8 @@ td {
 /* Fixed X Button below Diagnostics */
 .x-fixed-btn {
     position: fixed;
-    top: 50px;
-    /* Below the 20px top + ~25px height of diag bar */
+    top: 35px;
+    /* Below the 5px top + ~25px height of diag bar */
     left: 20px;
     background: rgba(157, 78, 221, 0.2);
     /* Purple tint */
@@ -3744,7 +3776,7 @@ td {
 /* Fixed Discord Button next to X */
 .discord-fixed-btn {
     position: fixed;
-    top: 50px;
+    top: 35px;
     left: 100px;
     /* Offset to sit next to X button */
     background: rgba(255, 165, 0, 0.2);
@@ -4217,13 +4249,14 @@ td {
 
 .status-message {
     position: absolute;
-    bottom: 20px;
+    bottom: 10px;
     left: 0;
     right: 0;
     z-index: 1;
     text-align: center;
     padding: 0 20px;
 }
+
 
 /* === WEEKEND MODE: PIXEL WHALE SLEEPING ANIMATION === */
 .whale-weekend-container {
@@ -4619,10 +4652,9 @@ td {
 /* === SYSTEM DIAGNOSTICS - CONCEPT 2: INLINE BAR === */
 .diag-inline {
     position: fixed;
-    top: 20px;
+    top: 5px;
     left: 20px;
     background: rgba(0, 0, 0, 0.8);
-    border-left: 2px solid #00FF41;
     padding: 4px 8px;
     display: flex;
     align-items: center;
@@ -4940,8 +4972,10 @@ td {
     /* Force scrollbar to prevent jitter */
     gap: 2px;
     padding-right: 5px;
-    padding-top: 10px;
+    padding-top: 20px;
     padding-bottom: 10px;
+    position: relative;
+    /* Required for accurate offsetTop calculations */
 }
 
 /* Scrollbar for chart */
@@ -5395,7 +5429,7 @@ td {
 /* Sign Out Button - Fixed below X/Discord */
 .sign-out-btn {
     position: fixed;
-    top: 80px;
+    top: 65px;
     left: 20px;
     background: rgba(255, 51, 51, 0.2);
     border: 1px solid #FF3333;
@@ -5609,8 +5643,8 @@ td {
 /* Support Text below Sign Out */
 .support-text {
     position: fixed;
-    top: 110px;
-    /* Below Sign Out button (80px + ~25px height + gap) */
+    top: 95px;
+    /* Below Sign Out button (65px + ~25px height + gap) */
     left: 20px;
     font-family: 'VT323', monospace;
     font-size: 10px;
@@ -5828,7 +5862,7 @@ td {
 
 .status-message {
     position: absolute;
-    bottom: 40px;
+    bottom: 10px;
     left: 0;
     right: 0;
     z-index: 1;
