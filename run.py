@@ -27,7 +27,7 @@ load_dotenv()  # Load .env file for POLYGON_API_KEY and other secrets
 
 import ssl
 import calendar
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import pytz
 from flask import Flask, jsonify, Response, request, send_from_directory, stream_with_context
 from flask_cors import CORS
@@ -150,8 +150,8 @@ def api_status():
 
 # === CONFIGURATION ===
 WHALE_WATCHLIST = [
-    'NVDA', 'TSLA', 'SPY', 'QQQ', 'AAPL', 'AMD', 'MSFT', 'AMZN', 
-    'META', 'PLTR', 'MU', 'NBIS'
+    'NVDA', 'TSLA', 'AAPL', 'AMD', 'MSFT', 'AMZN', 
+    'META', 'GOOG', 'GOOGL', 'PLTR', 'MU', 'NBIS'
 ]
 
 # MarketData.app API Token (for enhanced options data)
@@ -309,18 +309,26 @@ def fetch_options_chain_polygon(symbol, strike_limit=40):
         daily_expiry_tickers = ['SPY', 'QQQ', 'IWM', 'DIA']
         has_daily = symbol.upper() in daily_expiry_tickers
         
-        # Custom Logic: Switch to next expiry at 9:00 PM ET (21:00)
-        # This allows users to see closing data until late evening.
-        switch_hour = 21 
+        # Custom Logic: Switch to next expiry at 5:00 PM ET (17:00)
+        # This allows users to see next day's levels after market close
+        switch_hour = 17 
         current_hour = now_et.hour
         
+        # Track if we're showing next trading day data
+        is_next_trading_day = False
+        date_label = "TODAY"
+        
         if is_weekend:
+            is_next_trading_day = True
             if has_daily:
                 # Weekend + daily ticker: use next Monday (Polygon has Monday options ready)
                 days_until_monday = (7 - today_weekday) % 7
                 if days_until_monday == 0:
                     days_until_monday = 1
                 expiry_date = (now_et + timedelta(days=days_until_monday)).strftime("%Y-%m-%d")
+                # Format: "MON DEC 23"
+                next_day = now_et + timedelta(days=days_until_monday)
+                date_label = next_day.strftime("%a %b %d").upper()
                 print(f"Polygon: Weekend - using Monday {expiry_date} for {symbol}")
             else:
                 # Weekend + non-daily ticker: use next Friday
@@ -328,28 +336,42 @@ def fetch_options_chain_polygon(symbol, strike_limit=40):
                 if days_until_friday == 0:
                     days_until_friday = 7
                 expiry_date = (now_et + timedelta(days=days_until_friday)).strftime("%Y-%m-%d")
+                next_day = now_et + timedelta(days=days_until_friday)
+                date_label = next_day.strftime("%a %b %d").upper()
                 print(f"Polygon: Weekend - using Friday {expiry_date} for {symbol}")
         elif has_daily:
             # For daily tickers (SPY, QQQ, etc.)
-            # Keep showing TODAY's expiry until 9:00 PM
+            # Keep showing TODAY's expiry until 5:00 PM
             if current_hour < switch_hour:
                 expiry_date = now_et.strftime("%Y-%m-%d")
-                print(f"Polygon: Pre-9PM - using today {expiry_date} for {symbol}")
+                date_label = "TODAY"
+                print(f"Polygon: Pre-5PM - using today {expiry_date} for {symbol}")
             else:
-                # After 9 PM, switch to tomorrow (or Monday if Friday)
+                # After 5 PM, switch to next trading day
+                is_next_trading_day = True
                 if today_weekday == 4:  # Friday -> Monday
                     days_ahead = 3
+                elif today_weekday == 5:  # Saturday -> Monday
+                    days_ahead = 2
+                elif today_weekday == 6:  # Sunday -> Monday
+                    days_ahead = 1
                 else:
                     days_ahead = 1
-                expiry_date = (now_et + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
-                print(f"Polygon: Post-9PM - using next expiry {expiry_date} for {symbol}")
+                next_day = now_et + timedelta(days=days_ahead)
+                expiry_date = next_day.strftime("%Y-%m-%d")
+                date_label = next_day.strftime("%a %b %d").upper()
+                print(f"Polygon: Post-5PM - using next expiry {expiry_date} for {symbol}")
         else:
             # Non-daily tickers: always use next Friday
             days_until_friday = (4 - today_weekday) % 7
-            # If it's Friday and after 9 PM, switch to NEXT Friday
+            # If it's Friday and after 5 PM, switch to NEXT Friday
             if days_until_friday == 0 and current_hour >= switch_hour:
                 days_until_friday = 7
+                is_next_trading_day = True
             expiry_date = (now_et + timedelta(days=days_until_friday)).strftime("%Y-%m-%d")
+            if is_next_trading_day:
+                next_day = now_et + timedelta(days=days_until_friday)
+                date_label = next_day.strftime("%a %b %d").upper()
             print(f"Polygon: Using Friday {expiry_date} for {symbol}")
         
         # Polygon options chain snapshot endpoint
@@ -374,6 +396,8 @@ def fetch_options_chain_polygon(symbol, strike_limit=40):
                 print(f"Polygon: Fetched {len(data['results'])} contracts for {symbol} (exp: {expiry_date})")
                 data["_current_price"] = current_price
                 data["_expiry_date"] = expiry_date  # Include expiry in response
+                data["_is_next_trading_day"] = is_next_trading_day  # Flag for UI
+                data["_date_label"] = date_label  # Formatted label for UI
                 return data
             else:
                 print(f"Polygon: No data for {symbol} exp:{expiry_date}")
@@ -544,9 +568,15 @@ def refresh_single_whale_polygon(symbol):
         
         current_price = polygon_data.get("_current_price", 0)
         
-        # Thresholds (same as yfinance version)
+        # Thresholds - tiered by ticker liquidity
         vol_oi_multiplier = 4 if symbol.upper() in ['SPY', 'QQQ', 'IWM'] else 3
-        min_whale_val = 8_000_000 if symbol.upper() in ['SPY', 'QQQ'] else 500_000
+        # SPY/QQQ = $8M (index ETFs), TSLA = $4M (mega cap single stock), others = $500k
+        if symbol.upper() in ['SPY', 'QQQ']:
+            min_whale_val = 8_000_000
+        elif symbol.upper() == 'TSLA':
+            min_whale_val = 4_000_000
+        else:
+            min_whale_val = 500_000
         
         for contract in polygon_data.get("results", []):
             details = contract.get("details", {})
@@ -575,7 +605,7 @@ def refresh_single_whale_polygon(symbol):
             # 1. Vol/OI > 1.05 = Fresh positioning exceeds existing open interest
             # 2. Premium > $100,000 = Institutional-size trade (not retail)
             # 3. Volume > 500 = Block-level contract count
-            # 4. DTE <= 7 = Short-term conviction (industry standard for flow detection)
+            # 4. DTE <= 14 = Short-term conviction (weeklies + next monthly)
             
             is_unusual = vol_oi_ratio > 1.05
             is_significant_premium = notional >= min_whale_val  # Use ticker-specific threshold
@@ -585,7 +615,7 @@ def refresh_single_whale_polygon(symbol):
             try:
                 exp_date = datetime.strptime(expiry, "%Y-%m-%d").date()
                 dte = (exp_date - now_et.date()).days
-                is_short_term = 0 <= dte <= 7
+                is_short_term = 0 <= dte <= 14
             except:
                 is_short_term = False
             
@@ -1501,22 +1531,45 @@ def api_polymarket():
                 markets = event.get('markets', [])
                 if not markets: continue
                 
-                # For multi-outcome events (e.g., Fed decisions with 4+ options),
-                # pick the sub-market with the HIGHEST "Yes" probability.
-                # This shows the most likely outcome instead of a random low-probability one.
+                # For multi-outcome events (e.g., 'Next CEO', 'Republican Nominee'),
+                # pick the sub-market with the HIGHEST ABSOLUTE 24h CHANGE.
+                # This shows where the action is, not just the boring favorite.
+                # Tie-breaker: If delta is equal (or all 0), fall back to highest probability.
                 if len(markets) > 1:
-                    best_market = None
-                    best_yes_prob = 0
-                    for mkt in markets:
-                        try:
-                            prices = json.loads(mkt['outcomePrices']) if isinstance(mkt['outcomePrices'], str) else mkt['outcomePrices']
-                            yes_prob = float(prices[0]) if prices else 0
-                            if yes_prob > best_yes_prob:
-                                best_yes_prob = yes_prob
-                                best_market = mkt
-                        except:
-                            continue
-                    m = best_market if best_market else markets[0]
+                    def get_lead_outcome(outcomes):
+                        """
+                        Select the sub-market with highest |24h_change|.
+                        Tie-breaker: highest probability.
+                        """
+                        if not outcomes:
+                            return None
+                        
+                        scored = []
+                        for mkt in outcomes:
+                            try:
+                                # Get 24h change (delta)
+                                delta = abs(float(mkt.get('oneDayPriceChange', 0) or 0))
+                                
+                                # Get probability for tie-breaker
+                                prices = json.loads(mkt['outcomePrices']) if isinstance(mkt['outcomePrices'], str) else mkt['outcomePrices']
+                                prob = float(prices[0]) if prices else 0
+                                
+                                scored.append({
+                                    'market': mkt,
+                                    'abs_delta': delta,
+                                    'prob': prob
+                                })
+                            except:
+                                continue
+                        
+                        if not scored:
+                            return outcomes[0]
+                        
+                        # Sort by |delta| DESC, then probability DESC as tie-breaker
+                        scored.sort(key=lambda x: (x['abs_delta'], x['prob']), reverse=True)
+                        return scored[0]['market']
+                    
+                    m = get_lead_outcome(markets) or markets[0]
                 else:
                     m = markets[0] 
                 
@@ -1751,22 +1804,19 @@ def api_movers():
     try:
         movers = []
         
-        # Wrap yf.Tickers to prevent hanging
+        # Use yfinance for movers (Polygon rate limits at 50+ tickers)
         def fetch_movers_tickers():
             return yf.Tickers(" ".join(MOVERS_TICKERS))
         
         tickers_obj = with_timeout(fetch_movers_tickers, timeout_seconds=10)
         if not tickers_obj:
             print("⏰ Movers tickers fetch timed out")
-            return
+            return jsonify({"error": "timeout"})
         
         def fetch_ticker_data(symbol):
             try:
-                # Add small jitter to prevent thundering herd on API
-                time.sleep(random.uniform(0.01, 0.1)) 
-                
+                time.sleep(random.uniform(0.01, 0.05))  # Small jitter
                 t = tickers_obj.tickers[symbol]
-                # Use fast_info for speed
                 last = t.fast_info.last_price
                 prev = t.fast_info.previous_close
                 if last and prev:
@@ -1779,19 +1829,23 @@ def api_movers():
             except:
                 return None
             return None
-
-        # Parallelize fetching but keep it safe (4 workers is conservative but faster than 1)
+        
+        # Parallel fetch
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             results = list(executor.map(fetch_ticker_data, MOVERS_TICKERS))
-            
+        
         movers = [r for r in results if r is not None]
-            
         movers.sort(key=lambda x: x['change'], reverse=True)
+        
         CACHE["movers"]["data"] = movers
         CACHE["movers"]["timestamp"] = current_time
+        print(f"📊 Movers: Fetched {len(movers)} tickers via yfinance")
         return jsonify(movers)
+        
     except Exception as e:
+        print(f"Movers Error: {e}")
         return jsonify({"error": str(e)})
+
 
 @app.route('/api/news')
 def api_news():
@@ -1994,7 +2048,7 @@ def refresh_gamma_logic(symbol="SPY"):
             # Dynamic OI threshold based on ticker liquidity
             # Indices = higher bar (extremely liquid), single stocks = lower bar
             INDEX_ETFS = ['SPY', 'QQQ', 'IWM', 'DIA']
-            MIN_OI = 1000 if symbol.upper() in INDEX_ETFS else 500
+            MIN_OI = 500  # Same threshold for all tickers (indices and single stocks)
             
             final_data = []
             for strike, data in gamma_data.items():
@@ -2032,7 +2086,9 @@ def refresh_gamma_logic(symbol="SPY"):
                 "strikes": final_data,
                 "time_period": time_period,  # For smart badge display
                 "source": "polygon.io",
-                "_expiry_date": polygon_data.get("_expiry_date")  # Pass through for TOMORROW badge
+                "_expiry_date": polygon_data.get("_expiry_date"),  # Pass through for TOMORROW badge
+                "_is_next_trading_day": polygon_data.get("_is_next_trading_day", False),
+                "_date_label": polygon_data.get("_date_label", "TODAY")
             }
             
             cache_key = f"gamma_{symbol}"

@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const dotEl = document.querySelector('.status-dot');
 
                     if (latencyEl) {
-                        latencyEl.textContent = `${latency} ms`;
+                        latencyEl.textContent = `${latency}ms`;
 
                         // Sample latency (track every ~10th check to avoid spam)
                         if (Math.random() < 0.1) {
@@ -51,6 +51,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (latency < 100) latencyEl.style.color = 'var(--primary-color)';
                         else if (latency < 300) latencyEl.style.color = 'var(--warning-color)';
                         else latencyEl.style.color = '#ff3333';
+                    }
+
+                    // Update WiFi signal bars based on latency
+                    const wifiSignal = document.getElementById('wifi-bars');
+                    if (wifiSignal) {
+                        wifiSignal.classList.remove('weak', 'fair', 'good', 'excellent', 'disconnected');
+                        if (latency < 100) wifiSignal.classList.add('excellent');
+                        else if (latency < 200) wifiSignal.classList.add('good');
+                        else if (latency < 400) wifiSignal.classList.add('fair');
+                        else wifiSignal.classList.add('weak');
                     }
 
                     if (dotEl) {
@@ -646,44 +656,52 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!priceTicker) return;
 
         // Filter data
-        const gainers = moversData.filter(m => m.type === 'gain').sort((a, b) => b.change - a.change); // Sort highest to lowest
-        const losers = moversData.filter(m => m.type === 'loss').sort((a, b) => a.change - b.change); // Sort lowest to highest (most negative first)
+        const gainers = moversData.filter(m => m.type === 'gain').sort((a, b) => b.change - a.change);
+        const losers = moversData.filter(m => m.type === 'loss').sort((a, b) => a.change - b.change);
 
-        // Select set to display - LIMIT TO 5 ITEMS MAX
-        const currentSet = (showGainers ? gainers : losers).slice(0, 5);
-        const label = showGainers ? 'TOP GAINERS' : 'TOP LOSERS';
-        const labelClass = showGainers ? 'mover-gain' : 'mover-loss';
+        // Select set to display - LIMIT TO 6 ITEMS MAX for compact view
+        const currentSet = (showGainers ? gainers : losers).slice(0, 6);
+        const label = showGainers ? 'HOT' : 'COLD';
+        const labelClass = showGainers ? 'mover-hot' : 'mover-cold';
 
-        // Build HTML
-        const itemsHtml = currentSet.map(m => {
-            const colorClass = m.type === 'gain' ? 'mover-gain' : 'mover-loss';
-            const arrow = m.type === 'gain' ? '▲' : '▼';
-            const changeStr = m.change > 0 ? `+ ${m.change}% ` : `${m.change}% `;
-            return `<span class="mover-item ${colorClass}">
-            <span class="mover-symbol">${m.symbol}</span>
-            <span class="mover-separator">//</span>
-            <span class="mover-change">${arrow} ${changeStr}</span>
-        </span>`;
-        }).join(' ');
+        // Build HTML with cascading delays and "tease" on last item
+        const itemsHtml = currentSet.map((m, index) => {
+            const colorClass = m.type === 'gain' ? 'mover-hot' : 'mover-cold';
+            const changeStr = m.change > 0 ? `+${m.change}%` : `${m.change}%`;
 
-        const contentHtml = `
-    <div class="ticker-content ticker-fade-in">
-        <span class="mover-label ${labelClass}">[ ${label} ]</span>
-            ${itemsHtml}
-        </div>
-    `;
+            // THE TEASE LOGIC: Last item waits 1200ms, others cascade 100ms apart
+            const isLastItem = index === currentSet.length - 1;
+            const delay = isLastItem ? 1200 : (index + 1) * 100;
 
-        // Fade Out -> Update -> Fade In
-        const oldContent = priceTicker.querySelector('.ticker-content');
-        if (oldContent) {
-            oldContent.classList.remove('ticker-fade-in');
-            oldContent.classList.add('ticker-fade-out');
+            return `<span class="mover-item reel-item" style="animation-delay: ${delay}ms">
+                <span class="mover-symbol">${m.symbol}</span>
+                <span class="mover-change ${colorClass}">${changeStr}</span>
+            </span>`;
+        }).join('');
+
+        // Build with viewport and track for arcade reel animation
+        // Label is INSIDE the track so it animates together with tickers
+        const newTrackHtml = `
+            <div class="ticker-viewport">
+                <div class="ticker-track reel-in">
+                    <span class="mover-label ${labelClass}">${label}</span>
+                    <div class="mover-items">${itemsHtml}</div>
+                </div>
+            </div>
+        `;
+
+        // Arcade Reel Animation: Out -> In
+        const existingTrack = priceTicker.querySelector('.ticker-track');
+        if (existingTrack) {
+            // Animate out (fast drop)
+            existingTrack.classList.remove('reel-in');
+            existingTrack.classList.add('reel-out');
 
             setTimeout(() => {
-                priceTicker.innerHTML = contentHtml;
-            }, 500); // Wait for fade out (0.5s)
+                priceTicker.innerHTML = newTrackHtml;
+            }, 250); // Match reelOut duration (fast)
         } else {
-            priceTicker.innerHTML = contentHtml;
+            priceTicker.innerHTML = newTrackHtml;
         }
 
         // Toggle for next update
@@ -727,8 +745,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update data every 60s
         setInterval(fetchMoversData, 60000);
 
-        // Switch slides every 15s
-        setInterval(updateMoversTape, 15000);
+        // Switch slides every 20s (increased for reading time)
+        setInterval(updateMoversTape, 20000);
     }
 
     // FRED API & TFI Logic
@@ -1022,12 +1040,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById(elementId);
         if (container) {
             const textSpan = container.querySelector('.status-text');
+            const dotSpan = container.querySelector('.status-dot');
+
             if (isLive) {
                 container.classList.add('status-live');
                 if (textSpan) textSpan.textContent = "LIVE";
+                if (dotSpan) dotSpan.style.display = ""; // Reset to CSS default (inline-block via class)
             } else {
                 container.classList.remove('status-live');
                 if (textSpan) textSpan.textContent = "OFFLINE";
+                if (dotSpan) dotSpan.style.display = "none"; // Explicitly hide
             }
         }
     }
@@ -1371,10 +1393,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Get market state early
         const marketState = getMarketState();
 
-        // Show Radar ONLY in Pre-Market (not when data is empty during market hours)
-        // CRITICAL FIX: Don't wipe existing trades if we have them!
+        // === PRE-MARKET / AFTER HOURS / WEEKEND MODE: Show radar scanning animation ===
         const existingTrades = document.querySelectorAll('.whale-row');
-        if (marketState.isPreMarket && existingTrades.length === 0) {
+        if ((marketState.isPreMarket || marketState.isAfterHours || marketState.isWeekend) && existingTrades.length === 0) {
             // Clear all tracking caches for fresh start at market open
             seenTrades.clear();
             tradeFirstSeen.clear();
@@ -1382,6 +1403,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const flowFeedContainer = document.getElementById('flow-feed-container');
             if (flowFeedContainer) {
+                let statusText = "STATUS: PRE-MARKET. Monitoring for block orders...";
+                if (marketState.isWeekend) statusText = "STATUS: WEEKEND. Monitoring for block orders...";
+                else if (marketState.isAfterHours) statusText = "STATUS: AFTER HOURS. Monitoring for block orders...";
+
                 flowFeedContainer.innerHTML = `
                     <div class="whale-pre-market-container">
                         <div class="radar-container">
@@ -1392,7 +1417,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <div class="status-message">
                             <span style="color: #888; font-size: 11px; font-family: var(--font-mono);">
-                                STATUS: PRE-MARKET. Monitoring for block orders...
+                                ${statusText}
                             </span>
                         </div>
                     </div>
@@ -1787,17 +1812,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (gammaHeader) {
             let html = `GAMMA WALL`;
 
-            // Check if we are showing a future expiry (e.g. after 9 PM switch)
-            let isFutureExpiry = false;
-            if (data._expiry_date) {
-                const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
-                if (data._expiry_date !== todayStr) {
-                    isFutureExpiry = true;
-                }
-            }
+            // Check if we are showing next trading day data (after 5 PM switch)
+            const isNextTradingDay = data._is_next_trading_day || false;
+            const dateLabel = data._date_label || "TODAY";
 
-            if (isFutureExpiry) {
-                html += ` <span class="today-badge-orange">TOMORROW</span>`;
+            if (isNextTradingDay) {
+                // Show the specific date (e.g., "FRI DEC 20")
+                html += ` <span class="today-badge-orange">${dateLabel}</span>`;
             } else if (data.time_period === 'weekend') {
                 html += ` <span class="monday-badge">MON</span>`;
             } else if (data.time_period === 'after_hours') {
@@ -1817,6 +1838,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const strike = parseFloat(row.dataset.strike);
             if (!isNaN(strike)) existingRows.set(strike, row);
         });
+
+        // Filter strikes to ±10% of current price (ensures ATM is always visible)
+        const spot = data.current_price;
+        const range = 0.10; // 10%
+        const filteredStrikes = data.strikes.filter(s =>
+            s.strike >= spot * (1 - range) &&
+            s.strike <= spot * (1 + range)
+        );
+
+        console.log('[Gamma] Spot:', spot.toFixed(2), '| Filter range:', (spot * 0.90).toFixed(0), '-', (spot * 1.10).toFixed(0));
+        console.log('[Gamma] Total strikes:', data.strikes.length, '| After filter:', filteredStrikes.length);
+        if (filteredStrikes.length > 0) {
+            const strikes = filteredStrikes.map(s => s.strike).sort((a, b) => b - a);
+            console.log('[Gamma] Filtered strikes:', strikes[0], '(high) to', strikes[strikes.length - 1], '(low)');
+        }
+
         // Data is pre-sorted High → Low by server
 
         // Find ATM Strike (closest to current price) - used for reference only
@@ -1829,6 +1866,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 closestStrike = s.strike;
             }
         });
+        console.log('[Gamma] Current price:', data.current_price, '| ATM strike:', closestStrike, '| Diff:', minDiff.toFixed(2));
 
         // === TRUE GAMMA FLIP DETECTION ===
         // Find where Net GEX crosses from positive to negative (or vice versa)
@@ -1901,6 +1939,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.lastGammaTicker !== data.symbol) {
             window.gammaGlobalMax = currentMaxVol;
             window.lastGammaTicker = data.symbol;
+            // Reset scroll flag so we scroll to ATM on ticker change
+            if (gammaChartBars) gammaChartBars.dataset.scrolled = "";
         }
         // Reset on new trading day (handles users who don't refresh overnight)
         const today = new Date().toDateString();
@@ -1915,9 +1955,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Target container height ~500px. 
         // If few strikes, make rows taller (max 30px). If many, keep compact (min 14px).
         const containerHeight = 500;
-        const rowHeight = Math.min(30, Math.max(14, Math.floor(containerHeight / data.strikes.length)));
+        const rowHeight = Math.min(30, Math.max(14, Math.floor(containerHeight / filteredStrikes.length)));
 
-        data.strikes.forEach(strikeData => {
+        filteredStrikes.forEach(strikeData => {
             let row = existingRows.get(strikeData.strike);
             const putWidth = (strikeData.put_vol / maxVol) * 100;
             const callWidth = (strikeData.call_vol / maxVol) * 100;
@@ -2091,16 +2131,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
         existingRows.forEach((row) => row.remove());
 
-        // Auto-scroll on first load
-        if (!gammaChartBars.dataset.scrolled) {
-            setTimeout(() => {
-                const currentRow = document.querySelector('.zero-gamma-row');
-                if (currentRow) {
-                    currentRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    gammaChartBars.dataset.scrolled = "true";
-                }
-            }, 500);
-        }
+        // Always scroll to center the ATM (current price) row
+        // Use explicit scroll calculation for reliable centering (scrollIntoView unreliable in nested containers)
+        setTimeout(() => {
+            const currentRow = gammaChartBars.querySelector('.atm-row');
+            console.log('[Gamma] ATM row found:', currentRow ? 'YES' : 'NO', currentRow);
+            if (currentRow && gammaChartBars) {
+                // Calculate scroll position to center the ATM row
+                const containerHeight = gammaChartBars.clientHeight;
+                const rowTop = currentRow.offsetTop;
+                const rowHeight = currentRow.offsetHeight;
+                const scrollTarget = rowTop - (containerHeight / 2) + (rowHeight / 2);
+
+                gammaChartBars.scrollTo({
+                    top: Math.max(0, scrollTarget),
+                    behavior: 'smooth'
+                });
+                console.log('[Gamma] Scrolled to ATM row at position:', scrollTarget.toFixed(0));
+            }
+        }, 300);
     }
 
     function showTooltip(e, data, type, tooltip) {
@@ -2279,8 +2328,10 @@ document.addEventListener('DOMContentLoaded', () => {
             colTag.textContent = 'HEDGE';
             colTag.classList.add('tag-hedge');
         }
-        // Priority 3: FRESH (Vol/OI > 2.5 = new positioning, Barchart-inspired threshold)
-        else if (flow.vol_oi > 2.5) {
+        // Priority 3: FRESH (Vol/OI > 2.5 = new positioning)
+        // V2: Added liquidity filter to reduce noise from low-volume strikes
+        // Requires Vol/OI > 2.5 AND (500+ contracts traded OR $20k+ premium)
+        else if (flow.vol_oi > 2.5 && (flow.volume > 500 || flow.notional_value > 20000)) {
             colTag.textContent = 'FRESH';
             colTag.classList.add('tag-fresh');
         }
@@ -2344,6 +2395,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Start SSE Stream
     initWhaleStream();
+
+    // === IMMEDIATE MARKET STATE CHECK ON PAGE LOAD ===
+    // Render weekend/pre-market animation immediately (SSE can take 60s on weekends)
 
     // Periodic cleanup: Remove NEW badges after 10 minutes
     setInterval(() => {

@@ -7,7 +7,7 @@
     <title>PIGMENT OS</title>
     <meta name="description" content="Real-time Financial Intelligence Dashboard">
     <link rel="icon" type="image/png" href="assets/favicon.png">
-    <link rel="stylesheet" href="styles.css?v=3.15">
+    <link rel="stylesheet" href="styles.css?v=3.20">
     <link href="https://fonts.googleapis.com/css2?family=VT323&family=JetBrains+Mono:wght@400;700&display=swap"
         rel="stylesheet">
 
@@ -195,25 +195,17 @@
             <!-- Center Column -->
             <div class="column center-col">
                 <div class="news-feed-container" id="news-feed-container">
-                    <div class="news-header">
-                        <span
-                            style="color: #FFFFFF; font-weight: 600; font-family: 'VT323', monospace; font-size: 18px; letter-spacing: 1px;">INTEL
-                            FEED 📡</span>
-                        <div class="header-controls" style="display: flex; align-items: center; gap: 15px;">
-                            <!-- Auto-Scroll Button -->
-                            <div id="auto-scroll-indicator" class="auto-scroll-btn style-success">
-                                <span id="auto-scroll-text">AUTO-SCROLL</span>
-                                <div class="scroll-icon">
-                                    <div class="bar"></div>
-                                    <div class="bar"></div>
-                                </div>
-                            </div>
+                    <div class="news-header intel-bar">
+                        <!-- 1. Title -->
+                        <div class="intel-title">INTEL</div>
 
-                            <div class="status-container" id="status-news">
-                                <span class="status-dot">●</span>
-                                <span class="status-text">LIVE</span>
-                            </div>
+                        <!-- 2. HOT/COLD Ticker -->
+                        <div class="header-movers-ticker" id="price-ticker">
+                            <!-- Populated by JS -->
                         </div>
+
+                        <!-- 3. Controls -->
+                        <div id="auto-scroll-indicator" class="scroll-control">[SCROLL]</div>
                     </div>
                     <div id="news-items-list">
                         <div id="news-track">
@@ -317,27 +309,17 @@
             </div>
         </main>
 
-        <!-- Bottom Ticker Widget -->
-        <div class="widget ticker-widget">
-            <div class="widget-content" id="price-ticker">
-                <div class="ticker-content">
-                    <!-- Populated by JS -->
-                </div>
-            </div>
-        </div>
+        <!-- Bottom Ticker Widget - Moved to Intel Feed Header -->
     </div>
 
-    <!-- System Diagnostics - Concept 2: Inline Bar -->
+    <!-- System Diagnostics - Minimal WiFi + Latency -->
     <div id="connection-monitor" class="diag-inline">
-        <div class="inline-status" id="system-status-text">OPTIMAL</div>
-        <div class="inline-divider"></div>
-        <div class="inline-services">
-            <span id="status-poly"><span class="dot green"></span> POLY</span>
-            <span id="status-yfin"><span class="dot green"></span> YFIN</span>
-            <span id="status-rss"><span class="dot green"></span> RSS</span>
-            <span id="status-gamma"><span class="dot green"></span> GAMMA</span>
+        <div class="wifi-signal" id="wifi-bars">
+            <div class="wifi-bar" data-bar="1"></div>
+            <div class="wifi-bar" data-bar="2"></div>
+            <div class="wifi-bar" data-bar="3"></div>
+            <div class="wifi-bar" data-bar="4"></div>
         </div>
-        <div class="inline-divider"></div>
         <div class="inline-metric" id="latency-value">--ms</div>
     </div>
 
@@ -366,7 +348,7 @@
     <!-- Support Text -->
     <div class="support-text">Questions? DM us on X</div>
 
-    <script src="app.js?v=3.17"></script>
+    <script src="app.js?v=3.20"></script>
 
     <!-- Trial Tracking & Auth -->
     <script type="module">
