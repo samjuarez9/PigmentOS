@@ -1447,16 +1447,40 @@ def api_polymarket():
             # --- NEW LOGIC START ---
             import math # Import locally to avoid changing top of file
             
-            KEYWORDS = {
-                "GEOPOL": ['war', 'invasion', 'strike', 'china', 'russia', 'israel', 'iran', 'taiwan', 'ukraine', 'gaza', 'border', 'military', 'ceasefire', 'capture', 'regime', 'clash', 'peace', 'khamenei', 'hezbollah', 'venezuela'],
-                "MACRO": ['fed', 'rate', 'inflation', 'cpi', 'jobs', 'recession', 'gdp', 'fomc', 'powell', 'gold', 'reserve', 'ipo'],
-                "CRYPTO": ['bitcoin', 'crypto', 'btc', 'eth', 'nft'],
-                "TECH": ['apple', 'nvidia', 'microsoft', 'google', 'meta', 'tesla', 'amazon', 'ai', 'tech', 'openai', 'gemini'],
-                "CULTURE": ['tweet', 'youtube', 'subscriber', 'mrbeast', 'logan paul', 'ksi', 'spotify', 'taylor swift', 'beyonce', 'film', 'movie', 'box office'],
-                "SCIENCE": ['space', 'nasa', 'spacex', 'mars', 'moon', 'cancer', 'climate', 'temperature', 'fda', 'medicine']
+            CATEGORY_KEYWORDS = {
+                "GEOPOL": [
+                    "war", "invasion", "strike", "china", "russia", "israel", "iran", 
+                    "taiwan", "ukraine", "gaza", "military", "ceasefire", "regime", 
+                    "syria", "korea", "venezuela", "heutih"
+                ],
+                "MACRO": [
+                    "fed", "rate", "inflation", "cpi", "recession", "powell", "gold", 
+                    "treasury", "trump", "cabinet", "nominate", "tariff"
+                ],
+                "TECH": [
+                    "nvidia", "apple", "microsoft", "google", "tesla", "openai", "gemini", 
+                    "grok", "deepseek", "claude", "spacex", "starship", "robotaxi"
+                ],
+                "CULTURE": [
+                    "spotify", "youtube", "mrbeast", "swift", "beyonce", "grammy"
+                ]
             }
 
-            BLACKLIST = ['nfl', 'nba', 'super bowl', 'sport', 'football', 'basketball', 'soccer', 'tennis', 'golf', 'searched', 'election', 'solana', 'microstrategy', 'mstr', 'zootopia', 'wicked', 'movie', 'film', 'box office', 'cinema', 'counterstrike', 'counter-strike', 'cs2', 'satoshi', 'in december']
+            BLACKLIST_WORDS = [
+                # Structural (Enforce Yes/No UI)
+                "who will", "which company", "what will", "price on", "how many", 
+                "highest", "lowest", "above/below",
+                
+                # Sports/Entertainment Noise
+                "nfl", "nba", "super bowl", "sport", "football", "basketball", 
+                "soccer", "tennis", "golf", "box office", "cinema", "rotten tomatoes",
+                
+                # Crypto/Asset Noise
+                "solana", "memecoin", "pepe", "doge", 
+                
+                # General
+                "searched", "daily", "weekly"
+            ]
             
             candidates = []
             seen_stems = {}
@@ -1494,7 +1518,7 @@ def api_polymarket():
                     continue
 
                 # 1. Blacklist Check
-                if any(bad in title_lower for bad in BLACKLIST): continue
+                if any(bad in title_lower for bad in BLACKLIST_WORDS): continue
                 
                 # 2. Filter out markets with specific times of day (e.g., "11AM ET", "7PM ET")
                 # This regex matches patterns like: 11AM, 11:30AM, 7PM, 3:45PM (with optional ET/EST/PST)
@@ -1504,7 +1528,7 @@ def api_polymarket():
                 
                 # 3. Determine Category
                 category = "OTHER"
-                for cat, keys in KEYWORDS.items():
+                for cat, keys in CATEGORY_KEYWORDS.items():
                     if any(re.search(r'\b' + re.escape(k) + r'\b', title_lower) for k in keys):
                         category = cat
                         break
@@ -1777,22 +1801,16 @@ def api_movers():
         "NVDA", "TSLA", "AAPL", "MSFT", "AMZN", "META", "GOOGL",
         
         # Semiconductors & AI
-        "AMD", "INTC", "AVGO", "MU", "QCOM", "ARM", "SMCI",
+        "AMD", "INTC", "AVGO", "MU", "ARM", "SMCI",
         
         # FinTwit Meme Stocks & High Volume
-        "PLTR", "COIN", "MSTR", "GME", "AMC", "SOFI", "HOOD", "BBBY",
+        "PLTR",
         
         # Growth Tech & SaaS
-        "SNOW", "DDOG", "NET", "CRWD", "ZS", "SHOP", "ROKU", "UPST",
-        
-        # FinTech & Payments (Removed SQ due to API errors)
-        "PYPL", "AFRM",
+        "CRWD", "SHOP", "ROKU", "UPST",
         
         # Consumer & Entertainment
         "NFLX", "DIS", "UBER", "DASH", "ABNB", "PTON", "NKE", "SBUX",
-        
-        # EV & Space (High Vol)
-        "RIVN", "LCID", "NIO", "RKLB",
         
         # Big Movers / Volatility
         "BA", "SNAP", "PINS", "SPOT",

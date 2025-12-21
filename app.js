@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             new TradingView.widget({
                 "autosize": true,
-                "symbol": "NASDAQ:" + ticker,
+                "symbol": ticker,
                 "interval": "15",
                 "timezone": "Etc/UTC",
                 "theme": "dark",
@@ -242,28 +242,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // News Feed Logic moved to consolidated function below
 
-    // Watchlist Tickers for Dropdown (Expanded w/ FinTwit Favorites)
     const WATCHLIST_TICKERS = [
-        // Mag 7 & Tech Giants
-        'NVDA', 'TSLA', 'AAPL', 'MSFT', 'META', 'GOOGL', 'AMZN',
-
         // Indices & ETFs
-        'QQQ', 'SPY', 'DIA', 'IWM', 'VIX', 'ARKK', 'TQQQ', 'SQQQ',
+        'SPY', 'QQQ', 'IWM',
 
         // Semiconductors & AI Hardware
-        'AMD', 'INTC', 'MU', 'QCOM', 'AVGO', 'TSM', 'ARM', 'SMCI',
+        'AMD', 'INTC', 'MU', 'AVGO', 'TSM', 'ARM', 'SMCI',
 
         // AI & Cloud
-        'PLTR', 'SNOW', 'CRM', 'ORCL', 'DDOG', 'NET', 'ZS', 'CRWD',
+        'PLTR', 'ORCL', 'CRWD',
 
         // FinTwit Memes & High Volume
-        'GME', 'AMC', 'BBBY', 'SOFI', 'HOOD', 'COIN', 'MSTR',
-
-        // EVs & Future Mobility
-        'RIVN', 'LCID', 'NIO', 'RKLB', 'F', 'GM',
-
-        // FinTech & Payments
-        'SQ', 'PYPL', 'V', 'MA', 'AFRM',
+        'GME', 'AMC',
 
         // Entertainment & Consumer
         'NFLX', 'DIS', 'SPOT', 'UBER', 'ABNB', 'NKE', 'SBUX', 'LULU',
@@ -1799,12 +1789,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (diff >= 10) {
                 if (callGexPct > putGexPct) {
-                    dominanceBadgeHtml = `<span class="dominance-badge bullish">📈 CALLS +${Math.round(diff)}%</span>`;
+                    dominanceBadgeHtml = `<span class="dominance-badge bullish">CALLS +${Math.round(diff)}%</span>`;
                 } else {
-                    dominanceBadgeHtml = `<span class="dominance-badge bearish">📉 PUTS +${Math.round(diff)}%</span>`;
+                    dominanceBadgeHtml = `<span class="dominance-badge bearish">PUTS +${Math.round(diff)}%</span>`;
                 }
             } else {
-                dominanceBadgeHtml = `<span class="dominance-badge neutral">⚖️ BALANCED</span>`;
+                dominanceBadgeHtml = `<span class="dominance-badge neutral">BALANCED</span>`;
             }
         }
 
