@@ -574,7 +574,7 @@ def refresh_single_whale_polygon(symbol):
         if symbol.upper() in ['SPY', 'QQQ']:
             min_whale_val = 8_000_000
         elif symbol.upper() == 'TSLA':
-            min_whale_val = 4_000_000
+            min_whale_val = 6_000_000
         else:
             min_whale_val = 500_000
         
@@ -615,7 +615,7 @@ def refresh_single_whale_polygon(symbol):
             try:
                 exp_date = datetime.strptime(expiry, "%Y-%m-%d").date()
                 dte = (exp_date - now_et.date()).days
-                is_short_term = 0 <= dte <= 14
+                is_short_term = 0 <= dte <= 15
             except:
                 is_short_term = False
             
@@ -670,7 +670,8 @@ def refresh_single_whale_polygon(symbol):
                 "premium": format_money(notional),
                 "notional_value": notional,
                 "moneyness": moneyness,
-                "is_mega_whale": notional > MEGA_WHALE_THRESHOLD,
+                # MEGA threshold: $12M for TSLA, $5M for all others
+                "is_mega_whale": notional > (12_000_000 if symbol.upper() == 'TSLA' else 5_000_000),
                 "delta": round(delta_val, 2),
                 "iv": round(iv_val, 2),
                 "source": "polygon"
@@ -1407,7 +1408,7 @@ def api_polymarket():
     try:
         # FETCH OPTIMIZATION:
         # 1. limit=200: Fetch more to allow for filtering
-        # 2. order=volume24hr: Prioritize what's actually trading
+        # 2. order=volume24hr: Prioritize what's actually trading (12h-1d window)
         # 3. active=true & closed=false: Strict liveness check
         url = "https://gamma-api.polymarket.com/events?limit=200&active=true&closed=false&order=volume24hr&ascending=false"
         

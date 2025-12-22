@@ -243,6 +243,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // News Feed Logic moved to consolidated function below
 
     const WATCHLIST_TICKERS = [
+        // Magnificent 7
+        'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA',
+
         // Indices & ETFs
         'SPY', 'QQQ', 'IWM',
 
@@ -2214,11 +2217,14 @@ document.addEventListener('DOMContentLoaded', () => {
             row.classList.add('new-row');
         }
 
-        // Add MEGA pulse animation for:
-        // 1. >$40M elite trades
-        // 2. High delta trades (>0.80 = deep ITM, likely institutional)
+        // Add MEGA pulse animation for Elite Trades:
+        // 1. Premium Thresholds: $40M for TSLA, $10M for all others
+        // 2. High Delta trades (>0.80 = deep ITM, likely institutional)
         const isDeepITM = flow.delta !== undefined && Math.abs(flow.delta) > 0.80;
-        if ((flow.notional_value && flow.notional_value >= 40000000) || isDeepITM) {
+        const eliteThreshold = flow.ticker === 'TSLA' ? 40000000 : 10000000;
+        const isElitePremium = flow.notional_value && flow.notional_value >= eliteThreshold;
+
+        if (isElitePremium || isDeepITM) {
             row.classList.add('mega-row');
         }
 
@@ -2319,12 +2325,17 @@ document.addEventListener('DOMContentLoaded', () => {
             colTag.textContent = 'HEDGE';
             colTag.classList.add('tag-hedge');
         }
-        // Priority 3: FRESH (Vol/OI > 2.5 = new positioning)
+        // Priority 3: LOTTO (Delta < 0.20 = High-risk speculative "lottery ticket")
+        else if (deltaAbs !== null && deltaAbs < 0.20) {
+            colTag.textContent = 'LOTTO 🎰';
+            colTag.classList.add('tag-lotto');
+        }
+        // Priority 4: SWEEP (Vol/OI > 2.5 = new positioning)
         // V2: Added liquidity filter to reduce noise from low-volume strikes
         // Requires Vol/OI > 2.5 AND (500+ contracts traded OR $20k+ premium)
         else if (flow.vol_oi > 2.5 && (flow.volume > 500 || flow.notional_value > 20000)) {
-            colTag.textContent = 'FRESH';
-            colTag.classList.add('tag-fresh');
+            colTag.textContent = 'SWEEP';
+            colTag.classList.add('tag-sweep');
         }
         // Priority 4: Standard Direction
         else if (isCall) {
@@ -2428,11 +2439,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const track = document.getElementById('news-track');
         if (!track) return;
 
-        // Filter for Last 24 Hours (86400 seconds)
+        // Filter for Last 12 Hours (43200 seconds)
         const now = new Date().getTime() / 1000;
-        const last24Hours = now - 86400;
+        const last12Hours = now - 43200;
 
-        const validNews = newsItems.filter(item => item.time >= last24Hours);
+        const validNews = newsItems.filter(item => item.time >= last12Hours);
 
 
         if (validNews.length === 0) {

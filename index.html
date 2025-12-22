@@ -142,7 +142,6 @@
                         <h2 id="whale-widget-title">UNUSUAL WHALES 🐳</h2>
                         <button id="market-status-btn" class="market-status-btn after-market">AFTER MARKET</button>
                         <div class="status-container" id="status-whales">
-                            <span class="status-dot">●</span>
                             <span class="status-text">LIVE</span>
                         </div>
                         <div class="decoration-line"></div>
@@ -241,7 +240,6 @@
                     <div class="widget-header">
                         <h2>🔮 POLYMARKET ODDS</h2>
                         <div class="status-container" id="status-polymarket">
-                            <span class="status-dot">●</span>
                             <span class="status-text">OFFLINE</span>
                         </div>
                         <div class="decoration-line"></div>
@@ -392,6 +390,15 @@
         }
 
         onAuthStateChanged(auth, async (user) => {
+            // DEV MODE BYPASS
+            const isDevMode = localStorage.getItem('devMode') === 'true';
+            if (isDevMode && !user) {
+                console.log('🔧 DEV MODE: Bypassing auth check');
+                hideLoadingScreen();
+                document.body.style.visibility = 'visible';
+                return;
+            }
+
             if (!user) {
                 window.location.href = '/login.html';
                 return;
