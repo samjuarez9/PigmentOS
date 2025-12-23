@@ -295,6 +295,33 @@ document.addEventListener('DOMContentLoaded', () => {
         element.innerHTML = '';
     }
 
+    // === TFI DAMAGE ANIMATION STATE (must be before updateTFI call) ===
+    let previousTFIScore = null;
+
+    function spawnDamageNumber(delta, container) {
+        const ghost = document.createElement('div');
+        ghost.className = 'tfi-damage-number';
+        ghost.textContent = `-${delta}`;
+
+        // Color based on severity
+        if (delta >= 10) {
+            ghost.style.color = '#FF0000'; // Bright red for big drops
+        } else if (delta >= 5) {
+            ghost.style.color = '#FF6600'; // Orange for medium drops
+        } else {
+            ghost.style.color = '#FFCC00'; // Yellow for small drops
+        }
+
+        container.appendChild(ghost);
+
+        // Shake the container
+        container.classList.add('shake');
+        setTimeout(() => container.classList.remove('shake'), 200);
+
+        // Remove ghost after animation
+        setTimeout(() => ghost.remove(), 900);
+    }
+
     // Initialize TFI
     updateTFI(50, 'Neutral', null); // Default neutral
 
@@ -654,8 +681,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Select set to display - LIMIT TO 6 ITEMS MAX for compact view
         const currentSet = (showGainers ? gainers : losers).slice(0, 6);
-        const label = showGainers ? 'HOT' : 'COLD';
+        const label = showGainers ? '🔥 HOT' : '❄️ COLD';
         const labelClass = showGainers ? 'mover-hot' : 'mover-cold';
+        console.log(`[DEBUG] Movers Tape Update - Label: ${label}, Class: ${labelClass}`);
 
         // Build HTML with cascading delays and "tease" on last item
         const itemsHtml = currentSet.map((m, index) => {
@@ -942,20 +970,28 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // === DAMAGE ANIMATION ON SCORE DROP ===
+        const roundedValue = Math.round(value);
+        if (previousTFIScore !== null && roundedValue < previousTFIScore) {
+            const delta = previousTFIScore - roundedValue;
+            spawnDamageNumber(delta, tfiContainer);
+        }
+        previousTFIScore = roundedValue;
+
         // Update score and rating
         const tfiScore = document.getElementById('tfi-score');
         const tfiRating = document.getElementById('tfi-rating');
         const tfiVixRef = document.getElementById('tfi-vix-ref');
 
         if (tfiScore && tfiRating) {
-            tfiScore.textContent = Math.round(value);
+            tfiScore.textContent = roundedValue;
             tfiRating.textContent = rating.toUpperCase();
             tfiRating.style.color = ""; // Reset color
         }
 
-        // Update source reference (was VIX, now shows Crypto F&G)
+        // Update source reference
         if (tfiVixRef && source) {
-            tfiVixRef.textContent = `₿ ${source}`;
+            tfiVixRef.textContent = source;
         }
 
         // Clear previous classes

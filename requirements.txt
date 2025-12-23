@@ -13,3 +13,4 @@ gevent
 stripe
 firebase-admin
 python-dotenv
+fear-and-greed

@@ -1742,47 +1742,44 @@ def api_polymarket():
 
     return jsonify({"data": CACHE["polymarket"]["data"], "is_mock": CACHE["polymarket"]["is_mock"]})
 
-# VIX endpoint removed - not used (TFI uses Alternative.me Crypto F&G instead)
+# VIX endpoint removed - not used (TFI uses CNN+VIX composite instead)
 
 @app.route('/api/cnn-fear-greed')
 def api_fear_greed():
-    """Fetch Crypto Fear & Greed Index from Alternative.me"""
+    """
+    Fetch Trader Fear Index (TFI) - 50/50 weighted composite:
+    1. CNN Anchor (50%): CNN Fear & Greed Index via fear-and-greed library
+    2. VIX Pulse (50%): Intraday VIX on linear scale (12→100, 17→50, 22→0)
+    """
     global CACHE
     current_time = time.time()
     
-    # Cache for 5 minutes (API updates once daily, so this is plenty)
-    if current_time - CACHE["cnn_fear_greed"]["timestamp"] < 300:
+    # Cache for 15 minutes
+    if current_time - CACHE["cnn_fear_greed"]["timestamp"] < 900:
         return jsonify(CACHE["cnn_fear_greed"]["data"])
         
     try:
-        # Fetch from Alternative.me Crypto Fear & Greed Index
-        url = "https://api.alternative.me/fng/"
-        resp = requests.get(url, timeout=10)
-        resp.raise_for_status()
+        # Import the composite module
+        from fetch_composite_tfi import get_composite_score
         
-        api_data = resp.json()
-        fng_data = api_data.get("data", [{}])[0]
+        result = get_composite_score()
         
-        value = int(fng_data.get("value", 50))
-        classification = fng_data.get("value_classification", "Neutral")
-        
-        # Map to our rating format
-        if value >= 75: rating = "Extreme Greed"
-        elif value >= 55: rating = "Greed"
-        elif value >= 45: rating = "Neutral"
-        elif value >= 25: rating = "Fear"
-        else: rating = "Extreme Fear"
-        
+        # Map to expected frontend format
         data = {
-            "value": value, 
-            "rating": rating, 
-            "source": "Crypto F&G",
-            "classification": classification
+            "value": result["score"],
+            "rating": result["rating"],
+            "source": f"CNN:{result['cnn_anchor']:.0f} VIX:{result['vix_value']:.1f}",
+            "cnn_anchor": result["cnn_anchor"],
+            "vix_score": result["vix_score"],
+            "vix_value": result["vix_value"],
+            "mode": result["mode"]
         }
+        
         CACHE["cnn_fear_greed"] = {"data": data, "timestamp": current_time}
         return jsonify(data)
+        
     except Exception as e:
-        print(f"Crypto Fear/Greed Error: {e}")
+        print(f"TFI Composite Error: {e}")
         # Return cached data if available, else fallback
         if CACHE["cnn_fear_greed"]["data"]:
             return jsonify(CACHE["cnn_fear_greed"]["data"])

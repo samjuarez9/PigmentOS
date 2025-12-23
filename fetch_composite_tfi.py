@@ -1,108 +1,172 @@
-import yfinance as yf
-import pandas as pd
-import sys
-import json
+"""
+Trader Fear Index (TFI) - Composite Score Calculator
 
-def calculate_rsi(data, window=14):
-    delta = data.diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
-    rs = gain / loss
-    return 100 - (100 / (1 + rs))
+50/50 weighted composite of:
+1. CNN Anchor (50%): CNN Fear & Greed Index, cached at 9:30 AM EST as daily anchor
+2. VIX Pulse (50%): Intraday VIX on linear scale (12→100, 17→50, 22→0)
+
+Output: JSON with final_score, rating, cnn_anchor, vix_score, vix_value, mode
+"""
+
+import json
+import sys
+from datetime import datetime, time as dt_time
+import pytz
+import yfinance as yf
+import fear_and_greed
+
+# === GLOBAL CACHE ===
+# CNN Anchor: Fetched once at 9:30 AM EST, cached for the trading day
+_cnn_anchor_cache = {
+    "value": None,
+    "date": None  # Date string (YYYY-MM-DD) when anchor was set
+}
+
+
+def get_current_et_time():
+    """Get current time in Eastern Time."""
+    et = pytz.timezone("America/New_York")
+    return datetime.now(et)
+
+
+def should_refresh_cnn_anchor():
+    """
+    Determine if we need to fetch a new CNN anchor.
+    Refresh if:
+    1. No cached value exists
+    2. It's a new trading day (after 9:30 AM ET)
+    """
+    if _cnn_anchor_cache["value"] is None:
+        return True
+    
+    now_et = get_current_et_time()
+    today_str = now_et.strftime("%Y-%m-%d")
+    
+    # If cache is from a different day, refresh
+    if _cnn_anchor_cache["date"] != today_str:
+        return True
+    
+    return False
+
+
+def get_cnn_anchor():
+    """
+    Fetch CNN Fear & Greed Index as daily anchor.
+    Cached at 9:30 AM EST, reused for the entire trading day.
+    """
+    global _cnn_anchor_cache
+    
+    if should_refresh_cnn_anchor():
+        try:
+            result = fear_and_greed.get()
+            cnn_value = result.value
+            
+            now_et = get_current_et_time()
+            _cnn_anchor_cache = {
+                "value": cnn_value,
+                "date": now_et.strftime("%Y-%m-%d")
+            }
+            
+            return cnn_value
+        except Exception as e:
+            # If fetch fails and we have a cached value, use it
+            if _cnn_anchor_cache["value"] is not None:
+                return _cnn_anchor_cache["value"]
+            # Otherwise return neutral
+            return 50.0
+    
+    return _cnn_anchor_cache["value"]
+
+
+def get_vix_pulse():
+    """
+    Fetch intraday VIX and convert to score.
+    Linear scale:
+    - VIX 12 = 100 (Extreme Greed)
+    - VIX 17 = 50 (Neutral)
+    - VIX 22+ = 0 (Extreme Fear)
+    
+    Formula: vix_score = max(0, min(100, 100 - ((vix_val - 12) * 10)))
+    """
+    try:
+        vix = yf.Ticker("^VIX")
+        try:
+            vix_val = vix.fast_info['last_price']
+        except:
+            vix_val = vix.history(period="1d")['Close'].iloc[-1]
+        
+        # Apply linear scale
+        vix_score = 100 - ((vix_val - 12) * 10)
+        vix_score = max(0, min(100, vix_score))
+        
+        return vix_val, vix_score
+    except Exception as e:
+        # Fallback to neutral if VIX fetch fails
+        return 17.0, 50.0
+
+
+def get_rating(score):
+    """Convert numeric score to text rating."""
+    if score >= 75:
+        return "Extreme Greed"
+    elif score >= 55:
+        return "Greed"
+    elif score >= 45:
+        return "Neutral"
+    elif score >= 25:
+        return "Fear"
+    else:
+        return "Extreme Fear"
+
 
 def get_composite_score():
+    """
+    Calculate the composite TFI score.
+    
+    Returns JSON:
+    {
+        "score": 62,
+        "rating": "Greed",
+        "cnn_anchor": 74,
+        "vix_score": 50,
+        "vix_value": 17.0,
+        "mode": "COMPOSITE"
+    }
+    """
     response = {
         "score": 50,
         "rating": "Neutral",
-        "mode": "COMPOSITE",
-        "details": {}
+        "cnn_anchor": 50,
+        "vix_score": 50,
+        "vix_value": 17.0,
+        "mode": "COMPOSITE"
     }
-
+    
     try:
-        # Fetch SPY (for RSI & Trend) and ^VIX (for Volatility)
-        # We need enough history for 125-day MA
-        tickers = yf.Tickers("SPY ^VIX")
+        # 1. Get CNN Anchor (50%)
+        cnn_anchor = get_cnn_anchor()
         
-        # Fetch 6 months to be safe for 125d MA
-        hist = tickers.history(period="6mo")
+        # 2. Get VIX Pulse (50%)
+        vix_value, vix_score = get_vix_pulse()
         
-        # === 1. Volatility (VIX) - 50% Weight ===
-        vix_series = hist['Close']['^VIX']
-        if vix_series.empty: raise Exception("No VIX data")
-        current_vix = vix_series.iloc[-1]
-        
-        # VIX Score: 10-40 mapped to 100-0
-        vix_score = 100 - ((current_vix - 10) / 30 * 100)
-        vix_score = max(0, min(100, vix_score))
-        
-        # === 2. Momentum (RSI) - 25% Weight ===
-        spy_series = hist['Close']['SPY']
-        if spy_series.empty: raise Exception("No SPY data")
-        
-        rsi_series = calculate_rsi(spy_series)
-        current_rsi = rsi_series.iloc[-1]
-        
-        # RSI Score: 30 (Fear) to 70 (Greed) mapped to 0-100
-        # RSI 30 -> Score 0
-        # RSI 70 -> Score 100
-        rsi_score = (current_rsi - 30) / 40 * 100
-        rsi_score = max(0, min(100, rsi_score))
-        
-        # === 3. Trend (Price vs 125d MA) - 25% Weight ===
-        ma_125 = spy_series.rolling(window=125).mean().iloc[-1]
-        current_price = spy_series.iloc[-1]
-        
-        # Trend Score:
-        # > 5% above MA = 100 (Greed)
-        # > 5% below MA = 0 (Fear)
-        diff_pct = (current_price - ma_125) / ma_125
-        # Map -0.05 to 0.05 -> 0 to 100
-        trend_score = (diff_pct + 0.05) / 0.10 * 100
-        trend_score = max(0, min(100, trend_score))
-        
-        # === Composite Calculation ===
-        final_score = (vix_score * 0.50) + (rsi_score * 0.25) + (trend_score * 0.25)
+        # 3. Calculate Composite
+        final_score = (cnn_anchor * 0.5) + (vix_score * 0.5)
         
         response["score"] = round(final_score)
-        response["details"] = {
-            "vix": round(current_vix, 2),
-            "vix_score": round(vix_score),
-            "rsi": round(current_rsi, 2),
-            "rsi_score": round(rsi_score),
-            "trend_diff": round(diff_pct * 100, 2),
-            "trend_score": round(trend_score)
-        }
+        response["rating"] = get_rating(final_score)
+        response["cnn_anchor"] = round(cnn_anchor, 1)
+        response["vix_score"] = round(vix_score, 1)
+        response["vix_value"] = round(vix_value, 2)
         
     except Exception as e:
-        # === FALLBACK MODE ===
         response["mode"] = "FALLBACK"
         response["error"] = str(e)
-        
-        try:
-            # Try to get just VIX as last resort
-            vix = yf.Ticker("^VIX")
-            try:
-                price = vix.fast_info['last_price']
-            except:
-                price = vix.history(period="1d")['Close'].iloc[-1]
-            
-            vix_score = 100 - ((price - 10) / 30 * 100)
-            response["score"] = round(max(0, min(100, vix_score)))
-            response["details"]["vix"] = round(price, 2)
-            
-        except Exception as fallback_error:
-            response["error"] += f" | Fallback failed: {fallback_error}"
-            response["score"] = 50 # Ultimate fallback
+        response["score"] = 50
+        response["rating"] = "Neutral"
+    
+    return response
 
-    # Determine Rating
-    s = response["score"]
-    if s >= 75: response["rating"] = "Extreme Greed"
-    elif s >= 55: response["rating"] = "Greed"
-    elif s >= 45: response["rating"] = "Neutral"
-    elif s >= 25: response["rating"] = "Fear"
-    else: response["rating"] = "Extreme Fear"
-
-    print(json.dumps(response))
 
 if __name__ == "__main__":
-    get_composite_score()
+    result = get_composite_score()
+    print(json.dumps(result, indent=2))
