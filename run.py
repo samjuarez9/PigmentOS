@@ -644,9 +644,13 @@ def refresh_single_whale_polygon(symbol):
             if not (is_unusual and is_significant_premium and is_meaningful_volume and is_short_term):
                 continue
             
-            # Moneyness calculation
+            # Moneyness calculation with 0.5% ATM buffer
             is_call = contract_type == "CALL"
-            if is_call:
+            price_diff_pct = abs(current_price - strike) / current_price
+            
+            if price_diff_pct <= 0.005:
+                moneyness = "ATM"
+            elif is_call:
                 moneyness = "ITM" if current_price > strike else "OTM"
             else:
                 moneyness = "ITM" if current_price < strike else "OTM"

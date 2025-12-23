@@ -224,11 +224,10 @@ body::after {
     display: flex;
     flex-direction: column;
     align-items: center;
-    align-items: center;
-    gap: 5px;
+    gap: 15px;
     position: absolute;
     left: 50%;
-    top: 50%;
+    top: 48%;
     transform: translate(-50%, -50%);
 }
 
@@ -248,8 +247,6 @@ body::after {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-top: -5px;
-    /* Pull closer to title */
 }
 
 .subtitle-text {
@@ -291,41 +288,62 @@ body::after {
     font-size: 64px;
     letter-spacing: 2px;
 
-    /* Dark Thermal - Infrared Heat Gradient */
-    background: linear-gradient(90deg,
-            #1a0a2e 0%,
-            /* Deep Indigo (cold) */
-            #3d1a5c 8%,
-            /* Dark Purple */
-            #7B2D8E 15%,
-            /* Purple */
-            #FF00FF 25%,
-            /* Magenta */
-            #FF4500 40%,
-            /* Red-Orange */
-            #FF8C00 50%,
-            /* Glowing Orange */
-            #FFD700 60%,
-            /* Hot Yellow */
-            #FFFFFF 70%,
-            /* White-Hot center */
-            #FFD700 80%,
-            /* Hot Yellow */
-            #FF4500 90%,
-            /* Red-Orange */
-            #FF00FF 100%);
-    /* Magenta */
-    background-size: 300% 100%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+    /* Arcade 3D - Bright Yellow Face */
+    color: #FFFF00;
+    background: none;
+    -webkit-text-fill-color: #FFFF00;
 
-    /* COMBO: Entrance Slam + Thermal Flow (breathing removed) */
+    /* Deep Layered 3D Extrusion (Pink then Blue) */
+    text-shadow:
+        1px 1px 0 #FF00FF, 2px 2px 0 #FF00FF, 3px 3px 0 #FF00FF, 4px 4px 0 #FF00FF, 5px 5px 0 #FF00FF, 6px 6px 0 #FF00FF,
+        7px 7px 0 #0000FF, 8px 8px 0 #0000FF, 9px 9px 0 #0000FF, 10px 10px 0 #0000FF, 11px 11px 0 #0000FF, 12px 12px 0 #0000FF,
+        13px 13px 20px rgba(0, 0, 0, 0.5);
+
+    /* Subtle White Highlight */
+    filter: drop-shadow(-1px -1px 0px #FFFFFF);
+
     animation:
         slam-enter 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards,
-        thermalFlow 45s ease-in-out infinite 0.6s;
+        retroShine 4s linear infinite 0.6s;
+}
 
-    filter: drop-shadow(0 0 4px #FF3333) drop-shadow(0 0 10px #FF3333);
+/* Retro Shine Animation (Light Sweep) */
+@keyframes retroShine {
+
+    0%,
+    100% {
+        filter: drop-shadow(-1px -1px 0px #FFFFFF) brightness(1);
+    }
+
+    50% {
+        filter: drop-shadow(-1px -1px 0px #FFFFFF) brightness(1.4);
+    }
+}
+
+/* Thermal Infrared Flow */
+@keyframes thermalFlow {
+
+    0%,
+    100% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 300% 50%;
+    }
+}
+
+/* Thermal Infrared Flow */
+@keyframes thermalFlow {
+
+    0%,
+    100% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 300% 50%;
+    }
 }
 
 /* "Round 1" Slam Effect */
@@ -339,12 +357,12 @@ body::after {
     70% {
         opacity: 1;
         transform: scale(0.9);
-        filter: drop-shadow(0 0 50px white) drop-shadow(0 0 20px #00FFFF);
+        filter: drop-shadow(0 0 50px white) drop-shadow(0 0 20px #FF00FF);
     }
 
     100% {
         transform: scale(1);
-        filter: drop-shadow(4px 4px 0px #FF00CC);
+        filter: drop-shadow(-1px -1px 0px #FFFFFF);
     }
 }
 
@@ -378,14 +396,23 @@ body::after {
 
 .os-word {
     font-family: var(--font-pixel);
-    font-weight: 400;
+    font-weight: 700;
     font-size: 64px;
-    /* Increased size from 42px */
     color: #FFFFFF;
-    /* Pure White */
-    opacity: 1;
-    text-shadow: none;
-    /* Clean, no glow */
+    letter-spacing: 2px;
+
+    /* Deep Layered 3D Extrusion (Pink then Blue) */
+    text-shadow:
+        1px 1px 0 #FF00FF, 2px 2px 0 #FF00FF, 3px 3px 0 #FF00FF, 4px 4px 0 #FF00FF, 5px 5px 0 #FF00FF, 6px 6px 0 #FF00FF,
+        7px 7px 0 #0000FF, 8px 8px 0 #0000FF, 9px 9px 0 #0000FF, 10px 10px 0 #0000FF, 11px 11px 0 #0000FF, 12px 12px 0 #0000FF,
+        13px 13px 20px rgba(0, 0, 0, 0.5);
+
+    /* Subtle White Highlight */
+    filter: drop-shadow(-1px -1px 0px #FFFFFF);
+
+    animation:
+        slam-enter 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards,
+        retroShine 4s linear infinite 0.6s;
 }
 
 @keyframes flowGradient {
@@ -920,6 +947,10 @@ h1 {
     gap: 4px;
     min-width: 70px;
     /* Consistent width to prevent layout jitter */
+}
+
+.intel-bar .mover-item .mover-symbol {
+    color: #FFFFFF !important;
 }
 
 /* Scroll Control - Bright by default, dims on intel-bar hover */
@@ -3853,6 +3884,16 @@ td {
     margin-right: 4px;
 }
 
+.tag-atm {
+    color: #FF3333;
+    /* Red for ATM (High Risk/Pivot) */
+    border: 1px solid rgba(255, 51, 51, 0.3);
+    padding: 1px 3px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    margin-right: 4px;
+}
+
 /* Tag Column - Flexbox for side-by-side meter + tags */
 .col-tag {
     display: flex;
@@ -4867,8 +4908,63 @@ td {
         justify-content: space-between;
     }
 
-    .pigment-word {
-        font-size: 20px;
+    .pigment-word,
+    .os-word {
+        font-size: 32px;
+        animation:
+            slam-enter-mobile 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards,
+            retroShine 4s linear infinite 0.6s;
+        filter: drop-shadow(-1px -1px 0px #FFFFFF);
+        text-shadow:
+            1px 1px 0 #FF00FF, 2px 2px 0 #FF00FF, 3px 3px 0 #FF00FF, 4px 4px 0 #FF00FF,
+            5px 5px 0 #0000FF, 6px 6px 0 #0000FF, 7px 7px 0 #0000FF, 8px 8px 8px rgba(0, 0, 0, 0.5);
+    }
+
+    @keyframes slam-enter-mobile {
+        0% {
+            opacity: 0;
+            transform: scale(3);
+            filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0));
+        }
+
+        70% {
+            opacity: 1;
+            transform: scale(0.9);
+            filter: drop-shadow(0 0 20px white) drop-shadow(0 0 10px #FF00FF);
+        }
+
+        100% {
+            transform: scale(1);
+            filter: drop-shadow(-1px -1px 0px #FFFFFF);
+        }
+    }
+
+    @keyframes idle-float-mobile {
+
+        0%,
+        100% {
+            transform: translateY(0);
+            filter: drop-shadow(2px 2px 0px #FF3333);
+        }
+
+        50% {
+            transform: translateY(-3px);
+            filter: drop-shadow(2px 4px 0px #FF3333);
+        }
+    }
+
+    @keyframes idle-float-mobile {
+
+        0%,
+        100% {
+            transform: translateY(0);
+            filter: drop-shadow(2px 2px 0px #FF3333);
+        }
+
+        50% {
+            transform: translateY(-3px);
+            filter: drop-shadow(2px 4px 0px #FF3333);
+        }
     }
 
     .os-word {

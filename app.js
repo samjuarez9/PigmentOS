@@ -2410,7 +2410,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (flow.moneyness) {
             const moneySpan = document.createElement('span');
             moneySpan.textContent = flow.moneyness;
-            moneySpan.className = flow.moneyness === 'ITM' ? 'tag-itm' : 'tag-otm';
+
+            if (flow.moneyness === 'ATM') {
+                moneySpan.className = 'tag-atm';
+            } else {
+                moneySpan.className = flow.moneyness === 'ITM' ? 'tag-itm' : 'tag-otm';
+            }
+
             // Insert before the main tag
             colTag.insertBefore(moneySpan, colTag.firstChild);
         }
