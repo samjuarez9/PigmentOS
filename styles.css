@@ -211,6 +211,14 @@ body::after {
     gap: 10px;
 }
 
+.clock {
+    color: #FFFFFF;
+    font-family: var(--font-mono);
+    font-size: 18px;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
 /* === PIGMENT OS BRANDING === */
 .brand-container {
     display: flex;
@@ -815,6 +823,54 @@ h1 {
     gap: 0;
 }
 
+/* Intel Row - Flex container for static label + scrollable ticker */
+.intel-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+}
+
+/* Intel Left - Static label area (non-scrolling) */
+.intel-left {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+}
+
+/* Intel Scroll - Horizontally scrollable ticker area */
+.intel-scroll {
+    flex: 1 1 auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+    scrollbar-width: none;
+    /* Firefox */
+    height: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.intel-scroll::-webkit-scrollbar {
+    display: none;
+    /* Chrome, Safari */
+}
+
+/* Inner container for ticker items - stays in one line */
+.intel-scroll-inner {
+    display: inline-flex;
+    gap: 8px;
+    white-space: nowrap;
+    align-items: center;
+    padding: 0 8px;
+}
+
+.intel-scroll-inner>* {
+    flex: 0 0 auto;
+}
+
 .intel-bar .intel-title {
     padding: 0 8px;
     font-size: 10px;
@@ -862,6 +918,8 @@ h1 {
     font-size: 10px;
     font-family: 'JetBrains Mono', monospace;
     gap: 4px;
+    min-width: 70px;
+    /* Consistent width to prevent layout jitter */
 }
 
 /* Scroll Control - Bright by default, dims on intel-bar hover */
@@ -1239,6 +1297,27 @@ h1 {
     min-height: 600px;
     /* Increased for taller chart display */
     margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+#live-price-action .widget-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+#chart-container {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    /* Allow shrinking in flex context */
+}
+
+#chart-container>div,
+#chart-container iframe {
+    width: 100% !important;
+    height: 100% !important;
 }
 
 /* Threat Level Animations */
@@ -1376,6 +1455,12 @@ h1 {
     image-rendering: pixelated;
     -webkit-font-smoothing: none;
     letter-spacing: 0px;
+}
+
+/* Make whale emoji slightly bigger to match text */
+.whale-emoji {
+    font-size: 18px;
+    vertical-align: middle;
 }
 
 .decoration-line {
@@ -4629,6 +4714,30 @@ td {
 
 /* === MOBILE RESPONSIVENESS === */
 @media (max-width: 768px) {
+
+    /* Mobile Adjustments */
+    .poly-logo-img {
+        height: 22px;
+        /* Reduced from 28px for mobile */
+    }
+
+    .subtitle-text {
+        font-size: 9px;
+    }
+
+    .clock {
+        font-size: 14px;
+    }
+
+    .date {
+        font-size: 11px;
+    }
+
+    .pigment-word,
+    .os-word {
+        font-size: 40px;
+    }
+
     body {
         overflow-y: auto;
         /* Enable scrolling on mobile */
@@ -4651,7 +4760,46 @@ td {
     .column {
         height: auto;
         overflow: visible;
+        display: contents;
+        /* Flatten columns so widgets can be individually ordered */
     }
+
+    /* Individual widget ordering for mobile */
+    .news-feed-container {
+        order: 1;
+    }
+
+    /* Intel feed first */
+    #unusual-whales {
+        order: 2;
+    }
+
+    /* Unusual Whales second */
+    #live-price-action {
+        order: 3;
+    }
+
+    /* Price Action third */
+    #gamma-wall {
+        order: 4;
+    }
+
+    /* Gamma Wall */
+    #polymarket-odds {
+        order: 5;
+    }
+
+    /* Polymarket */
+    #trader-fear-index {
+        order: 6;
+    }
+
+    /* TFI */
+    #sector-heatmap {
+        order: 7;
+    }
+
+    /* Market Map last */
 
     /* Adjust Widget Heights for Mobile */
     .widget {
@@ -4683,6 +4831,27 @@ td {
         min-height: 350px !important;
         /* Taller chart on mobile */
         height: 100% !important;
+        width: 100% !important;
+    }
+
+    /* Ensure TradingView iframe fills container */
+    #chart-container iframe {
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    /* Price Action title - Player 2 Ready font */
+    #live-price-action .widget-header h2 {
+        font-family: 'Press Start 2P', 'VT323', monospace;
+        font-size: 10px;
+        letter-spacing: 1px;
+    }
+
+    /* Smaller ticker selector on mobile */
+    #live-price-action .retro-selector {
+        font-size: 10px;
+        padding: 2px 4px;
+        margin-left: 5px;
     }
 
     /* Header Adjustments */

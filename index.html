@@ -140,7 +140,7 @@
             <div class="column left-col">
                 <div class="widget" id="unusual-whales">
                     <div class="widget-header">
-                        <h2 id="whale-widget-title">UNUSUAL WHALES 🐳</h2>
+                        <h2 id="whale-widget-title">UNUSUAL WHALES <span class="whale-emoji">🐳</span></h2>
                         <button id="market-status-btn" class="market-status-btn after-market">AFTER MARKET</button>
                         <div class="status-container" id="status-whales">
                             <span class="status-text">LIVE</span>
@@ -199,16 +199,20 @@
             <div class="column center-col">
                 <div class="news-feed-container" id="news-feed-container">
                     <div class="news-header intel-bar">
-                        <!-- 1. Title -->
-                        <div class="intel-title">INTEL</div>
-
-                        <!-- 2. HOT/COLD Ticker -->
-                        <div class="header-movers-ticker" id="price-ticker">
-                            <!-- Populated by JS -->
+                        <div class="intel-row">
+                            <!-- Static Left Side: INTEL Label + HOT/COLD indicator -->
+                            <div class="intel-left">
+                                <div class="intel-title">INTEL</div>
+                            </div>
+                            <!-- Scrollable Ticker Area -->
+                            <div class="intel-scroll">
+                                <div class="intel-scroll-inner" id="price-ticker">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+                            <!-- Controls (right side, static) -->
+                            <div id="auto-scroll-indicator" class="scroll-control">[SCROLL]</div>
                         </div>
-
-                        <!-- 3. Controls -->
-                        <div id="auto-scroll-indicator" class="scroll-control">[SCROLL]</div>
                     </div>
                     <div id="news-items-list">
                         <div id="news-track">
@@ -220,7 +224,7 @@
                 <div class="widget large-widget" id="live-price-action">
                     <div class="widget-header">
                         <div class="header-left-group">
-                            <h2>PRICE ACTION</h2>
+                            <h2>💸 PRICE ACTION</h2>
                             <!-- Custom Ticker Dropdown (Next to title) -->
                             <select id="ticker-select" class="retro-selector">
                                 <!-- Options populated by JS -->
