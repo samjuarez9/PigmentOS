@@ -151,7 +151,7 @@ def api_status():
 # === CONFIGURATION ===
 WHALE_WATCHLIST = [
     'NVDA', 'TSLA', 'AAPL', 'AMD', 'MSFT', 'AMZN', 
-    'META', 'GOOG', 'GOOGL', 'PLTR', 'MU', 'NBIS'
+    'META', 'GOOG', 'GOOGL', 'PLTR', 'MU', 'ORCL', 'TSM'
 ]
 
 # MarketData.app API Token (for enhanced options data)
@@ -331,14 +331,19 @@ def fetch_options_chain_polygon(symbol, strike_limit=40):
                 date_label = next_day.strftime("%a %b %d").upper()
                 print(f"Polygon: Weekend - using Monday {expiry_date} for {symbol}")
             else:
-                # Weekend + non-daily ticker: use next Friday
+                # Weekend + non-daily ticker: use next Friday for DATA, but label as Monday for UI consistency
                 days_until_friday = (4 - today_weekday + 7) % 7
                 if days_until_friday == 0:
                     days_until_friday = 7
                 expiry_date = (now_et + timedelta(days=days_until_friday)).strftime("%Y-%m-%d")
-                next_day = now_et + timedelta(days=days_until_friday)
-                date_label = next_day.strftime("%a %b %d").upper()
-                print(f"Polygon: Weekend - using Friday {expiry_date} for {symbol}")
+                
+                # UI LABEL: Always show next trading day (Monday) to match SPY/QQQ
+                days_until_monday = (7 - today_weekday) % 7
+                if days_until_monday == 0: days_until_monday = 1
+                next_trading_day = now_et + timedelta(days=days_until_monday)
+                date_label = next_trading_day.strftime("%a %b %d").upper()
+                
+                print(f"Polygon: Weekend - using Friday {expiry_date} for {symbol} (Label: {date_label})")
         elif has_daily:
             # For daily tickers (SPY, QQQ, etc.)
             # Keep showing TODAY's expiry until 5:00 PM
@@ -364,15 +369,31 @@ def fetch_options_chain_polygon(symbol, strike_limit=40):
         else:
             # Non-daily tickers: always use next Friday
             days_until_friday = (4 - today_weekday) % 7
-            # If it's Friday and after 5 PM, switch to NEXT Friday
+            
+            # If it's Friday and after 5 PM, switch to NEXT Friday for data
             if days_until_friday == 0 and current_hour >= switch_hour:
                 days_until_friday = 7
-                is_next_trading_day = True
+                
             expiry_date = (now_et + timedelta(days=days_until_friday)).strftime("%Y-%m-%d")
-            if is_next_trading_day:
-                next_day = now_et + timedelta(days=days_until_friday)
-                date_label = next_day.strftime("%a %b %d").upper()
-            print(f"Polygon: Using Friday {expiry_date} for {symbol}")
+            
+            # UI LABEL LOGIC:
+            # If after 5 PM, always show Next Trading Day (to match SPY/QQQ behavior)
+            if current_hour >= switch_hour:
+                is_next_trading_day = True
+                # Calculate next trading day
+                if today_weekday == 4: # Friday -> Monday
+                    days_ahead = 3
+                elif today_weekday == 5: # Saturday -> Monday
+                    days_ahead = 2
+                elif today_weekday == 6: # Sunday -> Monday
+                    days_ahead = 1
+                else: # Mon-Thu -> Next Day
+                    days_ahead = 1
+                    
+                next_trading_day = now_et + timedelta(days=days_ahead)
+                date_label = next_trading_day.strftime("%a %b %d").upper()
+            
+            print(f"Polygon: Using Friday {expiry_date} for {symbol} (Label: {date_label})")
         
         # Polygon options chain snapshot endpoint
         url = f"https://api.polygon.io/v3/snapshot/options/{symbol}"

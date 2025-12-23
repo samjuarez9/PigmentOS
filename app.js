@@ -1798,6 +1798,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 html += ` <span class="today-badge-dim">TODAY</span>`;
             }
             gammaTitle.innerHTML = html;
+            gammaTitle.innerHTML = html;
+        }
+
+        // Update DTE Display (Tiny text in black header)
+        const dteDisplay = document.getElementById('gamma-dte-display');
+        if (dteDisplay && data._expiry_date) {
+            const expiryParts = data._expiry_date.split('-');
+            const expiryDate = new Date(expiryParts[0], expiryParts[1] - 1, expiryParts[2]);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            // Calculate difference in days
+            const diffTime = expiryDate - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            let dteText = "";
+            if (diffDays === 0) dteText = "0DTE";
+            else if (diffDays === 1) dteText = "1DTE";
+            else dteText = `${diffDays}DTE`;
+
+            dteDisplay.textContent = dteText;
+        } else if (dteDisplay) {
+            dteDisplay.textContent = "";
         }
 
         let totalCallVol = 0;

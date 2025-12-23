@@ -1368,6 +1368,16 @@ h1 {
     letter-spacing: 0px;
 }
 
+/* Unusual Whales - Pixel Title */
+#whale-widget-title {
+    font-family: 'Press Start 2P', 'VT323', monospace;
+    font-size: 12px;
+    font-weight: 400;
+    image-rendering: pixelated;
+    -webkit-font-smoothing: none;
+    letter-spacing: 0px;
+}
+
 .decoration-line {
     height: 2px;
     width: 20px;
@@ -5301,6 +5311,16 @@ td {
 
 .gamma-axis-top span:last-child {
     color: #66ff88;
+}
+
+.gamma-dte-text {
+    font-family: 'VT323', monospace;
+    font-size: 11px;
+    color: #FFF;
+    opacity: 1;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
 }
 
 .gamma-price-badge {
