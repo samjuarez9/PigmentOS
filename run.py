@@ -2483,15 +2483,28 @@ def start_background_worker():
                     print(f"Startup Whale Error ({symbol}): {e}")
         
         # 2. Fetch Gamma & Heatmap (lightweight on weekends) - WITH TIMEOUT
-        try: 
-            with_timeout(refresh_gamma_logic, timeout_seconds=15)
-        except: pass
-        try: 
-            with_timeout(refresh_heatmap_logic, timeout_seconds=15)
-        except: pass
-        try: 
-            with_timeout(refresh_news_logic, timeout_seconds=15)
-        except: pass
+        # 2. Fetch Gamma & Heatmap & News - WITH RETRY & ROBUST TIMEOUT
+        def retry_fetch(func, name, retries=3):
+            for i in range(retries):
+                try:
+                    print(f"🔄 Hydrating {name} (Attempt {i+1}/{retries})...")
+                    with_timeout(func, timeout_seconds=30)
+                    # Check if data actually populated
+                    if name == "News" and not CACHE.get("news", {}).get("data"):
+                        raise Exception("News data still empty after fetch")
+                    if name == "Heatmap" and not CACHE.get("heatmap", {}).get("data"):
+                        raise Exception("Heatmap data still empty after fetch")
+                        
+                    print(f"✅ {name} Hydrated!")
+                    return
+                except Exception as e:
+                    print(f"⚠️ {name} Hydration Failed (Attempt {i+1}): {e}")
+                    time.sleep(2) # Wait a bit before retry
+            print(f"❌ {name} Hydration GAVE UP after {retries} attempts.")
+
+        retry_fetch(refresh_gamma_logic, "Gamma")
+        retry_fetch(refresh_heatmap_logic, "Heatmap")
+        retry_fetch(refresh_news_logic, "News")
         
 
 
