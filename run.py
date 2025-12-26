@@ -2264,9 +2264,104 @@ def debug_heatmap():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/debug/sources')
+def debug_sources():
+    """
+    Production diagnostic: Test each external data source individually.
+    Call this on production to identify which service is rate limiting.
+    """
+    results = {
+        "timestamp": datetime.now().isoformat(),
+        "sources": {}
+    }
+    
+    # 1. Test RSS Feeds
+    rss_feeds = {
+        "investing.com": "https://www.investing.com/rss/news.rss",
+        "cnbc": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664",
+        "techcrunch": "https://techcrunch.com/feed/",
+        "wsj": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"
+    }
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+    }
+    
+    for name, url in rss_feeds.items():
+        start = time.time()
+        try:
+            resp = requests.get(url, headers=headers, verify=False, timeout=10)
+            duration = time.time() - start
+            feed = feedparser.parse(resp.content)
+            results["sources"][f"rss_{name}"] = {
+                "status": "OK" if resp.status_code == 200 else f"HTTP {resp.status_code}",
+                "duration_ms": round(duration * 1000),
+                "items_found": len(feed.entries) if feed.entries else 0,
+                "rate_limited": resp.status_code == 429 or "too many" in resp.text.lower()
+            }
+        except Exception as e:
+            results["sources"][f"rss_{name}"] = {
+                "status": "ERROR",
+                "error": str(e)[:100],
+                "rate_limited": "rate" in str(e).lower() or "429" in str(e)
+            }
+    
+    # 2. Test yfinance (single ticker to minimize impact)
+    start = time.time()
+    try:
+        def test_yf():
+            t = yf.Ticker("SPY")
+            return t.fast_info.last_price
+        price = with_timeout(test_yf, timeout_seconds=5)
+        duration = time.time() - start
+        results["sources"]["yfinance"] = {
+            "status": "OK" if price else "NO DATA",
+            "duration_ms": round(duration * 1000),
+            "spy_price": round(price, 2) if price else None,
+            "rate_limited": price is None
+        }
+    except Exception as e:
+        err_str = str(e)
+        results["sources"]["yfinance"] = {
+            "status": "ERROR",
+            "error": err_str[:100],
+            "rate_limited": "Too Many Requests" in err_str or "429" in err_str
+        }
+    
+    # 3. Test Polygon API (should never rate limit on Starter plan)
+    if POLYGON_API_KEY:
+        start = time.time()
+        try:
+            url = f"https://api.polygon.io/v2/aggs/ticker/SPY/prev?apiKey={POLYGON_API_KEY}"
+            resp = requests.get(url, timeout=5)
+            duration = time.time() - start
+            data = resp.json()
+            results["sources"]["polygon"] = {
+                "status": "OK" if resp.status_code == 200 else f"HTTP {resp.status_code}",
+                "duration_ms": round(duration * 1000),
+                "has_data": bool(data.get("results")),
+                "rate_limited": resp.status_code == 429
+            }
+        except Exception as e:
+            results["sources"]["polygon"] = {
+                "status": "ERROR",
+                "error": str(e)[:100]
+            }
+    
+    # 4. Summary
+    failing = [k for k, v in results["sources"].items() 
+               if v.get("status") != "OK" or v.get("rate_limited")]
+    results["summary"] = {
+        "failing_sources": failing,
+        "recommendation": "Remove or replace failing sources" if failing else "All sources OK"
+    }
+    
+    return jsonify(results)
 
 
 def refresh_gamma_logic(symbol="SPY"):
+
     global CACHE
     
     from datetime import timedelta
