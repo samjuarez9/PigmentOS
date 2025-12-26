@@ -2264,6 +2264,39 @@ def debug_heatmap():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/debug/force-whales')
+def debug_force_whales():
+    """Force a whale scan on a single ticker and show raw results."""
+    import io, sys
+    symbol = request.args.get('symbol', 'NVDA')
+    
+    old_stdout = sys.stdout
+    new_stdout = io.StringIO()
+    sys.stdout = new_stdout
+    
+    try:
+        # Run the whale scan
+        refresh_single_whale(symbol)
+        
+        sys.stdout = old_stdout
+        logs = new_stdout.getvalue()
+        
+        return jsonify({
+            "status": "success",
+            "symbol": symbol,
+            "cache_count": len(CACHE["whales"]["data"]),
+            "cache_timestamp": CACHE["whales"]["timestamp"],
+            "cache_data": CACHE["whales"]["data"][:5],  # First 5
+            "logs": logs
+        })
+    except Exception as e:
+        sys.stdout = old_stdout
+        import traceback
+        return jsonify({
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
 @app.route('/api/debug/sources')
 def debug_sources():
     """
