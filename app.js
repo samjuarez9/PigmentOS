@@ -1852,9 +1852,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (diff >= 10) {
                 if (callVolPct > putVolPct) {
-                    dominanceBadgeHtml = `<span class="dominance-badge bullish">CALLS ${Math.round(diff)}%</span>`;
+                    // Show Percent of Total (e.g. 60%) instead of Difference (20%)
+                    dominanceBadgeHtml = `<span class="dominance-badge bullish">CALLS ${Math.round(callVolPct)}%</span>`;
                 } else {
-                    dominanceBadgeHtml = `<span class="dominance-badge bearish">PUTS ${Math.round(diff)}%</span>`;
+                    dominanceBadgeHtml = `<span class="dominance-badge bearish">PUTS ${Math.round(putVolPct)}%</span>`;
                 }
             } else {
                 dominanceBadgeHtml = `<span class="dominance-badge neutral">BALANCED</span>`;
