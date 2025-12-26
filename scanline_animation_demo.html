@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8-Bit Glitch-In Animation Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #000000;
+            --primary-color: #0051CA;
+            --bullish-color: #00c853;
+            --bearish-color: #ff5252;
+            --widget-bg: rgba(0, 10, 25, 0.9);
+            --font-mono: 'VT323', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: #fff;
+            font-family: var(--font-mono);
+            min-height: 100vh;
+            padding: 30px;
+        }
+
+        /* CRT Scanline Overlay */
+        body::after {
+            content: " ";
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+                linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 9999;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        .demo-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-family: var(--font-mono);
+            font-size: 32px;
+            color: var(--primary-color);
+            text-shadow: 0 0 10px var(--primary-color);
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+
+        /* Widget Container */
+        .widget {
+            background: var(--widget-bg);
+            border: 1px solid var(--primary-color);
+            box-shadow: 0 0 15px rgba(0, 81, 202, 0.2);
+            margin-bottom: 30px;
+        }
+
+        .widget-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--primary-color);
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .widget-header h2 {
+            font-family: 'Press Start 2P', var(--font-mono);
+            font-size: 12px;
+            color: var(--primary-color);
+            letter-spacing: 2px;
+        }
+
+        .whale-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        /* Whale Trade Row */
+        .whale-row {
+            display: grid;
+            grid-template-columns: 0.8fr 1fr 1.2fr 0.8fr;
+            align-items: center;
+            padding: 0 10px;
+            height: 40px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            font-size: 14px;
+            transition: background-color 0.2s;
+            border-left: 3px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .whale-row:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-left-color: #d500f9;
+        }
+
+        .whale-row.call-row {
+            border-left-color: var(--bullish-color);
+        }
+
+        .whale-row.put-row {
+            border-left-color: var(--bearish-color);
+        }
+
+        /* Column Styling */
+        .col-ticker {
+            font-weight: bold;
+            color: #fff;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .col-premium {
+            color: #fff;
+        }
+
+        .col-details {
+            color: #aaa;
+            font-size: 12px;
+        }
+
+        .col-tags {
+            display: flex;
+            gap: 4px;
+            justify-content: flex-end;
+        }
+
+        .tag {
+            font-size: 9px;
+            padding: 2px 5px;
+            border-radius: 2px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+
+        .tag-call {
+            background: rgba(0, 200, 83, 0.2);
+            color: var(--bullish-color);
+            border: 1px solid var(--bullish-color);
+        }
+
+        .tag-put {
+            background: rgba(255, 82, 82, 0.2);
+            color: var(--bearish-color);
+            border: 1px solid var(--bearish-color);
+        }
+
+        .tag-mega {
+            background: rgba(255, 215, 0, 0.2);
+            color: gold;
+            border: 1px solid gold;
+        }
+
+        /* ========================================= */
+        /* 8-BIT GLITCH-IN ANIMATION                 */
+        /* ========================================= */
+
+        /* Digital artifacts / noise layer */
+        .glitch-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                repeating-linear-gradient(0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(0, 255, 255, 0.03) 2px,
+                    rgba(0, 255, 255, 0.03) 4px);
+            pointer-events: none;
+            z-index: 5;
+            opacity: 0;
+        }
+
+        /* Main glitch-in animation */
+        @keyframes glitchIn {
+            0% {
+                clip-path: inset(0 100% 0 0);
+                transform: translateX(-5px) skewX(-5deg);
+                filter: blur(3px) brightness(2);
+            }
+
+            10% {
+                clip-path: inset(40% 0 30% 0);
+                transform: translateX(3px) skewX(3deg);
+            }
+
+            20% {
+                clip-path: inset(10% 0 60% 0);
+                transform: translateX(-2px) skewX(-2deg);
+            }
+
+            30% {
+                clip-path: inset(70% 0 5% 0);
+                transform: translateX(4px) skewX(4deg);
+                filter: blur(2px) brightness(1.8);
+            }
+
+            40% {
+                clip-path: inset(20% 0 40% 0);
+                transform: translateX(-3px) skewX(-3deg);
+            }
+
+            50% {
+                clip-path: inset(0 0 70% 0);
+                transform: translateX(2px) skewX(1deg);
+                filter: blur(1px) brightness(1.4);
+            }
+
+            60% {
+                clip-path: inset(50% 0 10% 0);
+                transform: translateX(-1px) skewX(-1deg);
+            }
+
+            70% {
+                clip-path: inset(5% 0 5% 0);
+                transform: translateX(1px);
+                filter: blur(0.5px) brightness(1.2);
+            }
+
+            85% {
+                clip-path: inset(0);
+                transform: translateX(0);
+                filter: blur(0) brightness(1.1);
+            }
+
+            100% {
+                clip-path: inset(0);
+                transform: translateX(0) skewX(0);
+                filter: blur(0) brightness(1);
+            }
+        }
+
+        /* Chromatic aberration - Red channel */
+        @keyframes chromaticRed {
+            0% {
+                text-shadow: -4px 0 #ff0000, 4px 0 #00ffff;
+                opacity: 0.8;
+            }
+
+            15% {
+                text-shadow: 3px 0 #ff0000, -3px 0 #00ffff;
+            }
+
+            30% {
+                text-shadow: -2px 1px #ff0000, 2px -1px #00ffff;
+            }
+
+            50% {
+                text-shadow: 2px 0 #ff0000, -2px 0 #00ffff;
+            }
+
+            70% {
+                text-shadow: -1px 0 #ff0000, 1px 0 #00ffff;
+            }
+
+            85% {
+                text-shadow: 0.5px 0 #ff0000, -0.5px 0 #00ffff;
+                opacity: 1;
+            }
+
+            100% {
+                text-shadow: 0 0 transparent;
+                opacity: 1;
+            }
+        }
+
+        /* Random block artifacts */
+        @keyframes blockGlitch {
+
+            0%,
+            100% {
+                background: transparent;
+            }
+
+            5% {
+                background: linear-gradient(90deg,
+                        transparent 0%,
+                        rgba(255, 0, 0, 0.3) 10%,
+                        rgba(0, 255, 255, 0.3) 20%,
+                        transparent 30%,
+                        rgba(255, 0, 255, 0.2) 50%,
+                        transparent 60%);
+            }
+
+            10% {
+                background: linear-gradient(90deg,
+                        rgba(0, 255, 0, 0.2) 0%,
+                        transparent 15%,
+                        rgba(255, 0, 0, 0.3) 40%,
+                        transparent 55%);
+            }
+
+            20% {
+                background: linear-gradient(90deg,
+                        transparent 0%,
+                        rgba(0, 255, 255, 0.4) 25%,
+                        transparent 40%,
+                        rgba(255, 0, 0, 0.2) 70%,
+                        transparent 85%);
+            }
+
+            30% {
+                background: linear-gradient(90deg,
+                        rgba(255, 255, 0, 0.15) 10%,
+                        transparent 25%);
+            }
+
+            50% {
+                background: transparent;
+            }
+        }
+
+        /* Row flash on decode complete */
+        @keyframes decodeFlash {
+            0% {
+                box-shadow: inset 0 0 30px rgba(0, 255, 255, 0.5);
+            }
+
+            100% {
+                box-shadow: inset 0 0 0 transparent;
+            }
+        }
+
+        /* Pixel scatter effect */
+        @keyframes pixelScatter {
+            0% {
+                letter-spacing: 8px;
+                word-spacing: 15px;
+            }
+
+            30% {
+                letter-spacing: 4px;
+                word-spacing: 8px;
+            }
+
+            60% {
+                letter-spacing: 1px;
+                word-spacing: 2px;
+            }
+
+            100% {
+                letter-spacing: normal;
+                word-spacing: normal;
+            }
+        }
+
+        /* NEW ROW STATE - Apply glitch animation */
+        .whale-row.glitch-new {
+            animation:
+                glitchIn 280ms steps(8) forwards,
+                blockGlitch 280ms steps(4) forwards,
+                decodeFlash 400ms ease-out 280ms forwards;
+        }
+
+        .whale-row.glitch-new .col-ticker,
+        .whale-row.glitch-new .col-premium,
+        .whale-row.glitch-new .col-details {
+            animation:
+                chromaticRed 280ms steps(6) forwards,
+                pixelScatter 200ms ease-out forwards;
+        }
+
+        .whale-row.glitch-new .col-tags {
+            animation: chromaticRed 280ms steps(6) forwards;
+        }
+
+        .whale-row.glitch-new .glitch-overlay {
+            animation: blockGlitch 280ms steps(4) forwards;
+            opacity: 1;
+        }
+
+        /* Control Panel */
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: rgba(0, 81, 202, 0.2);
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+            padding: 10px 20px;
+            font-family: var(--font-mono);
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            letter-spacing: 1px;
+        }
+
+        .btn:hover {
+            background: var(--primary-color);
+            color: #000;
+            box-shadow: 0 0 15px var(--primary-color);
+        }
+
+        .btn.bullish {
+            border-color: var(--bullish-color);
+            color: var(--bullish-color);
+        }
+
+        .btn.bullish:hover {
+            background: var(--bullish-color);
+            color: #000;
+            box-shadow: 0 0 15px var(--bullish-color);
+        }
+
+        .btn.bearish {
+            border-color: var(--bearish-color);
+            color: var(--bearish-color);
+        }
+
+        .btn.bearish:hover {
+            background: var(--bearish-color);
+            color: #000;
+            box-shadow: 0 0 15px var(--bearish-color);
+        }
+
+        /* Explanation Box */
+        .explanation {
+            background: rgba(0, 81, 202, 0.1);
+            border: 1px solid rgba(0, 81, 202, 0.3);
+            padding: 20px;
+            margin-top: 30px;
+        }
+
+        .explanation h3 {
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .explanation ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .explanation li {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            color: #aaa;
+            font-size: 14px;
+        }
+
+        .explanation li:last-child {
+            border-bottom: none;
+        }
+
+        .explanation code {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 2px 6px;
+            color: #00ffff;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="demo-container">
+        <h1>▸ 8-BIT GLITCH-IN ANIMATION</h1>
+        <p class="subtitle">Intercepted Transmission Decoding Effect</p>
+
+        <div class="controls">
+            <button class="btn bullish" onclick="addNewTrade('call')">+ ADD CALL TRADE</button>
+            <button class="btn bearish" onclick="addNewTrade('put')">+ ADD PUT TRADE</button>
+            <button class="btn" onclick="addNewTrade('mega')">+ ADD MEGA TRADE</button>
+            <button class="btn" onclick="clearTrades()">CLEAR ALL</button>
+        </div>
+
+        <div class="widget">
+            <div class="widget-header">
+                <h2>UNUSUAL WHALES</h2>
+                <span style="color: #888; font-size: 12px;">INTERCEPTED FEED</span>
+            </div>
+            <div class="whale-list" id="whale-list">
+                <!-- Initial static rows -->
+                <div class="whale-row call-row">
+                    <span class="col-ticker">AAPL</span>
+                    <span class="col-premium">$1.2M</span>
+                    <span class="col-details">$185C 01/17</span>
+                    <span class="col-tags">
+                        <span class="tag tag-call">CALL</span>
+                    </span>
+                </div>
+                <div class="whale-row put-row">
+                    <span class="col-ticker">TSLA</span>
+                    <span class="col-premium">$890K</span>
+                    <span class="col-details">$240P 01/10</span>
+                    <span class="col-tags">
+                        <span class="tag tag-put">PUT</span>
+                    </span>
+                </div>
+                <div class="whale-row call-row">
+                    <span class="col-ticker">NVDA</span>
+                    <span class="col-premium">$2.1M</span>
+                    <span class="col-details">$500C 01/24</span>
+                    <span class="col-tags">
+                        <span class="tag tag-mega">MEGA</span>
+                        <span class="tag tag-call">CALL</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="explanation">
+            <h3>▸ HOW IT WORKS</h3>
+            <ul>
+                <li><strong>Chromatic Aberration:</strong> Red/cyan color splitting that converges as text "decodes"
+                </li>
+                <li><strong>Clip-Path Glitch:</strong> Random horizontal slices appear/disappear using
+                    <code>clip-path: inset()</code></li>
+                <li><strong>Pixel Scatter:</strong> Letters start spread apart and snap into place</li>
+                <li><strong>Block Artifacts:</strong> Colored gradient blocks flash through the row</li>
+                <li><strong>Decode Flash:</strong> Cyan glow confirms successful "decode"</li>
+                <li><strong>Duration:</strong> <code>280ms</code> (stepped for 8-bit feel) - feels like intercepted
+                    transmission</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Mock trade data
+        const mockTrades = {
+            call: [
+                { ticker: 'SPY', premium: '$1.5M', details: '$475C 01/19', tags: ['CALL'] },
+                { ticker: 'MSFT', premium: '$2.3M', details: '$380C 02/16', tags: ['CALL', 'FRESH'] },
+                { ticker: 'META', premium: '$780K', details: '$350C 01/26', tags: ['CALL'] },
+                { ticker: 'AMZN', premium: '$1.1M', details: '$160C 01/12', tags: ['CALL'] },
+                { ticker: 'GOOGL', premium: '$920K', details: '$145C 02/21', tags: ['CALL'] },
+            ],
+            put: [
+                { ticker: 'QQQ', premium: '$890K', details: '$400P 01/19', tags: ['PUT'] },
+                { ticker: 'IWM', premium: '$450K', details: '$195P 01/26', tags: ['PUT'] },
+                { ticker: 'AMD', premium: '$1.2M', details: '$130P 02/16', tags: ['PUT', 'HEDGE'] },
+                { ticker: 'COIN', premium: '$670K', details: '$180P 01/12', tags: ['PUT'] },
+            ],
+            mega: [
+                { ticker: 'AAPL', premium: '$5.2M', details: '$200C 03/21', tags: ['MEGA', 'CALL'] },
+                { ticker: 'NVDA', premium: '$8.1M', details: '$550C 02/21', tags: ['MEGA', 'CALL'] },
+                { ticker: 'TSLA', premium: '$4.7M', details: '$300P 01/17', tags: ['MEGA', 'PUT'] },
+            ]
+        };
+
+        function getRandomTrade(type) {
+            const trades = mockTrades[type] || mockTrades.call;
+            return trades[Math.floor(Math.random() * trades.length)];
+        }
+
+        function createTradeRow(trade) {
+            const row = document.createElement('div');
+            const isCall = trade.tags.includes('CALL');
+            row.className = `whale-row ${isCall ? 'call-row' : 'put-row'} glitch-new`;
+
+            row.innerHTML = `
+                <div class="glitch-overlay"></div>
+                <span class="col-ticker">${trade.ticker}</span>
+                <span class="col-premium">${trade.premium}</span>
+                <span class="col-details">${trade.details}</span>
+                <span class="col-tags">
+                    ${trade.tags.map(tag => {
+                let tagClass = 'tag-call';
+                if (tag === 'PUT') tagClass = 'tag-put';
+                if (tag === 'MEGA') tagClass = 'tag-mega';
+                return `<span class="tag ${tagClass}">${tag}</span>`;
+            }).join('')}
+                </span>
+            `;
+
+            return row;
+        }
+
+        function addNewTrade(type) {
+            const trade = getRandomTrade(type);
+            const row = createTradeRow(trade);
+            const list = document.getElementById('whale-list');
+
+            // Insert at the top
+            list.insertBefore(row, list.firstChild);
+
+            // Remove the glitch-new class after animations complete
+            setTimeout(() => {
+                row.classList.remove('glitch-new');
+            }, 700);
+        }
+
+        function clearTrades() {
+            const list = document.getElementById('whale-list');
+            list.innerHTML = '';
+        }
+    </script>
+</body>
+
+</html>

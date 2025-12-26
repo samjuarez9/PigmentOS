@@ -1851,9 +1851,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (diff >= 10) {
                 if (callGexPct > putGexPct) {
-                    dominanceBadgeHtml = `<span class="dominance-badge bullish">CALLS +${Math.round(diff)}%</span>`;
+                    dominanceBadgeHtml = `<span class="dominance-badge bullish">CALLS ${Math.round(diff)}%</span>`;
                 } else {
-                    dominanceBadgeHtml = `<span class="dominance-badge bearish">PUTS +${Math.round(diff)}%</span>`;
+                    dominanceBadgeHtml = `<span class="dominance-badge bearish">PUTS ${Math.round(diff)}%</span>`;
                 }
             } else {
                 dominanceBadgeHtml = `<span class="dominance-badge neutral">BALANCED</span>`;
@@ -2177,6 +2177,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 callBar.onmousemove = (e) => moveTooltip(e, gammaTooltip);
                 callBar.onmouseleave = () => hideTooltip(gammaTooltip);
 
+                // Mobile touch support - position relative to tapped element
+                putBar.ontouchstart = (e) => {
+                    e.preventDefault();
+                    showTooltip(e, strikeData, 'PUT', gammaTooltip);
+                    // Position tooltip relative to the tapped bar element
+                    const rect = putBar.getBoundingClientRect();
+                    positionTooltipNearElement(rect, gammaTooltip);
+                };
+                putBar.ontouchend = () => hideTooltip(gammaTooltip);
+
+                callBar.ontouchstart = (e) => {
+                    e.preventDefault();
+                    showTooltip(e, strikeData, 'CALL', gammaTooltip);
+                    // Position tooltip relative to the tapped bar element
+                    const rect = callBar.getBoundingClientRect();
+                    positionTooltipNearElement(rect, gammaTooltip);
+                };
+                callBar.ontouchend = () => hideTooltip(gammaTooltip);
+
                 gammaChartBars.appendChild(row);
             }
         });
@@ -2256,8 +2275,73 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function moveTooltip(e, tooltip) {
-        const x = e.clientX + 15;
-        const y = e.clientY + 15;
+        // Support both mouse and touch events
+        let clientX, clientY;
+
+        if (e.touches && e.touches.length > 0) {
+            // Touch event
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else if (e.changedTouches && e.changedTouches.length > 0) {
+            // Touch end event
+            clientX = e.changedTouches[0].clientX;
+            clientY = e.changedTouches[0].clientY;
+        } else {
+            // Mouse event
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+
+        // Position tooltip near the tap/click, but keep it on screen
+        const tooltipWidth = tooltip.offsetWidth || 200;
+        const tooltipHeight = tooltip.offsetHeight || 150;
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+
+        // Default offset from cursor/tap
+        let x = clientX + 15;
+        let y = clientY + 15;
+
+        // Keep tooltip on screen (right edge)
+        if (x + tooltipWidth > screenWidth - 10) {
+            x = clientX - tooltipWidth - 15;
+        }
+
+        // Keep tooltip on screen (bottom edge)
+        if (y + tooltipHeight > screenHeight - 10) {
+            y = clientY - tooltipHeight - 15;
+        }
+
+        // Ensure tooltip doesn't go off left or top edge
+        x = Math.max(10, x);
+        y = Math.max(10, y);
+
+        tooltip.style.left = `${x}px`;
+        tooltip.style.top = `${y}px`;
+    }
+
+    // Position tooltip near an element (for mobile touch)
+    function positionTooltipNearElement(rect, tooltip) {
+        const tooltipWidth = tooltip.offsetWidth || 200;
+        const tooltipHeight = tooltip.offsetHeight || 150;
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+
+        // Position tooltip above the element, centered horizontally
+        let x = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+        let y = rect.top - tooltipHeight - 10;
+
+        // If tooltip would go off the top, position below instead
+        if (y < 10) {
+            y = rect.bottom + 10;
+        }
+
+        // Keep on screen horizontally
+        x = Math.max(10, Math.min(x, screenWidth - tooltipWidth - 10));
+
+        // Keep on screen vertically
+        y = Math.max(10, Math.min(y, screenHeight - tooltipHeight - 10));
+
         tooltip.style.left = `${x}px`;
         tooltip.style.top = `${y}px`;
     }
@@ -2804,4 +2888,270 @@ document.addEventListener('DOMContentLoaded', () => {
     // TFI Macro Update Loop (30 Minutes)
     // fetchVIX(); // Initial Render - DISABLED, using CNN Fear & Greed instead
     // setInterval(fetchVIX, 30 * 60 * 1000); // 30 Minutes - DISABLED
+
+    // === ECONOMIC EVENT CALENDAR LOGIC ===
+    // =====================================================================
+    // MANUAL EVENTS - Edit this array to add/remove economic events
+    // Format: { title, time, type, stars (1-3), rawDate: "YYYY-MM-DD" }
+    // =====================================================================
+    const MANUAL_EVENTS = [
+        // === JANUARY 2026 ===
+        { title: "OBBBA STIMULUS IMPLEMENTATION", time: "12:00 AM ET", type: "GOV", stars: 3, rawDate: "2026-01-01" },
+        { title: "JOBS REPORT (DEC 2025)", time: "8:30 AM ET", type: "LABOR", stars: 3, rawDate: "2026-01-09" },
+        { title: "BOJ MONETARY POLICY MEETING", time: "11:00 PM ET", type: "CB", stars: 2, rawDate: "2026-01-22" },
+        { title: "FOMC RATE DECISION", time: "2:00 PM ET", type: "FED", stars: 3, rawDate: "2026-01-28" },
+        { title: "BOC RATE ANNOUNCEMENT", time: "10:00 AM ET", type: "CB", stars: 2, rawDate: "2026-01-28" },
+        { title: "Q4 BIG TECH EARNINGS BEGIN", time: "4:00 PM ET", type: "EARNINGS", stars: 3, rawDate: "2026-01-28" },
+        // === FEBRUARY 2026 ===
+        { title: "ECB MONETARY POLICY MEETING", time: "8:15 AM ET", type: "CB", stars: 2, rawDate: "2026-02-05" },
+        { title: "BOE MPC DECISION", time: "7:00 AM ET", type: "CB", stars: 2, rawDate: "2026-02-05" },
+        { title: "JOBS REPORT (JAN 2026)", time: "8:30 AM ET", type: "LABOR", stars: 3, rawDate: "2026-02-06" },
+        { title: "CHINA LUNAR NEW YEAR", time: "12:00 AM ET", type: "HOLIDAY", stars: 2, rawDate: "2026-02-17" },
+        { title: "SUPREME COURT TARIFF RULINGS", time: "10:00 AM ET", type: "GOV", stars: 3, rawDate: "2026-02-15" },
+    ];
+
+    const economicCalendar = {
+        events: [],
+
+        countdownInterval: null,
+
+        init: function () {
+            this.cacheDOM();
+            this.bindEvents();
+            this.loadManualEvents(); // Load static events
+            this.checkCriticalEvents();
+
+            // Expose to window for global access (e.g. from index.html)
+            window.economicCalendar = this;
+        },
+
+        loadManualEvents: function () {
+            // Convert rawDate strings to Date objects
+            this.events = MANUAL_EVENTS.map(event => ({
+                ...event,
+                rawDate: new Date(event.rawDate + 'T12:00:00')
+            }));
+            this.render();
+        },
+
+        addTrialAlert: function (daysRemaining) {
+            if (daysRemaining > 3) return;
+
+            // Check if already added to avoid duplicates
+            if (this.events.some(e => e.title === "TRIAL EXPIRING")) return;
+
+            const alertEvent = {
+                title: "TRIAL EXPIRING",
+                time: `IN ${daysRemaining} DAYS`,
+                type: "SYSTEM ALERT",
+                status: "ACTIVE",
+                critical: true,
+                stars: 3,
+                rawDate: new Date(Date.now() + (daysRemaining * 86400000))
+            };
+
+            // Prepend to events
+            this.events.unshift(alertEvent);
+            this.render();
+            console.log(`⚠️ Trial alert added to Critical Events: ${daysRemaining} days left`);
+        },
+
+        cacheDOM: function () {
+            this.modal = document.getElementById('economic-calendar-modal');
+            this.closeBtn = document.getElementById('close-calendar-btn');
+            this.listContainer = document.getElementById('economic-event-list');
+            this.dateElement = document.getElementById('date');
+            this.countdownElement = document.getElementById('boss-countdown');
+        },
+
+        bindEvents: function () {
+            if (this.closeBtn) {
+                this.closeBtn.addEventListener('click', () => this.closeModal());
+            }
+
+            // Close on ESC
+            document.addEventListener('keydown', (e) => {
+                if (this.modal && !this.modal.classList.contains('hidden') && e.key === 'Escape') {
+                    this.closeModal();
+                }
+            });
+
+            // Close on overlay click
+            if (this.modal) {
+                const overlay = this.modal.querySelector('.modal-overlay');
+                if (overlay) {
+                    overlay.addEventListener('click', () => this.closeModal());
+                }
+            }
+
+            // Open on Date Click
+            if (this.dateElement) {
+                this.dateElement.addEventListener('click', () => this.openModal());
+            }
+        },
+
+        render: function () {
+            if (!this.listContainer) return;
+
+            if (this.events.length === 0) {
+                this.listContainer.innerHTML = '<div class="placeholder-item">NO UPCOMING EVENTS DETECTED...</div>';
+                return;
+            }
+
+            this.listContainer.innerHTML = this.events.map((event, index) => {
+                const isBoss = event.type === 'BOSS ENCOUNTER';
+                const isCleared = event.status === 'CLEARED';
+
+                let rowClass = '';
+                if (isCleared) rowClass = 'level-cleared';
+                else if (isBoss) rowClass = 'boss-encounter';
+
+                const icon = isCleared ? '✅' : (isBoss ? '⚠️' : '📅');
+
+                // Generate Stars
+                const starCount = event.stars || 1;
+                let starsHtml = '';
+                for (let i = 0; i < 3; i++) {
+                    const starClass = i < starCount ? 'pixel-star active' : 'pixel-star inactive';
+                    starsHtml += `<span class="${starClass}"></span>`;
+                }
+
+                return `
+                    <div class="event-row ${rowClass}" id="event-row-${index}">
+                        <div class="event-status-icon">${icon}</div>
+                        <div class="event-details">
+                            <div class="event-header">
+                                <span class="event-title">${event.title}</span>
+                                <span class="difficulty-stars">${starsHtml}</span>
+                                <span class="event-timer" data-index="${index}" data-time="${event.rawDate.toISOString()}">T-MINUS --:--:--</span>
+                            </div>
+                            <div class="event-meta">
+                                <span class="event-time">${event.time}</span>
+                                <span class="event-separator">|</span>
+                                <span class="event-type">${event.type}</span>
+                            </div>
+                            <div class="event-progress-container">
+                                <div class="event-progress-bar" data-index="${index}"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Start individual timers
+            this.startEventTimers();
+        },
+
+        startEventTimers: function () {
+            if (this.countdownInterval) clearInterval(this.countdownInterval);
+
+            this.updateEventTimers(); // Immediate update
+            this.countdownInterval = setInterval(() => {
+                this.updateEventTimers();
+            }, 1000);
+        },
+
+        updateEventTimers: function () {
+            const timerElements = this.listContainer.querySelectorAll('.event-timer');
+            const now = new Date();
+
+            timerElements.forEach(el => {
+                const targetTime = new Date(el.dataset.time);
+                const diff = targetTime - now;
+                const index = el.dataset.index;
+                const row = document.getElementById(`event-row-${index}`);
+                const progressBar = row ? row.querySelector('.event-progress-bar') : null;
+
+                // Progress bar: assume 7-day window (100% = event time, 0% = 7 days before)
+                const WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
+                let progressPercent = 0;
+                if (diff <= 0) {
+                    progressPercent = 100;
+                } else if (diff < WINDOW_MS) {
+                    progressPercent = ((WINDOW_MS - diff) / WINDOW_MS) * 100;
+                }
+
+                if (progressBar) {
+                    progressBar.style.width = `${Math.min(100, Math.max(0, progressPercent))}%`;
+                    // Color based on urgency
+                    if (diff <= 0) {
+                        progressBar.className = 'event-progress-bar active';
+                    } else if (diff < 60 * 60 * 1000) {
+                        progressBar.className = 'event-progress-bar critical';
+                    } else if (diff < 24 * 60 * 60 * 1000) {
+                        progressBar.className = 'event-progress-bar urgent';
+                    } else {
+                        progressBar.className = 'event-progress-bar';
+                    }
+                }
+
+                if (diff <= 0) {
+                    el.textContent = ">>> ACTIVE <<<";
+                    el.classList.add('blink-text');
+                    if (row) row.classList.add('urgent-pulse');
+                } else {
+                    // Calculate time components
+                    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+                    const hStr = String(hours).padStart(2, '0');
+                    const mStr = String(minutes).padStart(2, '0');
+                    const sStr = String(seconds).padStart(2, '0');
+
+                    // Dynamic Formatting
+                    if (days > 0) {
+                        el.textContent = `${days}d ${hStr}:${mStr}:${sStr}`;
+                    } else {
+                        el.textContent = `${hStr}:${mStr}:${sStr}`;
+                    }
+
+                    el.classList.remove('blink-text');
+
+                    // Critical Alert (< 60s)
+                    if (diff < 60 * 1000) {
+                        el.classList.add('critical-timer');
+                        el.classList.remove('urgent-timer');
+                        if (row) {
+                            row.classList.add('critical-pulse');
+                            row.classList.remove('urgent-pulse');
+                        }
+                    }
+                    // Urgency Check (< 60 mins)
+                    else if (diff < 60 * 60 * 1000) {
+                        el.classList.add('urgent-timer');
+                        el.classList.remove('critical-timer');
+                        if (row) {
+                            row.classList.add('urgent-pulse');
+                            row.classList.remove('critical-pulse');
+                        }
+                    } else {
+                        el.classList.remove('urgent-timer', 'critical-timer');
+                        if (row) row.classList.remove('urgent-pulse', 'critical-pulse');
+                    }
+                }
+            });
+        },
+
+        openModal: function () {
+            if (this.modal) this.modal.classList.remove('hidden');
+        },
+
+        closeModal: function () {
+            if (this.modal) this.modal.classList.add('hidden');
+        },
+
+        checkCriticalEvents: function () {
+            // Always make date clickable with pulsing border
+            if (this.dateElement) {
+                this.dateElement.classList.add('critical-event');
+                this.dateElement.title = "CLICK FOR ECONOMIC CALENDAR";
+            }
+        }
+    };
+
+    // Initialize Calendar
+    economicCalendar.init();
+
 });

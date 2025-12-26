@@ -123,6 +123,7 @@
 
                 <div class="financial-disclaimer">For educational and research purposes and not financial advice
                 </div>
+                <div id="manage-billing-btn" class="billing-link" style="display: none;">[MANAGE BILLING]</div>
                 <div class="clock-date-container">
                     <div id="clock" class="clock">00:00:00</div>
                     <div id="date" class="date">MON, JAN 1</div>
@@ -318,6 +319,30 @@
         <!-- Bottom Ticker Widget - Moved to Intel Feed Header -->
     </div>
 
+    <!-- ECONOMIC EVENT CALENDAR MODAL (Retro CRT Style) -->
+    <div id="economic-calendar-modal" class="retro-modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="crt-window">
+            <div class="crt-header">
+                <span class="crt-title">⚠️ CRITICAL EVENTS LOG</span>
+                <button id="close-calendar-btn" class="crt-close-btn">[X]</button>
+            </div>
+            <div class="crt-content">
+                <div class="scanline-overlay"></div>
+
+                <div class="event-list-header">
+                    <span class="crt-status">STATUS: <span class="status-active">ACTIVE</span></span>
+                </div>
+                <div id="economic-event-list" class="retro-list">
+                    <!-- Populated by JS -->
+                </div>
+                <div class="crt-footer">
+                    <span>PRESS ESC TO CLOSE</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- System Diagnostics - Minimal WiFi + Latency -->
     <div id="connection-monitor" class="diag-inline">
         <div class="wifi-signal" id="wifi-bars">
@@ -397,6 +422,47 @@
             });
         }
 
+        function setupBillingButton(user) {
+            const billingBtn = document.getElementById('manage-billing-btn');
+            if (!billingBtn) return;
+
+            // If no user (Dev Mode), show disabled or hide
+            if (!user) {
+                billingBtn.style.display = 'block';
+                billingBtn.style.opacity = '0.5';
+                billingBtn.onclick = () => alert('Billing not available in Dev Mode');
+                return;
+            }
+
+            billingBtn.style.display = 'block';
+            billingBtn.onclick = async () => {
+                try {
+                    const originalText = billingBtn.innerText;
+                    billingBtn.innerText = '[LOADING...]';
+                    const idToken = await user.getIdToken();
+                    const response = await fetch('/api/create-portal-session', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${idToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ email: user.email })
+                    });
+                    const data = await response.json();
+                    if (data.url) {
+                        window.location.href = data.url;
+                    } else {
+                        alert('Error: ' + (data.error || 'Could not create portal session'));
+                        billingBtn.innerText = originalText;
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert('Error connecting to billing portal');
+                    billingBtn.innerText = '[MANAGE BILLING]';
+                }
+            };
+        }
+
         onAuthStateChanged(auth, async (user) => {
             // DEV MODE BYPASS
             const isDevMode = localStorage.getItem('devMode') === 'true';
@@ -404,6 +470,7 @@
                 console.log('🔧 DEV MODE: Bypassing auth check');
                 hideLoadingScreen();
                 document.body.style.visibility = 'visible';
+                setupBillingButton(null); // Show disabled button
                 return;
             }
 
@@ -421,6 +488,7 @@
                 hideLoadingScreen();
                 document.body.style.visibility = 'visible';
                 showVipAnimation();
+                setupBillingButton(user); // Enable button for admins
                 return;
             }
 
@@ -428,23 +496,11 @@
             // This prevents long loading times and incorrect lockouts
             hideLoadingScreen();
             document.body.style.visibility = 'visible';
+            setupBillingButton(user); // Enable button for normal users
 
             // Background subscription check (non-blocking)
             setTimeout(async () => {
                 try {
-                    const userDoc = await getDoc(doc(db, "users", user.uid));
-
-                    if (!userDoc.exists()) {
-                        console.log("Creating trial for new user");
-                        await setDoc(doc(db, "users", user.uid), {
-                            email: user.email,
-                            trialStartDate: serverTimestamp(),
-                            subscriptionStatus: "trialing"
-                        });
-                        showTrialBanner(14);
-                        return;
-                    }
-
                     // Get Firebase ID token for server-side verification
                     const idToken = await user.getIdToken();
 
@@ -477,7 +533,13 @@
 
                     // Show appropriate UI based on status
                     if (status.status === 'trialing') {
-                        showTrialBanner(status.days_remaining || 14);
+                        const days = status.days_remaining !== undefined ? status.days_remaining : 14;
+                        showTrialBanner(days);
+
+                        // Integrate with Critical Events (Economic Calendar)
+                        if (window.economicCalendar && window.economicCalendar.addTrialAlert) {
+                            window.economicCalendar.addTrialAlert(days);
+                        }
 
                         if (status.login_count > 1) {
                             showPriceNotification();
@@ -499,7 +561,14 @@
             banner.innerHTML = `🎁 Free Trial: ${days} days remaining <a href="/upgrade.html" id="upgrade-link" style="color: #00FFFF; text-decoration: underline; margin-left: 20px;">Upgrade Now →</a>`;
             banner.style.cssText = 'position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; background: linear-gradient(90deg, #9D4EDD, #7B2CBF) !important; color: white !important; text-align: center !important; padding: 10px !important; font-family: VT323, monospace !important; font-size: 18px !important; z-index: 999999 !important; box-shadow: 0 2px 10px rgba(0,0,0,0.3) !important; display: block !important;';
             document.body.prepend(banner);
-            document.body.style.paddingTop = '40px';
+
+            // Push down the main container to avoid overlap
+            const terminal = document.querySelector('.terminal-container');
+            if (terminal) {
+                terminal.style.marginTop = '40px';
+            } else {
+                document.body.style.paddingTop = '40px';
+            }
 
             // Analytics
             if (window.pigmentAnalytics) {

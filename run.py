@@ -131,7 +131,8 @@ CACHE = {
     "movers": {"data": [], "timestamp": 0},
     "news": {"data": [], "timestamp": 0},
     "heatmap": {"data": [], "timestamp": 0},
-    "gamma_SPY": {"data": None, "timestamp": 0}
+    "gamma_SPY": {"data": None, "timestamp": 0},
+    "economic_calendar": {"data": [], "timestamp": 0}
 }
 
 # Service Status Tracker
@@ -162,6 +163,8 @@ MARKETDATA_MIN_INTERVAL = 0.25  # 250ms between requests
 
 # Polygon.io API Key (primary options data source - unlimited calls)
 POLYGON_API_KEY = os.environ.get("POLYGON_API_KEY")
+FMP_API_KEY = os.environ.get("FMP_API_KEY")  # No longer used
+FRED_API_KEY = os.environ.get("FRED_API_KEY", "9832f887b004951ec7d53cb78f1063a0")
 
 # Price cache to reduce redundant API calls (TTL: 60 seconds)
 PRICE_CACHE = {}  # {symbol: {"price": float, "timestamp": float}}
@@ -991,35 +994,72 @@ def subscription_status():
                 'is_vip': True
             })
         
-        # 2. STRIPE IS SOURCE OF TRUTH
-        # Check Stripe directly for the most accurate status
+        # 2. FIRESTORE IS SOURCE OF TRUTH FOR TRIAL COUNTDOWN
+        # We use Firestore for the countdown to avoid Stripe latency/sync issues
+        days_remaining = TRIAL_DAYS
+        is_premium = False
+        
+        if firestore_db and user_uid:
+            try:
+                user_ref = firestore_db.collection('users').document(user_uid)
+                user_doc = user_ref.get()
+                
+                if user_doc.exists:
+                    user_data = user_doc.to_dict()
+                    trial_start = user_data.get('trialStartDate')
+                    
+                    if trial_start:
+                        # Calculate days remaining
+                        # trial_start is a Firestore timestamp (datetime object)
+                        if isinstance(trial_start, datetime):
+                            start_ts = trial_start.timestamp()
+                        else:
+                            # Fallback if it's already a timestamp or other format
+                            start_ts = trial_start
+                            
+                        now_ts = datetime.now().timestamp()
+                        elapsed_days = int((now_ts - start_ts) / 86400)
+                        days_remaining = max(0, TRIAL_DAYS - elapsed_days)
+                    else:
+                        # Initialize trialStartDate if missing
+                        user_ref.update({'trialStartDate': firestore.SERVER_TIMESTAMP})
+                        print(f"Initialized missing trialStartDate for {user_email}")
+                else:
+                    # Create document if it doesn't exist (should be handled by login.html but safe fallback)
+                    user_ref.set({
+                        'email': user_email,
+                        'trialStartDate': firestore.SERVER_TIMESTAMP,
+                        'subscriptionStatus': 'trialing',
+                        'login_count': 1
+                    })
+                    print(f"Created missing user document for {user_email}")
+            except Exception as e:
+                print(f"Firestore trial check failed: {e}")
+
+        # 3. STRIPE IS SOURCE OF TRUTH FOR PAYMENTS
         try:
             customers = stripe.Customer.list(email=user_email, limit=1)
             if customers.data:
                 customer = customers.data[0]
-                # Check for ANY subscription (active, trialing, past_due, etc.)
                 subscriptions = stripe.Subscription.list(customer=customer.id, limit=1, status='all')
                 
                 if subscriptions.data:
                     sub = subscriptions.data[0]
                     print(f"Stripe Status for {user_email}: {sub.status}")
                     
-                    # LOGIC:
-                    # active / trialing -> ACCESS
-                    # past_due / canceled / unpaid -> NO ACCESS
-                    
                     if sub.status in ['active', 'trialing']:
-                        # Calculate days remaining if trialing
-                        days_left = 14 # Default
-                        if sub.status == 'trialing' and sub.trial_end:
-                            now_ts = datetime.now().timestamp()
-                            days_left = int((sub.trial_end - now_ts) / 86400)
+                        # If Stripe says active, they are premium
+                        if sub.status == 'active':
+                            is_premium = True
                         
+                        # If Stripe has a more accurate trial_end, we could use it, 
+                        # but per requirements we stick to Firestore for the countdown.
                         return jsonify({
                             'status': sub.status,
-                            'days_remaining': max(0, days_left),
+                            'days_remaining': days_remaining,
                             'has_access': True,
-                            'login_count': login_count
+                            'login_count': login_count,
+                            'is_premium': is_premium
                         })
                     else:
                         # Hard Lockout for expired/bad status
@@ -1028,14 +1068,13 @@ def subscription_status():
                             'has_access': False
                         })
                 else:
-                    print("Customer exists but no subscription found -> Auto-Migrating to New Trial")
-                    # Fall through to creation logic
+                    print("Customer exists but no subscription found -> Auto-Migrating")
             else:
-                print("No Stripe customer found -> Auto-Migrating to New Trial")
+                print("No Stripe customer found -> Auto-Migrating")
                 
-            # AUTO-MIGRATION LOGIC
-            # If we are here, the user has NO active subscription.
-            # Return IMMEDIATELY with trialing status, create Stripe subscription in background
+            # AUTO-MIGRATION LOGIC (Background)
+            # If we are here, the user has NO active subscription in Stripe.
+            # We return the Firestore-calculated trial status immediately.
             
             def create_stripe_subscription_async(email, uid, cust_data):
                 """Background task to create Stripe customer and subscription"""
@@ -1047,31 +1086,23 @@ def subscription_status():
                             email=email,
                             metadata={'firebase_uid': uid}
                         )
-                        print(f"Created new customer for migration: {customer.id}")
                     
-                    # Create the trial subscription
-                    new_sub = stripe.Subscription.create(
+                    stripe.Subscription.create(
                         customer=customer.id,
                         items=[{'price': STRIPE_PRICE_ID}],
                         trial_period_days=TRIAL_DAYS,
                         payment_behavior='default_incomplete',
                         metadata={'firebase_uid': uid, 'source': 'auto_migration'}
                     )
-                    print(f"Auto-migrated {email} to new trial: {new_sub.id}")
                     
-                    # Update Firestore
                     if firestore_db:
-                        firestore_db.collection('users').document(uid).set({
+                        firestore_db.collection('users').document(uid).update({
                             'stripeCustomerId': customer.id,
-                            'stripeSubscriptionId': new_sub.id,
-                            'subscriptionStatus': new_sub.status,
-                            'trialStartDate': firestore.SERVER_TIMESTAMP,
-                            'email': email
-                        }, merge=True)
+                            'subscriptionStatus': 'trialing'
+                        })
                 except Exception as e:
                     print(f"Background Stripe migration error: {e}")
             
-            # Start background thread for Stripe operations
             existing_customer = customers.data[0] if customers.data else None
             threading.Thread(
                 target=create_stripe_subscription_async,
@@ -1079,12 +1110,12 @@ def subscription_status():
                 daemon=True
             ).start()
             
-            # Return immediately - don't wait for Stripe
             return jsonify({
                 'status': 'trialing',
-                'days_remaining': TRIAL_DAYS,
+                'days_remaining': days_remaining,
                 'has_access': True,
-                'login_count': login_count
+                'login_count': login_count,
+                'is_premium': False
             })
 
         except Exception as stripe_e:
@@ -1204,6 +1235,70 @@ def start_trial():
         print(f"Start Trial Error: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/create-portal-session', methods=['POST'])
+@limiter.limit("5 per minute")
+def create_portal_session():
+    """Create a Stripe Customer Portal session for subscription management"""
+    try:
+        # 1. VERIFY FIREBASE TOKEN
+        auth_header = request.headers.get('Authorization', '')
+        
+        # Dev Bypass
+        if not firestore_db:
+            print("⚠️ Dev Mode: Bypassing token verification for portal session")
+            data = request.get_json()
+            user_email = data.get('email')
+        elif not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Missing Authorization header'}), 401
+        else:
+            id_token = auth_header.split('Bearer ')[1]
+            try:
+                decoded_token = firebase_auth.verify_id_token(id_token)
+                user_email = decoded_token.get('email')
+                user_uid = decoded_token.get('uid')
+            except Exception as auth_error:
+                print(f"Token verification failed: {auth_error}")
+                return jsonify({'error': 'Invalid token'}), 401
+
+        if not user_email:
+            return jsonify({'error': 'No email found'}), 400
+
+        # 2. GET STRIPE CUSTOMER ID
+        stripe_customer_id = None
+        
+        # Try Firestore first
+        if firestore_db and user_uid:
+            try:
+                user_doc = firestore_db.collection('users').document(user_uid).get()
+                if user_doc.exists:
+                    stripe_customer_id = user_doc.to_dict().get('stripeCustomerId')
+            except Exception as e:
+                print(f"Firestore lookup failed: {e}")
+
+        # Fallback to Stripe lookup by email
+        if not stripe_customer_id:
+            customers = stripe.Customer.list(email=user_email, limit=1)
+            if customers.data:
+                stripe_customer_id = customers.data[0].id
+        
+        if not stripe_customer_id:
+            return jsonify({'error': 'No Stripe customer found'}), 404
+
+        # 3. CREATE PORTAL SESSION
+        # Redirect back to dashboard after managing subscription
+        return_url = "https://pigmentos.onrender.com/index.html"
+        
+        portal_session = stripe.billing_portal.Session.create(
+            customer=stripe_customer_id,
+            return_url=return_url,
+        )
+
+        return jsonify({'url': portal_session.url})
+
+    except Exception as e:
+        print(f"Portal Session Error: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/stripe-webhook', methods=['POST'])
 def stripe_webhook():
     """Handle Stripe webhook events to update Firestore subscription status"""
@@ -1306,9 +1401,33 @@ def stripe_webhook():
                     break
         except Exception as e:
             print(f"❌ Subscription update handling failed: {e}")
-    
+
+    elif event_type == 'invoice.paid':
+        invoice = event['data']['object']
+        customer_id = invoice.get('customer')
+        subscription_id = invoice.get('subscription')
+        
+        try:
+            customer = stripe.Customer.retrieve(customer_id)
+            customer_email = customer.get('email')
+            
+            if customer_email and firestore_db:
+                users_ref = firestore_db.collection('users')
+                query = users_ref.where('email', '==', customer_email).limit(1)
+                docs = query.stream()
+                
+                for doc in docs:
+                    doc.reference.update({
+                        'subscriptionStatus': 'active',
+                        'stripeSubscriptionId': subscription_id,
+                        'subscriptionUpdatedAt': firestore.SERVER_TIMESTAMP
+                    })
+                    print(f"💰 Invoice Paid for {customer_email}: Status -> active")
+                    break
+        except Exception as e:
+            print(f"❌ Invoice paid handling failed: {e}")
+
     elif event_type == 'invoice.payment_failed':
-        # Handle failed payment - mark as past_due
         invoice = event['data']['object']
         customer_id = invoice.get('customer')
         
@@ -1326,10 +1445,10 @@ def stripe_webhook():
                         'subscriptionStatus': 'past_due',
                         'subscriptionUpdatedAt': firestore.SERVER_TIMESTAMP
                     })
-                    print(f"⚠️ Payment failed for {customer_email}: subscriptionStatus = past_due")
+                    print(f"⚠️ Payment Failed for {customer_email}: Status -> past_due")
                     break
         except Exception as e:
-            print(f"❌ Payment failed handling error: {e}")
+            print(f"❌ Invoice payment failed handling failed: {e}")
     
     return jsonify({'status': 'success'}), 200
 
@@ -1888,6 +2007,88 @@ def api_movers():
         return jsonify({"error": str(e)})
 
 
+@app.route('/api/economic-calendar')
+def api_economic_calendar():
+    global CACHE
+    current_time = time.time()
+    
+    # Cache for 1 hour for economic calendar
+    if current_time - CACHE["economic_calendar"]["timestamp"] < 3600:
+        return jsonify(CACHE["economic_calendar"]["data"])
+        
+    try:
+        # Fetch releases for the next 3 weeks using FRED API
+        start_date = datetime.now().strftime('%Y-%m-%d')
+        end_date = (datetime.now() + timedelta(days=21)).strftime('%Y-%m-%d')
+        
+        url = f"https://api.stlouisfed.org/fred/releases/dates?api_key={FRED_API_KEY}&file_type=json&realtime_start={start_date}&realtime_end={end_date}&include_release_dates_with_no_data=true&limit=50&sort_order=asc"
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code != 200:
+            print(f"⚠️ FRED API Error: {response.status_code}")
+            return jsonify(CACHE["economic_calendar"]["data"])
+            
+        data = response.json()
+        release_dates = data.get('release_dates', [])
+        
+        # High-impact releases (FOMC, CPI, Jobs, GDP)
+        HIGH_IMPACT_KEYWORDS = ['FOMC', 'CPI', 'Employment', 'GDP', 'Nonfarm', 'Jobless', 'Retail Sales', 'Consumer Price', 'Federal Reserve']
+        MEDIUM_IMPACT_KEYWORDS = ['ADP', 'PMI', 'Housing', 'Durable', 'Industrial', 'Trade Balance', 'Treasury']
+        
+        formatted_events = []
+        for item in release_dates:
+            release_name = item.get('release_name', 'Unknown')
+            release_date = item.get('date', '')
+            
+            # Determine impact level based on keywords
+            stars = 1
+            critical = False
+            event_type = "STANDARD"
+            
+            if any(kw.lower() in release_name.lower() for kw in HIGH_IMPACT_KEYWORDS):
+                stars = 3
+                critical = True
+                event_type = "BOSS ENCOUNTER"
+            elif any(kw.lower() in release_name.lower() for kw in MEDIUM_IMPACT_KEYWORDS):
+                stars = 2
+                event_type = "CRITICAL DATA"
+            
+            # Format time for display (e.g. "TUE JAN 07")
+            try:
+                dt = datetime.strptime(release_date, '%Y-%m-%d')
+                display_time = dt.strftime('%a %b %d').upper()
+            except:
+                display_time = release_date
+                dt = datetime.now()
+                
+            formatted_events.append({
+                "title": release_name.upper(),
+                "time": display_time,
+                "type": event_type,
+                "status": "UPCOMING",
+                "critical": critical,
+                "stars": stars,
+                "rawDate": release_date,
+                "country": "US"
+            })
+        
+        # Filter to only high-impact (3-star BOSS ENCOUNTER) events
+        formatted_events = [e for e in formatted_events if e['stars'] >= 3]
+        
+        # Sort by date and limit to top 6
+        formatted_events.sort(key=lambda x: x['rawDate'])
+        formatted_events = formatted_events[:6]
+        
+        CACHE["economic_calendar"]["data"] = formatted_events
+        CACHE["economic_calendar"]["timestamp"] = current_time
+        
+        return jsonify(formatted_events)
+        
+    except Exception as e:
+        print(f"⚠️ Economic Calendar Error: {e}")
+        return jsonify(CACHE["economic_calendar"]["data"])
+
+
 @app.route('/api/news')
 def api_news():
     global CACHE
@@ -2366,10 +2567,22 @@ def start_background_worker():
             whales_needs_hydration = not CACHE.get("whales", {}).get("data")
             
             if is_market_open or whales_needs_hydration:
-                for symbol in WHALE_WATCHLIST:
-                    try: refresh_single_whale(symbol)
-                    except Exception as e: print(f"Worker Error (Whale {symbol}): {e}")
-                    time.sleep(0.2)  # Polygon: unlimited API - faster polling
+                import gevent
+                start_time = time.time()
+                
+                def fetch_whale_task(symbol):
+                    try:
+                        refresh_single_whale(symbol)
+                    except Exception as e:
+                        print(f"Worker Error (Whale {symbol}): {e}")
+
+                # Spawn parallel tasks for each symbol
+                threads = [gevent.spawn(fetch_whale_task, s) for s in WHALE_WATCHLIST]
+                gevent.joinall(threads, timeout=30)
+                
+                duration = time.time() - start_time
+                if duration > 5:
+                    print(f"🐢 Whale Scan took {duration:.2f}s for {len(WHALE_WATCHLIST)} symbols", flush=True)
             else:
                 # If market closed AND cache populated, stop polling whales/gamma
                 # Just sleep and check News/Heatmap occasionally
@@ -2388,7 +2601,7 @@ def start_background_worker():
 if not hasattr(start_background_worker, '_started'):
     load_whale_cache()  # Restore persisted whale data
     mark_whale_cache_cleared()  # Mark this session's start time
-    start_background_worker()
+    # start_background_worker()  # REMOVED: Handled by Gunicorn post_worker_init
     start_background_worker._started = True
 
 if __name__ == "__main__":

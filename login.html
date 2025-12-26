@@ -1154,14 +1154,16 @@
                 const result = await signInWithPopup(auth, provider);
                 console.log("Google Sign-In successful:", result.user);
 
-                // Check if new user and store trial start date
+                // Ensure user document exists in Firestore with a trialStartDate
+                // Using merge: true ensures we don't overwrite if they already have a date
+                await setDoc(doc(db, "users", result.user.uid), {
+                    email: result.user.email,
+                    trialStartDate: serverTimestamp(),
+                    subscriptionStatus: "trialing"
+                }, { merge: true });
+
+                // Analytics
                 if (result.user.metadata.creationTime === result.user.metadata.lastSignInTime) {
-                    // New user - start trial
-                    await setDoc(doc(db, "users", result.user.uid), {
-                        email: result.user.email,
-                        trialStartDate: serverTimestamp(),
-                        subscriptionStatus: "trialing"
-                    });
                     logEvent(analytics, 'sign_up', { method: 'Google' });
                     logEvent(analytics, 'trial_started', {
                         method: 'Google',
