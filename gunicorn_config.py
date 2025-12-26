@@ -10,10 +10,10 @@ worker_class = "gevent"
 workers = 2  # 2 workers for better concurrency
 timeout = 120  # Increase timeout to 2 minutes for heavy hydration
 
-def post_worker_init(worker):
+def post_fork(server, worker):
     """
-    Start background worker thread AFTER Gunicorn forks.
-    This ensures the thread exists in the worker process, not the master.
+    Start background worker AFTER Gunicorn forks (gevent compatible).
+    post_worker_init doesn't work with gevent workers - must use post_fork.
     """
     try:
         from run import start_background_worker
@@ -21,5 +21,6 @@ def post_worker_init(worker):
         print(f"✅ Background worker started in process {worker.pid}", flush=True)
     except Exception as e:
         print(f"⚠️ Background worker failed to start: {e}", flush=True)
-        # Don't crash the entire worker - it can still serve requests
+        import traceback
+        traceback.print_exc()
 
