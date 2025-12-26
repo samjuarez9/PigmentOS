@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // === GLOBAL CONFIGURATION ===
     const IS_FILE_PROTOCOL = window.location.protocol === 'file:';
-    const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:8001' : '';
+    const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:8001' : 'https://pigmentos.onrender.com';
 
     // === ANALYTICS HELPER ===
     function trackEvent(eventName, params = {}) {
@@ -2993,12 +2993,20 @@ document.addEventListener('DOMContentLoaded', () => {
         render: function () {
             if (!this.listContainer) return;
 
-            if (this.events.length === 0) {
+            // Filter out events that are more than 24 hours past
+            const now = new Date();
+            const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+            const activeEvents = this.events.filter(event => {
+                const eventTime = event.rawDate.getTime();
+                return (now.getTime() - eventTime) < ONE_DAY_MS;
+            });
+
+            if (activeEvents.length === 0) {
                 this.listContainer.innerHTML = '<div class="placeholder-item">NO UPCOMING EVENTS DETECTED...</div>';
                 return;
             }
 
-            this.listContainer.innerHTML = this.events.map((event, index) => {
+            this.listContainer.innerHTML = activeEvents.map((event, index) => {
                 const isBoss = event.type === 'BOSS ENCOUNTER';
                 const isCleared = event.status === 'CLEARED';
 
