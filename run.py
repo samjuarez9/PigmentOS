@@ -1282,7 +1282,24 @@ def create_portal_session():
                 stripe_customer_id = customers.data[0].id
         
         if not stripe_customer_id:
-            return jsonify({'error': 'No Stripe customer found'}), 404
+            # Create new customer if none exists (e.g. trial user accessing billing first time)
+            try:
+                print(f"Creating new Stripe Customer for {user_email}")
+                new_customer = stripe.Customer.create(email=user_email)
+                stripe_customer_id = new_customer.id
+                
+                # Save to Firestore if available
+                if firestore_db and user_uid:
+                    try:
+                        firestore_db.collection('users').document(user_uid).set(
+                            {'stripeCustomerId': stripe_customer_id}, merge=True
+                        )
+                    except Exception as db_err:
+                        print(f"Failed to save new customer ID to Firestore: {db_err}")
+                        
+            except Exception as stripe_err:
+                 print(f"Failed to create new Stripe customer: {stripe_err}")
+                 return jsonify({'error': 'Could not create billing profile'}), 500
 
         # 3. CREATE PORTAL SESSION
         # Redirect back to dashboard after managing subscription
