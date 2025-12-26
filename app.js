@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // === GLOBAL CONFIGURATION ===
     const IS_FILE_PROTOCOL = window.location.protocol === 'file:';
     const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:8001' : 'https://pigmentos.onrender.com';
+    console.log('🚀 PigmentOS Config:', { API_BASE_URL, hostname: window.location.hostname });
 
     // === ANALYTICS HELPER ===
     function trackEvent(eventName, params = {}) {
