@@ -496,7 +496,7 @@
             // This prevents long loading times and incorrect lockouts
             hideLoadingScreen();
             document.body.style.visibility = 'visible';
-            setupBillingButton(user); // Enable button for normal users
+            // setupBillingButton(user); // REMOVED: Only show for Admins or Active Subscribers (after check)
 
             // Background subscription check (non-blocking)
             setTimeout(async () => {
@@ -544,6 +544,9 @@
                         if (status.login_count > 1) {
                             showPriceNotification();
                         }
+                    } else if (status.status === 'active') {
+                        // Show Billing Button for Paying Customers
+                        setupBillingButton(user);
                     }
 
                 } catch (error) {
