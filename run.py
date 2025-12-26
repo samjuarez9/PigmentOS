@@ -2496,7 +2496,8 @@ def start_background_worker():
             for i in range(retries):
                 try:
                     print(f"🔄 Hydrating {name} (Attempt {i+1}/{retries})...")
-                    with_timeout(func, timeout_seconds=60)
+                    # DIRECT CALL - No with_timeout to prevent deadlock
+                    func()
                     # Check if data actually populated
                     if name == "News" and not CACHE.get("news", {}).get("data"):
                         raise Exception("News data still empty after fetch")
@@ -2563,7 +2564,8 @@ def start_background_worker():
             
             if should_run_heatmap and (time.time() - last_heatmap_update > heatmap_interval):
                 try: 
-                    with_timeout(refresh_heatmap_logic, timeout_seconds=15)
+                    # DIRECT CALL - Internal with_timeout handles yfinance hanging
+                    refresh_heatmap_logic()
                     last_heatmap_update = time.time()
                 except Exception as e: print(f"Worker Error (Heatmap): {e}")
                 time.sleep(0.2)  # Polygon: unlimited API - faster polling
@@ -2578,7 +2580,8 @@ def start_background_worker():
             
             if should_run_news:
                     try: 
-                        with_timeout(refresh_news_logic, timeout_seconds=45)
+                        # DIRECT CALL - Has internal ThreadPool
+                        refresh_news_logic()
                         # Check if we actually got news
                         news_data = CACHE.get("news", {}).get("data", [])
                         if news_data:
@@ -2596,7 +2599,8 @@ def start_background_worker():
             
             if (is_market_open or gamma_needs_hydration) and (time.time() - last_gamma_update > 120):
                 try: 
-                    with_timeout(refresh_gamma_logic, timeout_seconds=15)
+                    # DIRECT CALL - Requests have timeouts
+                    refresh_gamma_logic()
                     last_gamma_update = time.time()
                 except Exception as e: print(f"Worker Error (Gamma): {e}")
                 time.sleep(0.2)  # Polygon: unlimited API - faster polling
