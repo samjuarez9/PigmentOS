@@ -51,7 +51,7 @@ CORS(app)
 
 # Timeout wrapper for external calls (prevents hanging)
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
-TIMEOUT_EXECUTOR = ThreadPoolExecutor(max_workers=4)
+TIMEOUT_EXECUTOR = ThreadPoolExecutor(max_workers=10)
 
 def with_timeout(func, timeout_seconds=5):
     """Run a function with a timeout. Returns None if timeout."""
@@ -62,7 +62,11 @@ def with_timeout(func, timeout_seconds=5):
         print(f"⏰ Timeout after {timeout_seconds}s: {func}")
         return None
     except Exception as e:
-        print(f"⚠️ Error in with_timeout: {e}")
+        err_str = str(e)
+        if "Too Many Requests" in err_str:
+            print(f"⚠️ Rate Limit (Too Many Requests) in {func.__name__ if hasattr(func, '__name__') else 'func'}")
+        else:
+            print(f"⚠️ Error in with_timeout: {e}")
         return None
 
 # Rate Limiting
@@ -166,9 +170,9 @@ POLYGON_API_KEY = os.environ.get("POLYGON_API_KEY")
 FMP_API_KEY = os.environ.get("FMP_API_KEY")  # No longer used
 FRED_API_KEY = os.environ.get("FRED_API_KEY", "9832f887b004951ec7d53cb78f1063a0")
 
-# Price cache to reduce redundant API calls (TTL: 60 seconds)
+# Price cache to reduce redundant API calls (TTL: 15 minutes)
 PRICE_CACHE = {}  # {symbol: {"price": float, "timestamp": float}}
-PRICE_CACHE_TTL = 300  # seconds (5 mins)
+PRICE_CACHE_TTL = 900  # seconds (15 mins)
 
 # === WHALE CACHE PERSISTENCE ===
 WHALE_CACHE_FILE = "/tmp/pigmentos_whale_cache.json"
@@ -244,8 +248,8 @@ def get_cached_price(symbol):
         # If valid price and fresh
         if cached["price"] is not None and (now - cached["timestamp"] < PRICE_CACHE_TTL):
             return cached["price"]
-        # If negative cache (failed recently), wait 30s before retrying
-        if cached["price"] is None and (now - cached["timestamp"] < 30):
+        # If negative cache (failed recently), wait 120s before retrying
+        if cached["price"] is None and (now - cached["timestamp"] < 120):
             return None
     
     # Fetch from yfinance with timeout (Primary source for price)
@@ -1952,7 +1956,7 @@ def api_movers():
     global CACHE
     current_time = time.time()
     
-    if current_time - CACHE["movers"]["timestamp"] < 60 and CACHE["movers"]["data"]:
+    if current_time - CACHE["movers"]["timestamp"] < 3600 and CACHE["movers"]["data"]:
         return jsonify(CACHE["movers"]["data"])
     
     MOVERS_TICKERS = [
@@ -2119,7 +2123,6 @@ def api_news():
 def refresh_news_logic():
     global CACHE
 
-    
     RSS_FEEDS = [
         "https://www.investing.com/rss/news.rss",
         "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664",
@@ -2135,62 +2138,68 @@ def refresh_news_logic():
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5'
     }
-    
+
+    def fetch_single_feed(url):
+        try:
+            # Individual timeout of 10s
+            response = requests.get(url, headers=headers, verify=False, timeout=10)
+            
+            if response.status_code != 200:
+                print(f"⚠️ Feed Error {url}: Status {response.status_code}", flush=True)
+                return []
+            
+            feed = feedparser.parse(response.content)
+            
+            if not feed.entries:
+                print(f"⚠️ Feed Empty {url}", flush=True)
+                return []
+            
+            print(f"✅ Feed Success {url}: Found {len(feed.entries)} entries", flush=True)
+            
+            feed_items = []
+            for entry in feed.entries[:5]:
+                pub_ts = int(time.time())
+                if hasattr(entry, 'published_parsed') and entry.published_parsed:
+                    pub_ts = int(calendar.timegm(entry.published_parsed))
+                
+                publisher = "Market Wire"
+                domain = "google.com" # Default fallback
+                
+                if "cnbc" in url: 
+                    publisher = "CNBC"
+                    domain = "cnbc.com"
+                elif "techcrunch" in url: 
+                    publisher = "TechCrunch"
+                    domain = "techcrunch.com"
+                elif "investing.com" in url: 
+                    publisher = "Investing.com"
+                    domain = "investing.com"
+                elif "wsj.com" in url or "dj.com" in url: 
+                    publisher = "WSJ"
+                    domain = "wsj.com"
+                
+                feed_items.append({
+                    "title": entry.get('title', ''),
+                    "publisher": publisher,
+                    "domain": domain,
+                    "link": entry.get('link', ''),
+                    "time": pub_ts,
+                    "ticker": "NEWS"
+                })
+            return feed_items
+            
+        except Exception as e:
+            print(f"⚠️ Feed Error {url}: {e}", flush=True)
+            return []
+
     try:
-        for url in RSS_FEEDS:
-            try:
-
-                time.sleep(1)
-                
-                response = requests.get(url, headers=headers, verify=False, timeout=10)
-
-                
-                if response.status_code != 200:
-                    print(f"⚠️ Feed Error {url}: Status {response.status_code}", flush=True)
-                    continue
-                
-                feed = feedparser.parse(response.content)
-
-                
-                if not feed.entries:
-                    print(f"⚠️ Feed Empty {url}", flush=True)
-                    continue
-                
-                print(f"✅ Feed Success {url}: Found {len(feed.entries)} entries", flush=True)
-
-                for entry in feed.entries[:5]:
-                    pub_ts = int(time.time())
-                    if hasattr(entry, 'published_parsed') and entry.published_parsed:
-                        pub_ts = int(calendar.timegm(entry.published_parsed))
-                    
-                    publisher = "Market Wire"
-                    domain = "google.com" # Default fallback
-                    
-                    if "cnbc" in url: 
-                        publisher = "CNBC"
-                        domain = "cnbc.com"
-                    elif "techcrunch" in url: 
-                        publisher = "TechCrunch"
-                        domain = "techcrunch.com"
-                    elif "investing.com" in url: 
-                        publisher = "Investing.com"
-                        domain = "investing.com"
-                    elif "wsj.com" in url or "dj.com" in url: 
-                        publisher = "WSJ"
-                        domain = "wsj.com"
-                    
-                    
-                    all_news.append({
-                        "title": entry.get('title', ''),
-                        "publisher": publisher,
-                        "domain": domain,
-                        "link": entry.get('link', ''),
-                        "time": pub_ts,
-                        "ticker": "NEWS"
-                    })
-            except Exception as e:
-                print(f"⚠️ Feed Error {url}: {e}", flush=True)
-                continue
+        # PARALLEL FETCHING
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            results = list(executor.map(fetch_single_feed, RSS_FEEDS))
+        
+        # Flatten results
+        for r in results:
+            all_news.extend(r)
             
         all_news.sort(key=lambda x: x['time'], reverse=True)
         
@@ -2198,7 +2207,6 @@ def refresh_news_logic():
             CACHE["news"]["data"] = all_news
             CACHE["news"]["timestamp"] = current_time
             CACHE["news"]["last_error"] = None
-
         else:
             print("⚠️ No news found from any RSS feed", flush=True)
             CACHE["news"]["last_error"] = "All RSS feeds empty or blocked"
@@ -2488,7 +2496,7 @@ def start_background_worker():
             for i in range(retries):
                 try:
                     print(f"🔄 Hydrating {name} (Attempt {i+1}/{retries})...")
-                    with_timeout(func, timeout_seconds=30)
+                    with_timeout(func, timeout_seconds=60)
                     # Check if data actually populated
                     if name == "News" and not CACHE.get("news", {}).get("data"):
                         raise Exception("News data still empty after fetch")
@@ -2506,7 +2514,7 @@ def start_background_worker():
         retry_fetch(refresh_heatmap_logic, "Heatmap")
         retry_fetch(refresh_news_logic, "News")
         
-
+        
 
     def worker():
         # Run Hydration ONCE on startup (Background)
@@ -2544,8 +2552,8 @@ def start_background_worker():
             is_slow_news_time = (not is_weekday) or is_late_night
 
             # 1. Heatmap (Runs in Extended Hours OR if cache is empty)
-            # Core Hours: 5 mins (300s) | Extended Hours: 15 mins (900s)
-            heatmap_interval = 300 if is_market_open else 900
+            # Core Hours: 30 mins (1800s) | Extended Hours: 30 mins (1800s)
+            heatmap_interval = 1800
             
             # Force hydration if cache is empty (e.g. server restart at night/weekend)
             heatmap_needs_hydration = not CACHE.get("heatmap", {}).get("data")
@@ -2570,7 +2578,7 @@ def start_background_worker():
             
             if should_run_news:
                     try: 
-                        with_timeout(refresh_news_logic, timeout_seconds=15)
+                        with_timeout(refresh_news_logic, timeout_seconds=45)
                         # Check if we actually got news
                         news_data = CACHE.get("news", {}).get("data", [])
                         if news_data:
@@ -2613,6 +2621,9 @@ def start_background_worker():
                 duration = time.time() - start_time
                 if duration > 5:
                     print(f"🐢 Whale Scan took {duration:.2f}s for {len(WHALE_WATCHLIST)} symbols", flush=True)
+                
+                # CRITICAL: Sleep to prevent hammering APIs
+                time.sleep(10)
             else:
                 # If market closed AND cache populated, stop polling whales/gamma
                 # Just sleep and check News/Heatmap occasionally
