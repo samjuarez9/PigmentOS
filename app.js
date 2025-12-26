@@ -1841,17 +1841,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return vol.toString();
         };
 
-        // === DOMINANCE BADGE (Based on Net GEX, not volume) ===
-        // This reflects actual dealer gamma positioning, not just trading activity
-        const totalGex = totalCallGex + totalPutGex;
+        // === DOMINANCE BADGE (Based on VOLUME) ===
+        // Switched to Volume as it's a clearer indicator of sentiment (Put/Call Ratio style)
+        const totalVol = totalCallVol + totalPutVol;
         let dominanceBadgeHtml = '';
-        if (totalGex > 0) {
-            const callGexPct = (totalCallGex / totalGex) * 100;
-            const putGexPct = (totalPutGex / totalGex) * 100;
-            const diff = Math.abs(callGexPct - putGexPct);
+        if (totalVol > 0) {
+            const callVolPct = (totalCallVol / totalVol) * 100;
+            const putVolPct = (totalPutVol / totalVol) * 100;
+            const diff = Math.abs(callVolPct - putVolPct);
 
             if (diff >= 10) {
-                if (callGexPct > putGexPct) {
+                if (callVolPct > putVolPct) {
                     dominanceBadgeHtml = `<span class="dominance-badge bullish">CALLS ${Math.round(diff)}%</span>`;
                 } else {
                     dominanceBadgeHtml = `<span class="dominance-badge bearish">PUTS ${Math.round(diff)}%</span>`;
