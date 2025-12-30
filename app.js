@@ -1863,12 +1863,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Update Header with dominance badge (using cached gammaHeader)
+        // Check if we are showing next trading day data (after 5 PM switch)
+        const isNextTradingDay = data._is_next_trading_day || false;
+        const dateLabel = data._date_label || "TODAY";
+
         if (gammaHeader) {
             let html = `GAMMA WALL`;
-
-            // Check if we are showing next trading day data (after 5 PM switch)
-            const isNextTradingDay = data._is_next_trading_day || false;
-            const dateLabel = data._date_label || "TODAY";
 
             if (isNextTradingDay) {
                 // Show the specific date (e.g., "FRI DEC 20")
@@ -1884,6 +1884,19 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             html += dominanceBadgeHtml;
             gammaHeader.innerHTML = html;
+        }
+
+        // === GHOST MODE: Apply hollow frame styling when market is CLOSED ===
+        // Linked to the same getMarketState() logic as the market status button
+        const marketState = getMarketState();
+        if (gammaChartBars) {
+            if (!marketState.isMarketHours) {
+                // Market closed (pre-market, after-hours, weekend) → Ghost bars
+                gammaChartBars.classList.add('gamma-ghost-mode');
+            } else {
+                // Market open (9:30 AM - 4 PM weekdays) → Solid bars
+                gammaChartBars.classList.remove('gamma-ghost-mode');
+            }
         }
 
 
@@ -2895,11 +2908,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // =====================================================================
     // MANUAL EVENTS - Edit this array to add/remove economic events
     // Format: { title, time, type, stars (1-3), rawDate: "YYYY-MM-DD" }
+    //
+    // AUTOMATIC LOGIC:
+    // - Events < 9 days away: "Critical" state (Red segments + Urgent Flash)
+    // - Events > 9 days away: "Standard" state (Green/Yellow segments + Flow Animation)
+    // - Events past 24 hours ago are automatically hidden
     // =====================================================================
+    const CRITICAL_THRESHOLD_DAYS = 9; // Events closer than this get the urgent flash
+
     const MANUAL_EVENTS = [
         // === JANUARY 2026 ===
         { title: "OBBBA STIMULUS IMPLEMENTATION", time: "12:00 AM ET", type: "GOV", stars: 3, rawDate: "2026-01-01" },
         { title: "JOBS REPORT (DEC 2025)", time: "8:30 AM ET", type: "LABOR", stars: 3, rawDate: "2026-01-09" },
+        { title: "US CPI (DEC 2025)", time: "8:30 AM ET", type: "INFLATION", stars: 3, rawDate: "2026-01-13" },
+        { title: "US RETAIL SALES (ADVANCE)", time: "8:30 AM ET", type: "CONSUMER", stars: 3, rawDate: "2026-01-14" },
         { title: "BOJ MONETARY POLICY MEETING", time: "11:00 PM ET", type: "CB", stars: 2, rawDate: "2026-01-22" },
         { title: "FOMC RATE DECISION", time: "2:00 PM ET", type: "FED", stars: 3, rawDate: "2026-01-28" },
         { title: "BOC RATE ANNOUNCEMENT", time: "10:00 AM ET", type: "CB", stars: 2, rawDate: "2026-01-28" },
@@ -2992,6 +3014,50 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         },
 
+        // 5-segment progress bar: 45-day range, 9 days per segment
+        // Bar FILLS from LEFT (green) to RIGHT (red) as event gets CLOSER
+        renderProgressBar: function (eventDate) {
+            const now = new Date();
+            const msPerDay = 24 * 60 * 60 * 1000;
+            const daysUntil = Math.max(0, Math.ceil((eventDate - now) / msPerDay));
+
+            // Calculate active segments (5 segments, 9 days each = 45 days total)
+            // Closer = more segments filled (left to right)
+            // 45+ days = 0, 36-44 = 1, 27-35 = 3, 18-26 = 3, 9-17 = 4, 0-8 = 5 (all filled)
+            let activeSegments;
+            if (daysUntil >= 45) {
+                activeSegments = 0;  // Far away, nothing filled
+            } else if (daysUntil >= 36) {
+                activeSegments = 1;  // Green only
+            } else if (daysUntil >= 27) {
+                activeSegments = 2;  // Green + Light green
+            } else if (daysUntil >= 18) {
+                activeSegments = 3;  // + Yellow
+            } else if (daysUntil >= CRITICAL_THRESHOLD_DAYS) {
+                activeSegments = 4;  // + Orange
+            } else {
+                activeSegments = 5;  // All filled including red (critical!)
+            }
+
+            const isCritical = daysUntil < CRITICAL_THRESHOLD_DAYS;
+            const barClass = isCritical ? 'critical' : 'flow';
+            const segments = [
+                { color: 'seg-green', index: 0 },
+                { color: 'seg-light-green', index: 1 },
+                { color: 'seg-yellow', index: 2 },
+                { color: 'seg-orange', index: 3 },
+                { color: 'seg-red', index: 4 }
+            ];
+
+            // Fill segments from LEFT to RIGHT as event approaches
+            const segmentsHtml = segments.map((seg, i) => {
+                const isActive = i < activeSegments;
+                return `<div class="progress-segment ${seg.color} ${isActive ? 'active' : ''}"></div>`;
+            }).join('');
+
+            return `<div class="pixel-progress-bar ${barClass}">${segmentsHtml}</div>`;
+        },
+
         render: function () {
             if (!this.listContainer) return;
 
@@ -3041,7 +3107,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <span class="event-type">${event.type}</span>
                             </div>
                             <div class="event-progress-container">
-                                <div class="event-progress-bar" data-index="${index}"></div>
+                                ${this.renderProgressBar(event.rawDate)}
                             </div>
                         </div>
                     </div>

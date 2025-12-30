@@ -5547,6 +5547,60 @@ td {
     border: 1px solid rgba(255, 255, 255, 0.6) !important;
 }
 
+/* === HOLLOW FRAME GHOST MODE (Next Trading Day) === */
+/* Applied to #gamma-chart-bars when showing next-day data */
+
+/* Base transition for all bar states */
+.gamma-bar-put,
+.gamma-bar-call {
+    transition: all 0.3s ease, width 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+/* Ghost Mode: Hollow frames with colored borders */
+.gamma-ghost-mode .gamma-bar-put {
+    background-color: transparent !important;
+    border: 1px solid var(--bearish-color);
+    opacity: 0.6;
+}
+
+.gamma-ghost-mode .gamma-bar-call {
+    background-color: transparent !important;
+    border: 1px solid var(--bullish-color);
+    opacity: 0.6;
+}
+
+/* Ghost Mode: Max walls still pulse but with hollow styling */
+.gamma-ghost-mode .gamma-max-wall {
+    background-color: transparent !important;
+    border-width: 2px !important;
+    opacity: 0.8;
+}
+
+/* Ghost Mode: ATM row remains solid and high-contrast */
+.gamma-ghost-mode .atm-row .gamma-bar-put,
+.gamma-ghost-mode .atm-row .gamma-bar-call {
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+    opacity: 1 !important;
+}
+
+/* Ghost Mode: FLIP label remains solid */
+.gamma-ghost-mode .zero-gamma-label {
+    opacity: 1 !important;
+    text-shadow: 0 0 8px currentColor;
+}
+
+/* Ghost Mode: Strike labels slightly dimmed */
+.gamma-ghost-mode .gamma-strike {
+    opacity: 0.7;
+}
+
+/* Ghost Mode: Magnet/Trigger strikes remain bright */
+.gamma-ghost-mode .magnet-strike,
+.gamma-ghost-mode .trigger-strike {
+    opacity: 1 !important;
+}
+
 .gamma-axis-label {
     display: flex;
     justify-content: space-between;
@@ -6316,6 +6370,22 @@ td {
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.2s ease;
+    position: relative;
+}
+
+/* "CRITICAL EVENTS" label below date to indicate tappability */
+.date.critical-event::after {
+    content: 'CRITICAL EVENTS';
+    position: absolute;
+    bottom: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'VT323', monospace;
+    font-size: 8px;
+    color: #FF3333;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    animation: criticalPulse 1.5s infinite ease-in-out;
 }
 
 .date.critical-event:hover {
@@ -6683,82 +6753,188 @@ td {
     margin-right: 10px;
 }
 
-/* === RETRO 16-BIT PROGRESS BAR === */
+/* === 5-SEGMENT PIXEL PROGRESS BAR (45-DAY COUNTDOWN) === */
 .event-progress-container {
     width: 100%;
-    height: 6px;
-    background: #111;
-    border: 1px solid #333;
-    border-radius: 0;
-    margin-top: 4px;
-    overflow: hidden;
-    position: relative;
-    image-rendering: pixelated;
+    margin-top: 6px;
 }
 
-.event-progress-container::before {
+.pixel-progress-bar {
+    display: flex;
+    gap: 2px;
+    height: 10px;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+}
+
+.progress-segment {
+    flex: 1;
+    height: 100%;
+    border: 2px solid #000;
+    background: #222;
+    transition: background 0.3s ease, box-shadow 0.3s ease;
+    position: relative;
+}
+
+/* Pill shape - rounded ends */
+.progress-segment:first-child {
+    border-radius: 6px 0 0 6px;
+}
+
+.progress-segment:last-child {
+    border-radius: 0 6px 6px 0;
+}
+
+/* Segment colors when ACTIVE (filled) */
+.progress-segment.seg-green.active {
+    background: linear-gradient(180deg, #00FF41 0%, #00CC33 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0 4px rgba(0, 255, 65, 0.4);
+}
+
+.progress-segment.seg-light-green.active {
+    background: linear-gradient(180deg, #7FFF00 0%, #66CC00 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0 4px rgba(127, 255, 0, 0.4);
+}
+
+.progress-segment.seg-yellow.active {
+    background: linear-gradient(180deg, #FFFF00 0%, #CCCC00 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0 4px rgba(255, 255, 0, 0.4);
+}
+
+.progress-segment.seg-orange.active {
+    background: linear-gradient(180deg, #FF9900 0%, #CC7700 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0 4px rgba(255, 153, 0, 0.4);
+}
+
+.progress-segment.seg-red.active {
+    background: linear-gradient(180deg, #FF3333 0%, #CC0000 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0 6px rgba(255, 51, 51, 0.6);
+}
+
+/* Critical state - red segment pulses when only red remains */
+/* Critical state - red segment pulses when only red remains */
+.pixel-progress-bar.critical .progress-segment.seg-red.active {
+    animation: redSegmentPulse 0.3s infinite alternate;
+    /* Faster pulse */
+}
+
+/* Standard Flow Animation - Scanline effect for non-critical events */
+.pixel-progress-bar.flow {
+    position: relative;
+    overflow: hidden;
+}
+
+.pixel-progress-bar.flow::after {
     content: '';
     position: absolute;
     top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: repeating-linear-gradient(90deg,
-            transparent 0px,
-            transparent 3px,
-            rgba(0, 0, 0, 0.3) 3px,
-            rgba(0, 0, 0, 0.3) 4px);
-    pointer-events: none;
-    z-index: 2;
-}
-
-.event-progress-bar {
+    left: -100%;
+    width: 50%;
     height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, #00FF41, #00CC33);
-    transition: width 1s linear;
-    position: relative;
-    box-shadow: 0 0 4px rgba(0, 255, 65, 0.5);
+    background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.1) 20%,
+            rgba(255, 255, 255, 0.4) 50%,
+            rgba(255, 255, 255, 0.1) 80%,
+            transparent 100%);
+    transform: skewX(-20deg);
+    animation: standardFlow 2s infinite linear;
+    pointer-events: none;
+    z-index: 10;
 }
 
-/* Urgent (< 24 hours) */
-.event-progress-bar.urgent {
-    background: linear-gradient(90deg, #FFCC00, #FF9900);
-    box-shadow: 0 0 4px rgba(255, 204, 0, 0.5);
+/* Staggered animation delay for cascading scan effect (top to bottom) */
+.event-row:nth-child(1) .pixel-progress-bar.flow::after {
+    animation-delay: 0s;
 }
 
-/* Critical (< 1 hour) */
-.event-progress-bar.critical {
-    background: linear-gradient(90deg, #FF3333, #FF0000);
-    box-shadow: 0 0 6px rgba(255, 0, 0, 0.6);
-    animation: progressPulse 0.5s infinite alternate;
+.event-row:nth-child(2) .pixel-progress-bar.flow::after {
+    animation-delay: 0.15s;
 }
 
-/* Active (event time reached) */
-.event-progress-bar.active {
-    background: linear-gradient(90deg, #00FFFF, #00CCFF);
-    box-shadow: 0 0 8px rgba(0, 255, 255, 0.8);
-    animation: progressGlow 1s infinite alternate;
+.event-row:nth-child(3) .pixel-progress-bar.flow::after {
+    animation-delay: 0.3s;
 }
 
-@keyframes progressPulse {
+.event-row:nth-child(4) .pixel-progress-bar.flow::after {
+    animation-delay: 0.45s;
+}
+
+.event-row:nth-child(5) .pixel-progress-bar.flow::after {
+    animation-delay: 0.6s;
+}
+
+.event-row:nth-child(6) .pixel-progress-bar.flow::after {
+    animation-delay: 0.75s;
+}
+
+.event-row:nth-child(7) .pixel-progress-bar.flow::after {
+    animation-delay: 0.9s;
+}
+
+.event-row:nth-child(8) .pixel-progress-bar.flow::after {
+    animation-delay: 1.05s;
+}
+
+.event-row:nth-child(9) .pixel-progress-bar.flow::after {
+    animation-delay: 1.2s;
+}
+
+.event-row:nth-child(10) .pixel-progress-bar.flow::after {
+    animation-delay: 1.35s;
+}
+
+@keyframes standardFlow {
+    0% {
+        left: -100%;
+    }
+
+    100% {
+        left: 200%;
+    }
+}
+
+/* Critical Animation - Intense Red Pulse (No Flow) */
+.pixel-progress-bar.critical {
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.6);
+    animation: criticalContainerPulse 0.5s infinite alternate;
+}
+
+@keyframes criticalContainerPulse {
     from {
-        opacity: 0.8;
+        box-shadow: 0 0 5px rgba(255, 0, 0, 0.4), inset 0 0 5px rgba(255, 0, 0, 0.2);
     }
 
     to {
-        opacity: 1;
+        box-shadow: 0 0 20px rgba(255, 0, 0, 0.9), inset 0 0 10px rgba(255, 0, 0, 0.5);
     }
 }
 
-@keyframes progressGlow {
+@keyframes criticalContainerPulse {
     from {
-        box-shadow: 0 0 4px rgba(0, 255, 255, 0.5);
+        box-shadow: 0 0 5px rgba(255, 0, 0, 0.3);
     }
 
     to {
-        box-shadow: 0 0 12px rgba(0, 255, 255, 1);
+        box-shadow: 0 0 15px rgba(255, 0, 0, 0.7);
     }
+}
+
+@keyframes redSegmentPulse {
+    from {
+        background: linear-gradient(180deg, #FF3333 0%, #CC0000 100%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0 6px rgba(255, 51, 51, 0.6);
+    }
+
+    to {
+        background: linear-gradient(180deg, #FF0000 0%, #990000 100%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 12px rgba(255, 0, 0, 0.9);
+    }
+}
+
+/* Inactive (empty) segments */
+.progress-segment:not(.active) {
+    background: #1a1a1a;
+    border-color: #333;
 }
 
 /* Footer */

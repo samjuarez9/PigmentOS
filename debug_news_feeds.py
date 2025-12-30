@@ -10,9 +10,10 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 RSS_URLS = [
-    "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114",
-    "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
-    "https://techcrunch.com/feed/"
+    "https://www.investing.com/rss/news.rss",
+    "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664",
+    "https://techcrunch.com/feed/",
+    "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"
 ]
 
 def debug_feeds():

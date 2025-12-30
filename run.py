@@ -169,6 +169,7 @@ MARKETDATA_MIN_INTERVAL = 0.25  # 250ms between requests
 POLYGON_API_KEY = os.environ.get("POLYGON_API_KEY")
 FMP_API_KEY = os.environ.get("FMP_API_KEY")  # No longer used
 FRED_API_KEY = os.environ.get("FRED_API_KEY", "9832f887b004951ec7d53cb78f1063a0")
+FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY", "d56539pr01qu3qo8fk40d56539pr01qu3qo8fk4g")
 
 # Price cache to reduce redundant API calls (TTL: 15 minutes)
 PRICE_CACHE = {}  # {symbol: {"price": float, "timestamp": float}}
@@ -273,6 +274,49 @@ def get_cached_price(symbol):
     PRICE_CACHE[symbol] = {"price": None, "timestamp": now}
     return None
 
+# Separate cache for Finnhub prices (used by Gamma Wall and Unusual Whales only)
+FINNHUB_PRICE_CACHE = {}  # {symbol: {"price": float, "timestamp": float}}
+FINNHUB_PRICE_CACHE_TTL = 60  # 1 minute TTL (fresher than yfinance cache)
+
+def get_finnhub_price(symbol):
+    """Get price from Finnhub API (used by Gamma Wall and Unusual Whales only).
+    
+    Uses Finnhub REST API for faster, more reliable price fetching.
+    Has its own cache to avoid affecting yfinance-based features.
+    """
+    global FINNHUB_PRICE_CACHE
+    
+    if not FINNHUB_API_KEY:
+        return None
+    
+    now = time.time()
+    
+    # Check cache first
+    if symbol in FINNHUB_PRICE_CACHE:
+        cached = FINNHUB_PRICE_CACHE[symbol]
+        if cached["price"] is not None and (now - cached["timestamp"] < FINNHUB_PRICE_CACHE_TTL):
+            return cached["price"]
+    
+    # Fetch from Finnhub
+    try:
+        url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={FINNHUB_API_KEY}"
+        resp = requests.get(url, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            price = data.get("c")  # "c" = current price
+            if price and price > 0:
+                FINNHUB_PRICE_CACHE[symbol] = {"price": price, "timestamp": now}
+                print(f"📈 Finnhub price {symbol}: ${price:.2f}")
+                return price
+    except Exception as e:
+        print(f"Finnhub price error ({symbol}): {e}")
+    
+    # Return stale cache if available
+    if symbol in FINNHUB_PRICE_CACHE and FINNHUB_PRICE_CACHE[symbol]["price"]:
+        return FINNHUB_PRICE_CACHE[symbol]["price"]
+    
+    return None
+
 def fetch_options_chain_polygon(symbol, strike_limit=40):
     """
     Fetch options chain snapshot from Polygon.io API.
@@ -284,10 +328,10 @@ def fetch_options_chain_polygon(symbol, strike_limit=40):
         return None
     
     try:
-        # Get current price from cache (shared with whale detection)
+        # Get current price from Finnhub (faster than yfinance)
         from datetime import timedelta
         
-        current_price = get_cached_price(symbol)
+        current_price = get_finnhub_price(symbol)
             
         # FALLBACK: If price fetch fails (Rate Limit/403), use a safe default to allow Gamma Wall to load
         if not current_price:
@@ -524,11 +568,11 @@ def fetch_unusual_options_polygon(symbol):
     try:
         from datetime import timedelta
         
-        # Get current price from cache (reduces API calls)
-        current_price = get_cached_price(symbol)
+        # Get current price from Finnhub (faster than yfinance)
+        current_price = get_finnhub_price(symbol)
         
         if not current_price:
-            print(f"Polygon: Could not get price for {symbol}, skipping whale scan")
+            print(f"Finnhub: Could not get price for {symbol}, skipping whale scan")
             return None
         
         # Calculate strike range (±10% for whale detection - wider range)
@@ -1970,16 +2014,10 @@ def api_movers():
         "PLTR",
         
         # Growth Tech & SaaS
-        "CRWD", "SHOP", "ROKU", "UPST",
+        "CRWD",
         
         # Consumer & Entertainment
         "NFLX", "DIS", "UBER", "DASH", "ABNB", "PTON", "NKE", "SBUX",
-        
-        # Big Movers / Volatility
-        "BA", "SNAP", "PINS", "SPOT",
-        
-        # Major Indices
-        "SPY", "QQQ", "IWM", "DIA"
     ]
     
     try:
@@ -2116,6 +2154,24 @@ def api_news():
     # Check if data has been hydrated (timestamp > 0 means we've fetched at least once)
     if CACHE["news"]["timestamp"] == 0:
         return jsonify({"loading": True, "data": []})
+    
+    # STALE DATA DETECTION: Clear cache if ALL news is older than 12 hours
+    # This prevents showing "NO RECENT NEWS FOUND" - instead triggers fresh fetch
+    news_data = CACHE["news"]["data"]
+    if news_data:
+        current_time = time.time()
+        max_age = 12 * 60 * 60  # 12 hours in seconds
+        freshness_threshold = current_time - max_age
+        
+        # Check if ANY news item is within the last 12 hours
+        has_fresh_news = any(item.get("time", 0) >= freshness_threshold for item in news_data)
+        
+        if not has_fresh_news:
+            print(f"⚠️ All {len(news_data)} news items are stale (>12h old). Clearing cache to trigger refresh.", flush=True)
+            CACHE["news"]["data"] = []
+            CACHE["news"]["timestamp"] = 0  # Reset to trigger hydration
+            return jsonify({"loading": True, "data": []})
+    
     return jsonify(CACHE["news"]["data"])
 
 
@@ -2193,14 +2249,66 @@ def refresh_news_logic():
             return []
 
     try:
-        # PARALLEL FETCHING
+        # PARALLEL FETCHING (RSS)
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             results = list(executor.map(fetch_single_feed, RSS_FEEDS))
         
         # Flatten results
         for r in results:
             all_news.extend(r)
-            
+        
+        # === FINNHUB SUPPLEMENTAL NEWS ===
+        # Adds market news from Finnhub API (1 call, ~100 items)
+        if FINNHUB_API_KEY:
+            try:
+                finnhub_url = f"https://finnhub.io/api/v1/news?category=general&token={FINNHUB_API_KEY}"
+                resp = requests.get(finnhub_url, timeout=10)
+                if resp.status_code == 200:
+                    finnhub_data = resp.json()
+                    
+                    # Filter to last 12 hours and take top 10
+                    freshness_threshold = current_time - (12 * 60 * 60)
+                    fresh_items = [item for item in finnhub_data if item.get('datetime', 0) >= freshness_threshold][:10]
+                    
+                    # Build set of existing titles for deduplication (lowercase, first 50 chars)
+                    existing_titles = set(item['title'][:50].lower() for item in all_news)
+                    
+                    finnhub_added = 0
+                    for item in fresh_items:
+                        headline = item.get('headline', '')
+                        # Skip if similar title already exists
+                        if headline[:50].lower() in existing_titles:
+                            continue
+                        
+                        source = item.get('source', 'Finnhub')
+                        # Map source to domain for favicon
+                        domain = "finnhub.io"
+                        if 'marketwatch' in source.lower():
+                            domain = "marketwatch.com"
+                        elif 'cnbc' in source.lower():
+                            domain = "cnbc.com"
+                        elif 'reuters' in source.lower():
+                            domain = "reuters.com"
+                        elif 'bloomberg' in source.lower():
+                            domain = "bloomberg.com"
+                        
+                        all_news.append({
+                            "title": headline,
+                            "publisher": source,
+                            "domain": domain,
+                            "link": item.get('url', ''),
+                            "time": item.get('datetime', int(current_time)),
+                            "ticker": "NEWS"
+                        })
+                        finnhub_added += 1
+                        existing_titles.add(headline[:50].lower())
+                    
+                    print(f"✅ Finnhub News: Added {finnhub_added} unique items (filtered from {len(fresh_items)} fresh)", flush=True)
+                else:
+                    print(f"⚠️ Finnhub News: HTTP {resp.status_code}", flush=True)
+            except Exception as e:
+                print(f"⚠️ Finnhub News Error: {e}", flush=True)
+        
         all_news.sort(key=lambda x: x['time'], reverse=True)
         
         if all_news:
@@ -2525,6 +2633,116 @@ def api_gamma():
 def api_ping():
     return jsonify({"status": "ok", "timestamp": time.time()})
 
+# === FINNHUB MARKET STATUS ===
+# Cache for market status (refresh every 60 seconds)
+MARKET_STATUS_CACHE = {"data": None, "timestamp": 0}
+MARKET_STATUS_CACHE_TTL = 60  # 1 minute
+
+@app.route('/api/market-status')
+def api_market_status():
+    """
+    Get real-time market status from Finnhub API.
+    Returns: isOpen, session (pre-market/regular/post-market), holiday info
+    Fallback to time-based calculation if API fails.
+    """
+    global MARKET_STATUS_CACHE
+    
+    now = time.time()
+    
+    # Return cached data if fresh
+    if MARKET_STATUS_CACHE["data"] and (now - MARKET_STATUS_CACHE["timestamp"] < MARKET_STATUS_CACHE_TTL):
+        return jsonify(MARKET_STATUS_CACHE["data"])
+    
+    # Fetch from Finnhub
+    try:
+        if FINNHUB_API_KEY:
+            url = f"https://finnhub.io/api/v1/stock/market-status?exchange=US&token={FINNHUB_API_KEY}"
+            resp = requests.get(url, timeout=5)
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                # Finnhub returns: {exchange, holiday, isOpen, session, t, timezone}
+                # session can be: "pre-market", "regular", "post-market", or null
+                
+                result = {
+                    "isOpen": data.get("isOpen", False),
+                    "session": data.get("session"),  # pre-market, regular, post-market, or null
+                    "holiday": data.get("holiday"),  # Holiday name if applicable
+                    "timestamp": data.get("t", int(now)),
+                    "source": "finnhub"
+                }
+                
+                # Map session to display status
+                if data.get("session") == "pre-market":
+                    result["status"] = "PRE MARKET"
+                elif data.get("session") == "regular" and data.get("isOpen"):
+                    result["status"] = "OPEN"
+                elif data.get("session") == "post-market":
+                    result["status"] = "AFTER MARKET"
+                elif data.get("holiday"):
+                    result["status"] = "HOLIDAY"
+                else:
+                    # Check for weekend
+                    tz_eastern = pytz.timezone('US/Eastern')
+                    now_et = datetime.now(tz_eastern)
+                    if now_et.weekday() >= 5:
+                        result["status"] = "WEEKEND"
+                    else:
+                        result["status"] = "CLOSED"
+                
+                MARKET_STATUS_CACHE["data"] = result
+                MARKET_STATUS_CACHE["timestamp"] = now
+                print(f"📊 Finnhub Market Status: {result['status']}")
+                return jsonify(result)
+    except Exception as e:
+        print(f"⚠️ Finnhub Market Status Error: {e}")
+    
+    # Fallback: Calculate based on time
+    tz_eastern = pytz.timezone('US/Eastern')
+    now_et = datetime.now(tz_eastern)
+    current_minutes = now_et.hour * 60 + now_et.minute
+    
+    market_open = 9 * 60 + 30  # 9:30 AM
+    market_close = 16 * 60     # 4:00 PM
+    pre_market_start = 4 * 60  # 4:00 AM
+    post_market_end = 20 * 60  # 8:00 PM
+    
+    is_weekend = now_et.weekday() >= 5
+    
+    if is_weekend:
+        status = "WEEKEND"
+        session = None
+        is_open = False
+    elif current_minutes >= market_open and current_minutes < market_close:
+        status = "OPEN"
+        session = "regular"
+        is_open = True
+    elif current_minutes >= pre_market_start and current_minutes < market_open:
+        status = "PRE MARKET"
+        session = "pre-market"
+        is_open = False
+    elif current_minutes >= market_close and current_minutes < post_market_end:
+        status = "AFTER MARKET"
+        session = "post-market"
+        is_open = False
+    else:
+        status = "CLOSED"
+        session = None
+        is_open = False
+    
+    result = {
+        "isOpen": is_open,
+        "session": session,
+        "status": status,
+        "holiday": None,
+        "timestamp": int(now),
+        "source": "calculated"
+    }
+    
+    MARKET_STATUS_CACHE["data"] = result
+    MARKET_STATUS_CACHE["timestamp"] = now
+    return jsonify(result)
+
 @app.route('/api/debug/system')
 def api_debug_system():
     """
@@ -2774,7 +2992,7 @@ def start_background_worker():
 if not hasattr(start_background_worker, '_started'):
     load_whale_cache()  # Restore persisted whale data
     mark_whale_cache_cleared()  # Mark this session's start time
-    # start_background_worker()  # REMOVED: Handled by Gunicorn post_worker_init
+    start_background_worker()  # Enabled for local dev (production uses gunicorn_config.py)
     start_background_worker._started = True
 
 if __name__ == "__main__":
