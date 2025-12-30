@@ -114,7 +114,7 @@ def preview_page():
 WATCHLIST = [
     "NVDA", "TSLA", "AAPL", "MSFT", "AMZN", "META", "GOOGL", "GOOG",
     "AMD", "AVGO", "ARM", "SMCI", "MU", "INTC",
-    "PLTR", "SOFI", "RKLB",
+    "PLTR", "SOFI", "RKLB", "ORCL",
     "SPY", "QQQ", "IWM"
 ]
 
@@ -704,7 +704,7 @@ def refresh_single_whale_polygon(symbol):
             try:
                 exp_date = datetime.strptime(expiry, "%Y-%m-%d").date()
                 dte = (exp_date - now_et.date()).days
-                is_short_term = 0 <= dte <= 15
+                is_short_term = 0 <= dte <= 30
             except:
                 is_short_term = False
             
