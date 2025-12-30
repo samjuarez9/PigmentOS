@@ -282,6 +282,7 @@ def get_finnhub_price(symbol):
     """Get price from Finnhub API (used by Gamma Wall and Unusual Whales only).
     
     Uses Finnhub REST API for faster, more reliable price fetching.
+    Falls back to Polygon previous close if Finnhub fails (after-hours, rate limit).
     Has its own cache to avoid affecting yfinance-based features.
     """
     global FINNHUB_PRICE_CACHE
@@ -314,6 +315,22 @@ def get_finnhub_price(symbol):
     # Return stale cache if available
     if symbol in FINNHUB_PRICE_CACHE and FINNHUB_PRICE_CACHE[symbol]["price"]:
         return FINNHUB_PRICE_CACHE[symbol]["price"]
+    
+    # FALLBACK: Polygon previous close (works after hours when Finnhub fails)
+    if POLYGON_API_KEY:
+        try:
+            url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev?apiKey={POLYGON_API_KEY}"
+            resp = requests.get(url, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("results"):
+                    price = data["results"][0].get("c")  # Previous close
+                    if price and price > 0:
+                        FINNHUB_PRICE_CACHE[symbol] = {"price": price, "timestamp": now}
+                        print(f"📈 Polygon fallback price {symbol}: ${price:.2f}")
+                        return price
+        except Exception as e:
+            print(f"Polygon fallback price error ({symbol}): {e}")
     
     return None
 
@@ -2951,10 +2968,12 @@ def start_background_worker():
                 except Exception as e: print(f"Worker Error (Gamma): {e}")
                 time.sleep(0.2)  # Polygon: unlimited API - faster polling
             
-            # 4. Whales (Market Hours OR Empty Cache)
+            # 4. Whales (Market Hours Only - No hydration after hours, Finnhub won't return data)
+            # Hydration only during extended hours (4 AM - 8 PM) when there's actual trading activity
             whales_needs_hydration = not CACHE.get("whales", {}).get("data")
+            can_hydrate_whales = is_extended_hours and whales_needs_hydration
             
-            if is_market_open or whales_needs_hydration:
+            if is_market_open or can_hydrate_whales:
                 import gevent
                 start_time = time.time()
                 
