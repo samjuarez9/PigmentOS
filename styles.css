@@ -5500,13 +5500,14 @@ td {
     /* Fixed height to prevent collapse */
     background: var(--bearish-color);
     /* Solid color, no gradient */
-    opacity: 0.8;
-    /* Slight transparency for retro feel */
+    opacity: 0.9;
+    /* Increased for better visibility */
     border-right: 2px solid var(--bearish-color);
     /* box-shadow removed to stop glow */
     transition: width 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
     will-change: width;
-    min-width: 1%;
+    min-width: 2px;
+    /* Ensure visible even if tiny */
 }
 
 .gamma-bar-call {
@@ -5514,13 +5515,14 @@ td {
     /* Fixed height to prevent collapse */
     background: var(--bullish-color);
     /* Solid color, no gradient */
-    opacity: 0.8;
-    /* Slight transparency for retro feel */
+    opacity: 0.9;
+    /* Increased for better visibility */
     border-left: 2px solid var(--bullish-color);
     /* Reduced from 4px */
     transition: width 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
     will-change: width;
-    min-width: 1%;
+    min-width: 2px;
+    /* Ensure visible even if tiny */
 }
 
 @keyframes gamma-pulse {

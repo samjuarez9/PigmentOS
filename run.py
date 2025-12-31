@@ -357,9 +357,16 @@ def fetch_options_chain_polygon(symbol, strike_limit=40):
             current_price = defaults.get(symbol, 100)
             print(f"Polygon: Price fetch failed, using fallback {current_price} for {symbol}")
 
-        # Calculate strike range (±5% around ATM)
-        strike_low = int(current_price * 0.80)
-        strike_high = int(current_price * 1.20)
+        # Calculate strike range
+        # For indices (SPY, QQQ, IWM, DIA), use TIGHTER range (±5%) to avoid hitting 250-item limit
+        # which truncates upside data (since Polygon sorts asc).
+        # For others, use wider range (±20%) to capture more context.
+        if symbol.upper() in ['SPY', 'QQQ', 'IWM', 'DIA']:
+            strike_low = int(current_price * 0.95)
+            strike_high = int(current_price * 1.05)
+        else:
+            strike_low = int(current_price * 0.80)
+            strike_high = int(current_price * 1.20)
         
         # Smart expiration selection for SPY/QQQ/IWM/DIA:
         tz_eastern = pytz.timezone('US/Eastern')
@@ -2581,8 +2588,13 @@ def refresh_gamma_logic(symbol="SPY"):
                 if total_oi < MIN_OI:
                     continue
                     
-                # Also skip if no volume today (stale/inactive)
-                if total_vol < MIN_VOLUME:
+                # Relax volume filter for Indices:
+                # For SPY/QQQ, we want to see the structure regardless of today's volume
+                # For single stocks, we still require some volume to prove activity
+                is_index = symbol in INDEX_ETFS
+                
+                # If it's NOT an index, enforce volume filter
+                if not is_index and total_vol < MIN_VOLUME:
                     continue
                 final_data.append({
                     "strike": strike,

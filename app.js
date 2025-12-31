@@ -2218,10 +2218,11 @@ document.addEventListener('DOMContentLoaded', () => {
         existingRows.forEach((row) => row.remove());
 
         // Always scroll to center the ATM (current price) row
-        // Use explicit scroll calculation for reliable centering (scrollIntoView unreliable in nested containers)
-        setTimeout(() => {
+        // Use explicit scroll calculation with RETRY mechanism for reliability
+        let attempts = 0;
+        const centerATM = () => {
             const currentRow = gammaChartBars.querySelector('.atm-row');
-            if (currentRow && gammaChartBars) {
+            if (currentRow && gammaChartBars && gammaChartBars.scrollHeight > 0) {
                 // Calculate scroll position to center the ATM row
                 const containerHeight = gammaChartBars.clientHeight;
                 const rowTop = currentRow.offsetTop;
@@ -2235,8 +2236,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     behavior: 'smooth'
                 });
                 console.log(`[Gamma] Centered ATM row at strike ${currentRow.dataset.strike} (pos: ${scrollTarget.toFixed(0)})`);
+            } else if (attempts < 5) {
+                // Retry if not ready yet (up to 5 times)
+                attempts++;
+                setTimeout(centerATM, 300); // Retry every 300ms
             }
-        }, 100); // Reduced delay for snappier feel
+        };
+
+        // Start trying to center
+        setTimeout(centerATM, 100);
     }
 
     function showTooltip(e, data, type, tooltip) {
