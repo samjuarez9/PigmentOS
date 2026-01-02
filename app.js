@@ -1530,7 +1530,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 timestamp: item.timestamp || 0,
                 enteredAt: enteredAtTime, // Preserve original entry time
                 delta: item.delta,
-                iv: item.iv
+                iv: item.iv,
+                side: item.side, // Fix: Pass the aggressor side (BUY/SELL)
+                bid: item.bid,
+                ask: item.ask
             };
         });
 
@@ -2383,14 +2386,20 @@ document.addEventListener('DOMContentLoaded', () => {
             row.classList.add('new-row');
         }
 
-        // Add MEGA pulse animation for Elite Trades:
-        // 1. Premium Thresholds: $40M for TSLA, $10M for all others
-        // 2. High Delta trades (>0.80 = deep ITM, likely institutional)
-        const isDeepITM = flow.delta !== undefined && Math.abs(flow.delta) > 0.80;
-        const eliteThreshold = flow.ticker === 'TSLA' ? 40000000 : 10000000;
-        const isElitePremium = flow.notional_value && flow.notional_value >= eliteThreshold;
+        // Add SWEEP/DUMP pulse animation for aggressive trades
+        // Pulse only applies to trades that will be tagged as SWEEP or DUMP
+        const bid = flow.bid || 0;
+        const ask = flow.ask || 0;
+        const tradePrice = flow.lastPrice || 0;
+        const notional = flow.notional_value || 0;
+        const MIN_PULSE_PREMIUM = 500000;
+        const isPut = flow.type === 'PUT';
+        const isSold = flow.side === 'SELL';
 
-        if (isElitePremium || isDeepITM) {
+        const wouldBeSweep = ask > 0 && tradePrice >= ask && notional >= MIN_PULSE_PREMIUM;
+        const wouldBeDump = bid > 0 && tradePrice <= bid && notional >= MIN_PULSE_PREMIUM && isSold;
+
+        if (wouldBeSweep || wouldBeDump) {
             row.classList.add('mega-row');
         }
 
@@ -2454,56 +2463,53 @@ document.addEventListener('DOMContentLoaded', () => {
         const colTag = document.createElement('div');
         colTag.className = 'col-tag';
 
-        // === HIGH-PRECISION HEDGE DETECTION ===
-        // Goal: Only tag institutional hedges with conviction/size, not routine index puts.
-        // Criteria: Index PUT with EITHER deep ITM (|delta| >= 0.55) OR significant premium.
-        // Rationale: Actual hedges are either deep ITM (portfolio protection) or large notional.
+        // === SIMPLIFIED TAG LOGIC (Using Alpaca Bid/Ask Data) ===
+        // Industry Standard "Quote Rule" (Unusual Whales, Cheddar Flow, etc.):
+        // SWEEP: Trade price >= Ask (aggressive buyer) + significant size
+        // DUMP: Trade price <= Bid (aggressive seller) + significant size
+        // Note: bid, ask, tradePrice, notional, isPut, isSold already declared above
 
-        // Tunable floors (USD) - stricter for high-volume tickers
-        const INDEX_HEDGE_PREMIUM_FLOOR_DEFAULT = 750000;   // $750K for IWM, DIA, VIX
-        const INDEX_HEDGE_PREMIUM_FLOOR_MAJOR = 1000000;    // $1M for SPY, QQQ (higher avg premiums)
+        // Size threshold (industry standard)
+        const MIN_SWEEP_PREMIUM = 500000;  // $500k for SWEEP/DUMP
 
-        const isIndex = ['SPY', 'QQQ', 'IWM', 'DIA', 'VIX'].includes(flow.ticker);
-        const isPut = !isCall;
-        const deltaAbs = flow.delta !== undefined ? Math.abs(flow.delta) : null;
-        const notional = flow.notional_value || 0;  // Already in USD from backend
+        // SWEEP: Aggressive BUY at/above ask (applies to BOTH calls and puts)
+        // - CALL sweep = bullish conviction
+        // - PUT sweep = bearish conviction  
+        const isSweep = ask > 0 && tradePrice >= ask && notional >= MIN_SWEEP_PREMIUM;
 
-        // Determine premium floor based on ticker
-        const hedgePremiumFloor = ['SPY', 'QQQ'].includes(flow.ticker)
-            ? INDEX_HEDGE_PREMIUM_FLOOR_MAJOR
-            : INDEX_HEDGE_PREMIUM_FLOOR_DEFAULT;
+        // DUMP: ANY option SOLD at/below bid (aggressive exit/liquidation)
+        // Applies to both calls and puts - dumping a position
+        const isDump = bid > 0 && tradePrice <= bid && notional >= MIN_SWEEP_PREMIUM && isSold;
 
-        // FRESH candidate check - new speculative positions shouldn't be labeled HEDGE
-        const isFreshCandidate = flow.vol_oi !== undefined && flow.vol_oi > 2.5;
+        // Combine MEGA with SWEEP/DUMP when both apply
+        const isMega = flow.is_mega_whale;
 
-        // HEDGE if: Index PUT with (deep ITM OR large premium) AND not a fresh opening position
-        const hasDeepDelta = deltaAbs !== null && deltaAbs >= 0.55;
-        const hasSignificantPremium = notional >= hedgePremiumFloor;
-        const isHedge = isIndex && isPut && (hasDeepDelta || hasSignificantPremium) && !isFreshCandidate;
-
-        // Priority 1: MEGA
-        if (flow.is_mega_whale) {
+        // Priority 1: MEGA SWEEP (Very high premium + aggressive buy)
+        if (isMega && isSweep) {
+            colTag.textContent = 'MEGA SWEEP';
+            colTag.classList.add('tag-mega', 'tag-sweep');
+        }
+        // Priority 2: MEGA DUMP (Very high premium + aggressive sell)
+        else if (isMega && isDump) {
+            colTag.textContent = 'MEGA DUMP';
+            colTag.classList.add('tag-mega', 'tag-dump');
+        }
+        // Priority 3: MEGA (Very high premium, not aggressive)
+        else if (isMega) {
             colTag.textContent = 'MEGA';
             colTag.classList.add('tag-mega');
         }
-        // Priority 2: HEDGE (High-conviction institutional hedges only)
-        else if (isHedge) {
-            colTag.textContent = 'HEDGE';
-            colTag.classList.add('tag-hedge');
-        }
-        // Priority 3: LOTTO (Delta < 0.20 = High-risk speculative "lottery ticket")
-        else if (deltaAbs !== null && deltaAbs < 0.20) {
-            colTag.textContent = 'LOTTO 🎰';
-            colTag.classList.add('tag-lotto');
-        }
-        // Priority 4: SWEEP (Vol/OI > 2.5 = new positioning)
-        // V2: Added liquidity filter to reduce noise from low-volume strikes
-        // Requires Vol/OI > 2.5 AND (500+ contracts traded OR $20k+ premium)
-        else if (flow.vol_oi > 2.5 && (flow.volume > 500 || flow.notional_value > 20000)) {
+        // Priority 4: SWEEP (Aggressive Buy at Ask)
+        else if (isSweep) {
             colTag.textContent = 'SWEEP';
             colTag.classList.add('tag-sweep');
         }
-        // Priority 4: Standard Direction
+        // Priority 5: DUMP (Aggressive Sell at Bid)
+        else if (isDump) {
+            colTag.textContent = 'DUMP';
+            colTag.classList.add('tag-dump');
+        }
+        // Priority 6: Standard Direction (BULL/BEAR)
         else if (isCall) {
             colTag.textContent = 'BULL';
             colTag.classList.add('tag-bull');
@@ -2528,35 +2534,17 @@ document.addEventListener('DOMContentLoaded', () => {
             colTag.insertBefore(moneySpan, colTag.firstChild);
         }
 
-        // Delta Progress Bar: Tiny red/green bar showing speculation level
-        if (flow.delta !== undefined && flow.delta !== 0) {
-            const deltaVal = Math.abs(flow.delta);
-            const deltaPercent = Math.round(deltaVal * 100);
+        // BOUGHT/SOLD Badge: Replace delta bar with prominent aggressor side indicator
+        if (flow.side) {
+            const sideWrapper = document.createElement('div');
+            sideWrapper.className = 'side-badge-wrapper';
 
-            // Create wrapper for label + bar
-            const deltaWrapper = document.createElement('div');
-            deltaWrapper.className = 'delta-wrapper';
+            const sideBadge = document.createElement('span');
+            sideBadge.className = flow.side === 'BUY' ? 'side-badge side-bought' : 'side-badge side-sold';
+            sideBadge.textContent = flow.side === 'BUY' ? 'BOUGHT' : 'SOLD';
 
-            // Small decimal label to the left
-            const deltaLabel = document.createElement('span');
-            deltaLabel.className = 'delta-label';
-            deltaLabel.textContent = deltaVal.toFixed(2).replace(/^0/, '');  // Remove leading zero (0.45 → .45)
-
-            // Create bar container
-            const deltaBar = document.createElement('div');
-            deltaBar.className = 'delta-bar-mini';
-
-            // Green fill (width = delta percentage)
-            const deltaFill = document.createElement('div');
-            deltaFill.className = 'delta-bar-fill';
-            deltaFill.style.width = `${deltaPercent}%`;
-
-            deltaBar.appendChild(deltaFill);
-            deltaWrapper.appendChild(deltaLabel);
-            deltaWrapper.appendChild(deltaBar);
-
-            // Insert at beginning so bar is on left, tags on right
-            colTag.insertBefore(deltaWrapper, colTag.firstChild);
+            sideWrapper.appendChild(sideBadge);
+            colTag.insertBefore(sideWrapper, colTag.firstChild);
         }
 
         row.appendChild(colTicker);

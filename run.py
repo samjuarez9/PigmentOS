@@ -25,6 +25,11 @@ import os
 from dotenv import load_dotenv
 load_dotenv()  # Load .env file for POLYGON_API_KEY and other secrets
 
+# Alpaca API Configuration (Hybrid Approach for Real-time Quotes)
+ALPACA_API_KEY = os.getenv("ALPACA_API_KEY")
+ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY")
+ALPACA_DATA_URL = "https://data.alpaca.markets/v1beta1/options"
+
 import ssl
 import calendar
 from datetime import datetime, date, timedelta
@@ -449,24 +454,13 @@ def fetch_options_chain_polygon(symbol, strike_limit=40):
             if days_until_friday == 0 and current_hour >= switch_hour:
                 days_until_friday = 7
                 
-            expiry_date = (now_et + timedelta(days=days_until_friday)).strftime("%Y-%m-%d")
+            next_friday = now_et + timedelta(days=days_until_friday)
+            expiry_date = next_friday.strftime("%Y-%m-%d")
             
             # UI LABEL LOGIC:
-            # If after 5 PM, always show Next Trading Day (to match SPY/QQQ behavior)
-            if current_hour >= switch_hour:
-                is_next_trading_day = True
-                # Calculate next trading day
-                if today_weekday == 4: # Friday -> Monday
-                    days_ahead = 3
-                elif today_weekday == 5: # Saturday -> Monday
-                    days_ahead = 2
-                elif today_weekday == 6: # Sunday -> Monday
-                    days_ahead = 1
-                else: # Mon-Thu -> Next Day
-                    days_ahead = 1
-                    
-                next_trading_day = now_et + timedelta(days=days_ahead)
-                date_label = next_trading_day.strftime("%a %b %d").upper()
+            # For individual tickers, show the actual Friday date we are using
+            is_next_trading_day = True
+            date_label = next_friday.strftime("%a %b %d").upper()
             
             print(f"Polygon: Using Friday {expiry_date} for {symbol} (Label: {date_label})")
         
@@ -630,12 +624,321 @@ def fetch_unusual_options_polygon(symbol):
         print(f"Polygon Whale Fetch Failed ({symbol}): {e}")
         return None
 
+        print(f"Polygon Whale Fetch Failed ({symbol}): {e}")
+        return None
 
-def refresh_single_whale_polygon(symbol):
+
+def fetch_alpaca_options_snapshot(contract_symbol):
+    """
+    Fetch real-time (or 15m delayed) NBBO and latest trade from Alpaca
+    to determine aggressor side (Buy/Sell).
+    """
+    if not ALPACA_API_KEY or not ALPACA_SECRET_KEY:
+        return None
+
+    headers = {
+        "APCA-API-KEY-ID": ALPACA_API_KEY,
+        "APCA-API-SECRET-KEY": ALPACA_SECRET_KEY,
+        "Accept": "application/json"
+    }
+    
+    # Alpaca Snapshot Endpoint (Combines Quote and Trade)
+    # /v1beta1/options/snapshots?symbols={symbol}
+    url = f"{ALPACA_DATA_URL}/snapshots"
+    params = {"symbols": contract_symbol}
+    
+    try:
+        resp = requests.get(url, headers=headers, params=params, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            snapshot = data.get("snapshots", {}).get(contract_symbol)
+            if snapshot:
+                return {
+                    "quote": snapshot.get("latestQuote", {}),
+                    "trade": snapshot.get("latestTrade", {})
+                }
+    except Exception as e:
+        print(f"⚠️ Alpaca Fetch Error ({contract_symbol}): {e}")
+    
+    return None
+
+def fetch_alpaca_options_snapshot_batch(symbols_list):
+    """
+    Fetch real-time NBBO/Trade for multiple symbols in one request.
+    Handles chunking (max 50 symbols) and prefix stripping.
+    Returns dict: {symbol: {quote: {}, trade: {}}}
+    """
+    if not ALPACA_API_KEY or not ALPACA_SECRET_KEY or not symbols_list:
+        return {}
+
+    headers = {
+        "APCA-API-KEY-ID": ALPACA_API_KEY,
+        "APCA-API-SECRET-KEY": ALPACA_SECRET_KEY,
+        "Accept": "application/json"
+    }
+    
+    results = {}
+    
+    # 1. Clean symbols (remove 'O:' prefix)
+    # Map cleaned -> original to restore keys later
+    clean_map = {} 
+    clean_symbols = []
+    for s in symbols_list:
+        clean = s.replace("O:", "")
+        clean_symbols.append(clean)
+        clean_map[clean] = s
+        
+    # 2. Chunk into groups of 50
+    chunk_size = 50
+    chunks = [clean_symbols[i:i + chunk_size] for i in range(0, len(clean_symbols), chunk_size)]
+    
+    for chunk in chunks:
+        try:
+            url = f"{ALPACA_DATA_URL}/snapshots"
+            params = {"symbols": ",".join(chunk)}
+            
+            resp = requests.get(url, headers=headers, params=params, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                snapshots = data.get("snapshots", {})
+                
+                for clean_sym, snap in snapshots.items():
+                    # Restore original symbol key (e.g. add O: back if needed, or just use what we have)
+                    # The caller expects the symbol they passed in.
+                    original_sym = clean_map.get(clean_sym, clean_sym)
+                    if snap:
+                        results[original_sym] = {
+                            "quote": snap.get("latestQuote", {}),
+                            "trade": snap.get("latestTrade", {})
+                        }
+            else:
+                print(f"⚠️ Alpaca Batch Error ({resp.status_code}): {resp.text}")
+                
+        except Exception as e:
+            print(f"⚠️ Alpaca Batch Exception: {e}")
+            
+    return results
+
+
+def scan_whales_alpaca():
+    """
+    Scan for unusual whale activity using Alpaca API.
+    Fetches options snapshots and filters by premium/volume thresholds.
+    Returns list of whale trades with real timestamps.
+    """
+    global WHALE_HISTORY
+    
+    if not ALPACA_API_KEY or not ALPACA_SECRET_KEY:
+        print("⚠️ Alpaca credentials not configured")
+        return []
+    
+    tz_eastern = pytz.timezone('US/Eastern')
+    now_et = datetime.now(tz_eastern)
+    
+    def format_money(val):
+        if val >= 1_000_000: return f"${val/1_000_000:.1f}M"
+        if val >= 1_000: return f"${val/1_000:.0f}k"
+        return f"${val:.0f}"
+    
+    def parse_occ_symbol(symbol):
+        """Parse OCC option symbol like SPY260102C00680000"""
+        try:
+            # Remove O: prefix if present
+            clean = symbol.replace("O:", "")
+            
+            # Find where the date starts (first digit after letters)
+            i = 0
+            while i < len(clean) and clean[i].isalpha():
+                i += 1
+            
+            underlying = clean[:i]
+            rest = clean[i:]
+            
+            # YYMMDD format
+            date_str = rest[:6]
+            put_call = rest[6]  # C or P
+            strike_raw = rest[7:]  # Price in 1/1000 dollars
+            strike = float(strike_raw) / 1000
+            
+            # Parse expiration
+            year = 2000 + int(date_str[:2])
+            month = int(date_str[2:4])
+            day = int(date_str[4:6])
+            expiry = f"{year}-{month:02d}-{day:02d}"
+            
+            return {
+                "underlying": underlying,
+                "expiry": expiry,
+                "put_call": put_call,
+                "strike": strike
+            }
+        except:
+            return None
+    
+    headers = {
+        "APCA-API-KEY-ID": ALPACA_API_KEY,
+        "APCA-API-SECRET-KEY": ALPACA_SECRET_KEY,
+        "Accept": "application/json"
+    }
+    
+    all_whales = []
+    
+    for symbol in WHALE_WATCHLIST:
+        try:
+            # Fetch options chain snapshot for this underlying
+            url = f"{ALPACA_DATA_URL}/snapshots/{symbol}"
+            params = {"limit": 250}  # Increased to capture more expirations (up to 30 DTE)
+            
+            resp = requests.get(url, headers=headers, params=params, timeout=10)
+            
+            if resp.status_code != 200:
+                print(f"⚠️ Alpaca chain error for {symbol}: {resp.status_code}")
+                continue
+                
+            data = resp.json()
+            snapshots = data.get("snapshots", {})
+            
+            # Get current underlying price for moneyness
+            underlying_price = get_cached_price(symbol) or 0
+            
+            for option_symbol, snapshot in snapshots.items():
+                daily_bar = snapshot.get("dailyBar", {})
+                latest_trade = snapshot.get("latestTrade", {})
+                latest_quote = snapshot.get("latestQuote", {})
+                
+                # Skip if no trade data
+                if not latest_trade or not daily_bar:
+                    continue
+                
+                # Extract data
+                volume = int(daily_bar.get("v", 0) or 0)
+                last_price = float(latest_trade.get("p", 0) or 0)
+                trade_time_str = latest_trade.get("t", "")
+                
+                bid = float(latest_quote.get("bp", 0) or 0)
+                ask = float(latest_quote.get("ap", 0) or 0)
+                
+                # Skip if no meaningful data
+                if volume == 0 or last_price == 0:
+                    continue
+                
+                # Parse the option symbol
+                parsed = parse_occ_symbol(option_symbol)
+                if not parsed:
+                    continue
+                
+                # Calculate premium (notional value)
+                notional = volume * last_price * 100
+                
+                # THRESHOLDS (same as Polygon version)
+                # SPY/QQQ = $8M, TSLA = $6M, others = $500k
+                if symbol.upper() in ['SPY', 'QQQ']:
+                    min_whale_val = 8_000_000
+                elif symbol.upper() == 'TSLA':
+                    min_whale_val = 6_000_000
+                else:
+                    min_whale_val = 500_000
+                
+                is_significant_premium = notional >= min_whale_val
+                is_meaningful_volume = volume >= 500
+                
+                # DTE Filter: Only include options expiring within 30 days
+                try:
+                    exp_date = datetime.strptime(parsed["expiry"], "%Y-%m-%d").date()
+                    dte = (exp_date - now_et.date()).days
+                    is_valid_dte = 0 <= dte <= 30
+                except:
+                    is_valid_dte = False
+                
+                if not (is_significant_premium and is_meaningful_volume and is_valid_dte):
+                    continue
+                
+                # Parse trade timestamp (ISO format)
+                try:
+                    trade_dt = datetime.fromisoformat(trade_time_str.replace("Z", "+00:00"))
+                    trade_dt_et = trade_dt.astimezone(tz_eastern)
+                    
+                    # Filter out stale trades from previous days
+                    if trade_dt_et.date() != now_et.date():
+                        continue
+                    
+                    trade_time_display = trade_dt_et.strftime("%H:%M:%S")
+                    timestamp_val = trade_dt_et.timestamp()
+                except:
+                    # Skip if can't parse timestamp
+                    continue
+                
+                # Moneyness calculation
+                strike = parsed["strike"]
+                is_call = parsed["put_call"] == "C"
+                
+                if underlying_price > 0:
+                    price_diff_pct = abs(underlying_price - strike) / underlying_price
+                    if price_diff_pct <= 0.005:
+                        moneyness = "ATM"
+                    elif is_call:
+                        moneyness = "ITM" if underlying_price > strike else "OTM"
+                    else:
+                        moneyness = "ITM" if underlying_price < strike else "OTM"
+                else:
+                    moneyness = "ATM"
+                
+                # Aggressor side (Quote Rule)
+                if bid > 0 and last_price <= bid:
+                    side = "SELL"
+                elif ask > 0 and last_price >= ask:
+                    side = "BUY"
+                else:
+                    side = "BUY"  # Default to BUY for mid-market
+                
+                # Deduplication: check if we've seen this exact trade
+                trade_id = f"{option_symbol}_{trade_time_str}"
+                if trade_id in WHALE_HISTORY:
+                    continue
+                WHALE_HISTORY[trade_id] = timestamp_val
+                
+                whale_data = {
+                    "baseSymbol": symbol,
+                    "symbol": option_symbol,
+                    "strikePrice": strike,
+                    "expirationDate": parsed["expiry"],
+                    "putCall": parsed["put_call"],
+                    "openInterest": 0,  # Not available from Alpaca
+                    "lastPrice": last_price,
+                    "tradeTime": trade_time_display,
+                    "timestamp": timestamp_val,
+                    "vol_oi": 0,  # Not available without OI
+                    "premium": format_money(notional),
+                    "notional_value": notional,
+                    "moneyness": moneyness,
+                    "is_mega_whale": notional > (12_000_000 if symbol.upper() == 'TSLA' else 5_000_000),
+                    "delta": 0,  # Not available from Alpaca
+                    "iv": 0,  # Not available from Alpaca
+                    "source": "alpaca",
+                    "volume": volume,
+                    "side": side,
+                    "bid": bid,
+                    "ask": ask
+                }
+                
+                all_whales.append(whale_data)
+        
+        except Exception as e:
+            print(f"⚠️ Alpaca scan error for {symbol}: {e}")
+    
+    # Sort by timestamp (newest first)
+    all_whales.sort(key=lambda x: x['timestamp'], reverse=True)
+    
+    return all_whales
+
+
+def scan_single_whale_polygon(symbol):
     """
     Fetch unusual options activity for a single ticker using Polygon.io.
-    Drop-in replacement for yfinance version with same output format.
+    Returns a list of whale_candidate dictionaries (without Alpaca side/bid/ask).
     """
+    print(f"🐢 Scanning {symbol}...", end="\r")
+    
     global CACHE, WHALE_HISTORY
     
     tz_eastern = pytz.timezone('US/Eastern')
@@ -659,8 +962,8 @@ def refresh_single_whale_polygon(symbol):
         polygon_data = fetch_unusual_options_polygon(symbol)
         
         if not polygon_data or not polygon_data.get("results"):
-            print(f"Polygon: No data for {symbol}, skipping")
-            return
+            # print(f"Polygon: No data for {symbol}, skipping")
+            return []
         
         current_price = polygon_data.get("_current_price", 0)
         
@@ -698,11 +1001,6 @@ def refresh_single_whale_polygon(symbol):
             vol_oi_ratio = volume / open_interest if open_interest > 0 else 999
             
             # INDUSTRY-STANDARD FILTERS (aligned with Unusual Whales, Cheddar Flow)
-            # 1. Vol/OI > 1.05 = Fresh positioning exceeds existing open interest
-            # 2. Premium > $100,000 = Institutional-size trade (not retail)
-            # 3. Volume > 500 = Block-level contract count
-            # 4. DTE <= 14 = Short-term conviction (weeklies + next monthly)
-            
             is_unusual = vol_oi_ratio > 1.05
             is_significant_premium = notional >= min_whale_val  # Use ticker-specific threshold
             is_meaningful_volume = volume >= 500
@@ -734,20 +1032,22 @@ def refresh_single_whale_polygon(symbol):
             delta_val = greeks.get("delta", 0) or 0
             iv_val = contract.get("implied_volatility", 0) or 0
             
-            # Trade time (from last_updated)
+            # Trade time: Polygon's day.last_updated is start of trading day (midnight),
+            # NOT actual trade time. Use server time when whale is detected instead.
             last_updated = day_data.get("last_updated", 0)
             if last_updated:
-                trade_time_obj = datetime.fromtimestamp(last_updated / 1_000_000_000, tz=tz_eastern)
+                polygon_time_obj = datetime.fromtimestamp(last_updated / 1_000_000_000, tz=tz_eastern)
                 
                 # CRITICAL: Filter out stale trades from previous days
                 # At 9:30 AM, we only want TODAY's trades
-                if trade_time_obj.date() != now_et.date():
+                if polygon_time_obj.date() != now_et.date():
                     continue
                     
-                trade_time_str = trade_time_obj.strftime("%H:%M:%S")
-                timestamp_val = trade_time_obj.timestamp()
+                # Use CURRENT server time as the detection time (more accurate for feed)
+                trade_time_str = now_et.strftime("%H:%M:%S")
+                timestamp_val = now_et.timestamp()
             else:
-                # If no timestamp, skip it to be safe (or assume now? No, safe is better)
+                # If no timestamp, skip it to be safe
                 continue
             
             # Volume tracking (same as yfinance version)
@@ -774,30 +1074,20 @@ def refresh_single_whale_polygon(symbol):
                 "is_mega_whale": notional > (12_000_000 if symbol.upper() == 'TSLA' else 5_000_000),
                 "delta": round(delta_val, 2),
                 "iv": round(iv_val, 2),
-                "source": "polygon"
+                "source": "polygon",
+                "volume": current_vol
+                # Missing: side, bid, ask (will be filled by worker)
             }
             
             if last_vol == 0 or delta >= VOLUME_THRESHOLD:
                 WHALE_HISTORY[contract_id] = current_vol
-                whale_data["volume"] = current_vol
                 new_whales.append(whale_data)
         
-        # Update cache
-        with CACHE_LOCK:
-            current_data = CACHE["whales"]["data"]
-            other_data = [w for w in current_data if w['baseSymbol'] != symbol]
-            updated_data = other_data + new_whales
-            updated_data.sort(key=lambda x: x['timestamp'], reverse=True)
-            # Keep only top 50 trades for a clean feed
-            CACHE["whales"]["data"] = updated_data[:50]
-            CACHE["whales"]["timestamp"] = time.time()
-        
-        if new_whales:
-            print(f"Polygon Whales: {len(new_whales)} unusual trades for {symbol} (cache: {len(CACHE['whales']['data'])})")
-            save_whale_cache()  # Persist to file
+        return new_whales
         
     except Exception as e:
         print(f"Polygon Whale Scan Failed ({symbol}): {e}")
+        return []
 
 def fetch_options_chain_marketdata(symbol, expiry=None, dte=None, strike_limit=None, min_volume=None):
     """
@@ -2347,6 +2637,8 @@ def refresh_news_logic():
         print(f"News Update Failed: {e}")
         CACHE["news"]["last_error"] = str(e)
 
+
+
 @app.route('/api/debug/force-news')
 def debug_news():
     try:
@@ -2855,15 +3147,13 @@ def start_background_worker():
         elif not is_market_hours:
             print("🌙 Market closed - minimal startup (using cached data)")
         else:
-            # Market hours - do full whale refresh with rate limiting
-            print("📈 Market hours - fetching live whale data...")
-            for symbol in WHALE_WATCHLIST[:5]:  # First 5 most important on startup
+            # Market hours - warm price cache, whale scan runs via main worker loop
+            print("📈 Market hours - warming price cache...")
+            for symbol in WHALE_WATCHLIST[:5]:
                 try:
-                    get_cached_price(symbol)  # Warm cache
-                    time.sleep(1)
-                    refresh_single_whale(symbol)
+                    get_cached_price(symbol)
                 except Exception as e:
-                    print(f"Startup Whale Error ({symbol}): {e}")
+                    print(f"Startup Price Cache Error ({symbol}): {e}")
         
         # 2. Fetch Gamma & Heatmap (lightweight on weekends) - WITH TIMEOUT
         # 2. Fetch Gamma & Heatmap & News - WITH RETRY & ROBUST TIMEOUT
@@ -2986,25 +3276,33 @@ def start_background_worker():
             can_hydrate_whales = is_extended_hours and whales_needs_hydration
             
             if is_market_open or can_hydrate_whales:
-                import gevent
                 start_time = time.time()
                 
-                def fetch_whale_task(symbol):
-                    try:
-                        refresh_single_whale(symbol)
-                    except Exception as e:
-                        print(f"Worker Error (Whale {symbol}): {e}")
+                # Use Alpaca-only scanning for real trade timestamps
+                try:
+                    new_whales = scan_whales_alpaca()
+                    
+                    if new_whales:
+                        # UPDATE CACHE (Atomic)
+                        with CACHE_LOCK:
+                            current_data = CACHE["whales"]["data"]
+                            updated_data = current_data + new_whales
+                            updated_data.sort(key=lambda x: x['timestamp'], reverse=True)
+                            CACHE["whales"]["data"] = updated_data[:50]
+                            CACHE["whales"]["timestamp"] = time.time()
+                        
+                        print(f"✅ Added {len(new_whales)} new whales to feed.")
+                        save_whale_cache()
+                        
+                except Exception as e:
+                    print(f"⚠️ Alpaca Whale Scan Error: {e}")
 
-                # Spawn parallel tasks for each symbol
-                threads = [gevent.spawn(fetch_whale_task, s) for s in WHALE_WATCHLIST]
-                gevent.joinall(threads, timeout=30)
-                
                 duration = time.time() - start_time
-                if duration > 5:
+                if duration > 1:
                     print(f"🐢 Whale Scan took {duration:.2f}s for {len(WHALE_WATCHLIST)} symbols", flush=True)
                 
-                # CRITICAL: Sleep to prevent hammering APIs
-                time.sleep(10)
+                # CRITICAL: Sleep to prevent hammering APIs (30s for Alpaca rate limit sustainability)
+                time.sleep(30)
             else:
                 # If market closed AND cache populated, stop polling whales/gamma
                 # Just sleep and check News/Heatmap occasionally
