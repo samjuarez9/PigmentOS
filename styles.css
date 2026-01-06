@@ -1486,6 +1486,13 @@ h1 {
     image-rendering: pixelated;
     -webkit-font-smoothing: none;
     letter-spacing: 0px;
+    cursor: pointer;
+    transition: text-shadow 0.2s ease, color 0.2s ease;
+}
+
+#whale-widget-title:hover {
+    color: #00FFFF;
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
 }
 
 /* Make whale emoji slightly bigger to match text */
@@ -3974,27 +3981,28 @@ td {
 }
 
 .side-badge {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 7px;
-    padding: 2px 5px;
-    border-radius: 2px;
-    font-weight: bold;
-    letter-spacing: 0.5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    font-size: 12px;
+    letter-spacing: 1px;
+    padding: 0;
+    border: none;
+    background: none;
     text-transform: uppercase;
 }
 
 .side-bought {
-    color: #00FF41;
-    background: rgba(0, 255, 65, 0.15);
-    border: 1px solid rgba(0, 255, 65, 0.4);
-    text-shadow: 0 0 5px rgba(0, 255, 65, 0.5);
+    color: #39FF14;
+    background: none;
+    border: none;
+    text-shadow: none;
 }
 
 .side-sold {
-    color: #FF3333;
-    background: rgba(255, 51, 51, 0.15);
-    border: 1px solid rgba(255, 51, 51, 0.4);
-    text-shadow: 0 0 5px rgba(255, 51, 51, 0.5);
+    color: #FF3131;
+    background: none;
+    border: none;
+    text-shadow: none;
 }
 
 /* Type Indicators in Strike Column */
@@ -7046,4 +7054,199 @@ td {
     to {
         text-shadow: 0 0 15px rgba(255, 215, 0, 1);
     }
+}
+
+/* === INSIDER TRADES === */
+.alert-item.insider-alert {
+    border-left: 3px solid #FFD700;
+    /* Gold border for Insider */
+    background: rgba(255, 215, 0, 0.05);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+}
+
+.insider-badge {
+    font-size: 0.7rem;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.insider-badge.insider-buy {
+    background: rgba(0, 255, 65, 0.2);
+    color: #00FF41;
+    border: 1px solid #00FF41;
+    box-shadow: 0 0 5px rgba(0, 255, 65, 0.3);
+}
+
+.insider-badge.insider-sell {
+    background: rgba(255, 51, 51, 0.2);
+    color: #FF3333;
+    border: 1px solid #FF3333;
+    box-shadow: 0 0 5px rgba(255, 51, 51, 0.3);
+}
+
+.insider-details {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+    flex-grow: 1;
+}
+
+.insider-name {
+    font-weight: 700;
+    color: #fff;
+    font-size: 0.85rem;
+}
+
+.insider-meta {
+    font-size: 0.75rem;
+    color: #aaa;
+}
+
+.insider-value {
+    color: #FFD700;
+    font-weight: 600;
+}
+
+.insider-time {
+    font-size: 0.7rem;
+    color: #666;
+    font-family: 'Courier New', monospace;
+    margin-left: auto;
+}
+
+/* === AFTER-MARKET FEED (SEC + Insider) === */
+.after-market-header {
+    text-align: center;
+    padding: 8px 0;
+    border-bottom: 1px dashed #FFD700;
+    margin-bottom: 8px;
+}
+
+.after-market-header .pixel-text {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: #FFD700;
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.after-market-row {
+    border-left: 3px solid #FFD700 !important;
+    background: rgba(255, 215, 0, 0.05) !important;
+}
+
+/* SEC Filing Badges */
+.sec-form {
+    font-family: 'Courier New', monospace;
+    font-weight: 800;
+    letter-spacing: 1px;
+}
+
+.sec-form.sec-major {
+    color: #00FFFF;
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
+}
+
+.sec-form.sec-minor {
+    color: #888;
+}
+
+.sec-label {
+    font-size: 0.75rem;
+    color: #00FFFF;
+    font-weight: 600;
+}
+
+.sec-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(0, 255, 255, 0.15);
+    color: #00FFFF;
+    border: 1px solid #00FFFF;
+}
+
+.sec-date {
+    font-size: 0.65rem;
+    color: #666;
+    font-family: 'Courier New', monospace;
+    margin-left: 6px;
+}
+
+/* Insider Trade Badges */
+.insider-buy {
+    color: #00FF41 !important;
+    text-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+}
+
+.insider-sell {
+    color: #FF3333 !important;
+    text-shadow: 0 0 8px rgba(255, 51, 51, 0.4);
+}
+
+.insider-badge {
+    font-size: 0.7rem;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.insider-badge.insider-buy {
+    background: rgba(0, 255, 65, 0.15);
+    color: #00FF41;
+    border: 1px solid #00FF41;
+}
+
+.insider-badge.insider-sell {
+    background: rgba(255, 51, 51, 0.15);
+    color: #FF3333;
+    border: 1px solid #FF3333;
+}
+
+.insider-name {
+    font-size: 0.75rem;
+    color: #AAA;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.insider-date {
+    font-size: 0.65rem;
+    color: #666;
+    font-family: 'Courier New', monospace;
+    margin-left: 6px;
+}
+
+/* Empty State */
+.after-market-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    gap: 8px;
+}
+
+.after-market-empty .pixel-text {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    color: #666;
+    letter-spacing: 2px;
+}
+
+.after-market-empty .pixel-subtext {
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    color: #444;
 }

@@ -465,7 +465,9 @@
 
         onAuthStateChanged(auth, async (user) => {
             // DEV MODE BYPASS
-            const isDevMode = localStorage.getItem('devMode') === 'true';
+            const isDevMode = localStorage.getItem('devMode') === 'true' || 
+                             window.location.hostname === 'localhost' || 
+                             window.location.hostname === '127.0.0.1';
             if (isDevMode && !user) {
                 console.log('🔧 DEV MODE: Bypassing auth check');
                 hideLoadingScreen();

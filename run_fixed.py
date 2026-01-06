@@ -61,24 +61,11 @@ TIMEOUT_EXECUTOR = ThreadPoolExecutor(max_workers=10)
 def with_timeout(func, timeout_seconds=5):
     """Run a function with a timeout. Returns None if timeout."""
     try:
-        # Safety check: don't submit if executor is shutting down
-        if TIMEOUT_EXECUTOR._shutdown:
-            print(f"⚠️ Executor shutdown, running {func} directly")
-            return func()
         future = TIMEOUT_EXECUTOR.submit(func)
         return future.result(timeout=timeout_seconds)
     except FuturesTimeoutError:
         print(f"⏰ Timeout after {timeout_seconds}s: {func}")
         return None
-    except RuntimeError as e:
-        if "cannot schedule" in str(e) or "shutdown" in str(e).lower():
-            # Executor is shutting down, run synchronously
-            print(f"⚠️ Executor unavailable, running {func} directly")
-            try:
-                return func()
-            except:
-                return None
-        raise
     except Exception as e:
         err_str = str(e)
         if "Too Many Requests" in err_str:
@@ -805,62 +792,6 @@ def fetch_alpaca_options_snapshot_batch(symbols_list):
             
     return results
 
-# === SIDE PERSISTENCE (For Library Accuracy) ===
-WHALE_SIDES_FILE = "whale_sides.json"
-SIDE_CACHE = {}
-
-def load_side_cache():
-    global SIDE_CACHE
-    if os.path.exists(WHALE_SIDES_FILE):
-        try:
-            with open(WHALE_SIDES_FILE, 'r') as f:
-                SIDE_CACHE = json.load(f)
-            print(f"Loaded {len(SIDE_CACHE)} persistent trade sides.")
-        except Exception as e:
-            print(f"Error loading side cache: {e}")
-            SIDE_CACHE = {}
-
-def save_side_cache():
-    global SIDE_CACHE
-    try:
-        with open(WHALE_SIDES_FILE, 'w') as f:
-            json.dump(SIDE_CACHE, f)
-    except Exception as e:
-        print(f"Error saving side cache: {e}")
-
-def prune_side_cache():
-    """Remove entries older than 35 days to prevent unlimited growth."""
-    global SIDE_CACHE
-    load_side_cache()
-    
-    cutoff_ts = time.time() - (35 * 24 * 60 * 60) # 35 days ago
-    initial_count = len(SIDE_CACHE)
-    
-    keys_to_remove = []
-    for key in SIDE_CACHE:
-        try:
-            # Key format: {Symbol}_{TimestampStr}_{Price}_{Size}
-            parts = key.split('_')
-            if len(parts) >= 2:
-                ts_str = parts[1]
-                dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-                if dt.timestamp() < cutoff_ts:
-                    keys_to_remove.append(key)
-        except:
-            pass # Keep if can't parse
-            
-    for k in keys_to_remove:
-        del SIDE_CACHE[k]
-        
-    if keys_to_remove:
-        print(f"🧹 Pruned {len(keys_to_remove)} old entries from Side Cache (New size: {len(SIDE_CACHE)})")
-        save_side_cache()
-    else:
-        print(f"🧹 Side Cache Pruning: No old entries found (Size: {len(SIDE_CACHE)})")
-
-# Initialize Side Cache on startup
-prune_side_cache()
-
 def scan_whales_polygon():
     """
     Scan for unusual whale activity using Polygon.io API.
@@ -1171,28 +1102,14 @@ def scan_whales_alpaca():
                     side = "SELL"
                 elif ask > 0 and last_price >= ask:
                     side = "BUY"
-                elif bid > 0 and ask > 0:
-                    # Mid-Market: Use distance to determine side
-                    dist_to_bid = abs(last_price - bid)
-                    dist_to_ask = abs(last_price - ask)
-                    if dist_to_bid < dist_to_ask:
-                        side = "SELL"
-                    else:
-                        side = "BUY" # Default to BUY if exactly mid or closer to ask
                 else:
-                    side = None  # Default to None if no quote (don't guess BUY)
+                    side = "BUY"  # Default to BUY for mid-market
                 
                 # Deduplication: check if we've seen this exact trade
                 trade_id = f"{option_symbol}_{trade_time_str}"
                 if trade_id in WHALE_HISTORY:
                     continue
                 WHALE_HISTORY[trade_id] = timestamp_val
-                
-                # PERSIST SIDE (For Library Accuracy)
-                # Key: {Symbol}_{TimestampStr}_{Price}_{Size}
-                side_key = f"{option_symbol}_{trade_time_str}_{last_price}_{volume}"
-                SIDE_CACHE[side_key] = side
-                save_side_cache()
                 
                 # Hybrid Logic: Fetch Polygon OI & Greeks for ALL candidates to apply Global Filter
                 # Alpaca symbol: ORCL260109C00105000 -> Polygon: O:ORCL260109C00105000
@@ -1237,9 +1154,7 @@ def scan_whales_alpaca():
                     "premium": format_money(notional),
                     "notional_value": notional,
                     "moneyness": moneyness,
-                    "moneyness": moneyness,
-                    "is_mega_whale": volume >= 500,
-                    "is_sweep": is_sweep,
+                    "is_mega_whale": notional > (12_000_000 if symbol.upper() == 'TSLA' else 5_000_000),
                     "is_sweep": is_sweep,
                     "delta": delta_val,
                     "iv": iv_val,
@@ -3559,9 +3474,9 @@ def start_background_worker():
                     time.sleep(2) # Wait a bit before retry
             print(f"❌ {name} Hydration GAVE UP after {retries} attempts.")
 
-        # retry_fetch(refresh_gamma_logic, "Gamma")
-        # retry_fetch(refresh_heatmap_logic, "Heatmap")
-        # retry_fetch(refresh_news_logic, "News")
+        retry_fetch(refresh_gamma_logic, "Gamma")
+        retry_fetch(refresh_heatmap_logic, "Heatmap")
+        retry_fetch(refresh_news_logic, "News")
         
 
     def worker():
@@ -3753,7 +3668,6 @@ if not hasattr(start_background_worker, '_started'):
     start_background_worker()  # Enabled for local dev (production uses gunicorn_config.py)
     start_background_worker._started = True
 
-
 @app.route('/api/library/options')
 def api_library_options():
     """
@@ -3769,7 +3683,7 @@ def api_library_options():
 
     # Cache Key (Symbol + Date + Hour to keep it relatively fresh but cached)
     current_time = time.time()
-    cache_key = f"library_alpaca_{symbol}_v4"
+    cache_key = f"library_alpaca_{symbol}"
     
     global LIBRARY_CACHE
     if 'LIBRARY_CACHE' not in globals():
@@ -3777,39 +3691,28 @@ def api_library_options():
         
     if cache_key in LIBRARY_CACHE:
         cached = LIBRARY_CACHE[cache_key]
-        if current_time - cached['timestamp'] < 300: # 5 min cache for rate limit safety
+        if current_time - cached['timestamp'] < 60: # 1 min cache for "live" feel
             return jsonify(cached['data'])
 
     try:
-        # Use Trade-by-Trade API instead of Snapshots for accurate intel
+        # Reuse logic from scan_whales_alpaca but for a single symbol
+        # 1. Fetch Snapshots
         headers = {
             "APCA-API-KEY-ID": ALPACA_API_KEY,
             "APCA-API-SECRET-KEY": ALPACA_SECRET_KEY,
             "Accept": "application/json"
         }
         
-        tz_eastern = pytz.timezone('US/Eastern')
-        now_et = datetime.now(tz_eastern)
+        url = f"{ALPACA_DATA_URL}/snapshots/{symbol}"
+        params = {"limit": 1000} # Max limit to get all contracts
         
-        # Get current stock price for moneyness calculation
-        current_price = 0
-        try:
-            stock_url = f"https://data.alpaca.markets/v2/stocks/{symbol}/trades/latest"
-            stock_resp = requests.get(stock_url, headers=headers, timeout=5)
-            if stock_resp.status_code == 200:
-                stock_data = stock_resp.json()
-                current_price = float(stock_data.get('trade', {}).get('p', 0) or 0)
-        except:
-            pass
+        resp = requests.get(url, headers=headers, params=params, timeout=10)
         
-        # First, get snapshots to find all active option contracts for this symbol
-        snapshot_url = f"{ALPACA_DATA_URL}/snapshots/{symbol}"
-        snapshot_resp = requests.get(snapshot_url, headers=headers, params={"limit": 500}, timeout=15)
-        
-        if snapshot_resp.status_code != 200:
-            return jsonify({"error": f"Alpaca Snapshot Error: {snapshot_resp.status_code}"}), 500
-        
-        snapshots = snapshot_resp.json().get("snapshots", {})
+        if resp.status_code != 200:
+            return jsonify({"error": f"Alpaca Error: {resp.status_code}"}), 500
+            
+        data = resp.json()
+        snapshots = data.get("snapshots", {})
         
         # Helper to parse OCC
         def parse_occ(sym):
@@ -3827,197 +3730,70 @@ def api_library_options():
                 expiry = f"{year}-{month:02d}-{day:02d}"
                 return {"expiry": expiry, "type": "CALL" if put_call == "C" else "PUT", "strike": strike}
             except: return None
+
+        tz_eastern = pytz.timezone('US/Eastern')
+        now_et = datetime.now(tz_eastern)
         
-        # Filter contracts: 0-30 DTE only
-        valid_contracts = []
-        for option_symbol in snapshots.keys():
+        processed_trades = []
+        
+        for option_symbol, snapshot in snapshots.items():
+            daily_bar = snapshot.get("dailyBar", {})
+            latest_trade = snapshot.get("latestTrade", {})
+            latest_quote = snapshot.get("latestQuote", {})
+            
+            if not latest_trade or not daily_bar: continue
+            
+            volume = int(daily_bar.get("v", 0) or 0)
+            last_price = float(latest_trade.get("p", 0) or 0)
+            
+            if volume == 0 or last_price == 0: continue
+            
             parsed = parse_occ(option_symbol)
             if not parsed: continue
             
+            # 30 DTE Filter
             try:
                 expiry_date = datetime.strptime(parsed['expiry'], "%Y-%m-%d").date()
                 days_to_expiry = (expiry_date - now_et.date()).days
-                if 0 <= days_to_expiry <= 30:
-                    valid_contracts.append(option_symbol)
-            except:
-                continue
-        
-        # Fetch trades for valid contracts (in batches to avoid URL length limits)
-        all_trades = []
-        batch_size = 20  # Alpaca allows multiple symbols per request
-        
-        # 30-day lookback for stateless history
-        start_date = (now_et - timedelta(days=30)).strftime("%Y-%m-%dT00:00:00Z")
-        
-        for i in range(0, len(valid_contracts), batch_size):
-            batch = valid_contracts[i:i+batch_size]
-            symbols_param = ",".join(batch)
-            
-            trades_url = "https://data.alpaca.markets/v1beta1/options/trades"
-            params = {
-                "symbols": symbols_param,
-                "start": start_date,
-                "limit": 1000
-            }
-            
-            try:
-                trades_resp = requests.get(trades_url, headers=headers, params=params, timeout=15)
-                if trades_resp.status_code == 200:
-                    trades_data = trades_resp.json().get("trades", {})
-                    for option_symbol, trades in trades_data.items():
-                        for trade in trades:
-                            all_trades.append({
-                                "symbol": option_symbol,
-                                "price": float(trade.get("p", 0)),
-                                "size": int(trade.get("s", 0)),
-                                "timestamp": trade.get("t", ""),
-                                "condition": trade.get("c", ""),
-                                "exchange": trade.get("x", "")
-                            })
-            except Exception as e:
-                print(f"Trade fetch error for batch: {e}")
-                continue
-        
-        # Process trades: calculate premium, filter by size, etc.
-        MIN_PREMIUM = 100000  # $100k minimum per trade for significant flow
-        MIN_SIZE = 100  # Minimum contracts per trade
-        
-        # Group trades by contract to apply Tick Test
-        trades_by_contract = {}
-        for trade in all_trades:
-            option_symbol = trade["symbol"]
-            if option_symbol not in trades_by_contract:
-                trades_by_contract[option_symbol] = []
-            trades_by_contract[option_symbol].append(trade)
-            
-        processed_trades = []
-        
-        for option_symbol, contract_trades in trades_by_contract.items():
-            # Sort trades for this contract by timestamp (ascending) for Tick Test
-            contract_trades.sort(key=lambda x: x.get("t", ""))
-            
-            last_price = None
-            last_side = "BUY" # Default starting side
-            
-            parsed = parse_occ(option_symbol)
-            if not parsed:
-                continue
-                
-            snapshot = snapshots.get(option_symbol, {})
-            quote = snapshot.get("latestQuote", {})
-            bid = float(quote.get("bp", 0) or 0)
-            ask = float(quote.get("ap", 0) or 0)
-            
-            # Get Delta from Greeks (Alpaca provides this in snapshots)
-            greeks = snapshot.get("greeks", {})
-            contract_delta = float(greeks.get("delta", 0) or 0)
-            
-            for trade in contract_trades:
-                price = float(trade["price"])
-                size = int(trade["size"])
-                premium = price * size * 100
-                
-                if premium < MIN_PREMIUM or size < MIN_SIZE:
-                    last_price = price # Still update price for tick test
-                    continue
-                
-                # Parse timestamp
-                try:
-                    trade_dt = datetime.fromisoformat(trade["timestamp"].replace("Z", "+00:00"))
-                    trade_dt_et = trade_dt.astimezone(tz_eastern)
-                    trade_time_display = trade_dt_et.strftime("%H:%M:%S")
-                    timestamp = trade_dt_et.timestamp()
-                    is_recent = (now_et - trade_dt_et).total_seconds() < 900 # Last 15 minutes
-                except:
-                    trade_time_display = "N/A"
-                    timestamp = 0
-                    is_recent = False
-                
-                # Side Calculation (Hybrid with Persistence)
-                side = "BUY"
-                
-                # 1. Check Persistence Cache First (Most Accurate)
-                # Key: {Symbol}_{TimestampStr}_{Price}_{Size}
-                side_key = f"{option_symbol}_{trade['timestamp']}_{price}_{size}"
-                if side_key in SIDE_CACHE:
-                    side = SIDE_CACHE[side_key]
-                
-                # 2. Fallback to Live Quote / Tick Test
-                elif is_recent and bid > 0 and ask > 0:
-                    # Use Live Quote for recent trades
-                    if price <= bid:
-                        side = "SELL"
-                    elif price >= ask:
-                        side = "BUY"
-                    else:
-                        # Mid-Market: Use distance
-                        dist_to_bid = abs(price - bid)
-                        dist_to_ask = abs(price - ask)
-                        if dist_to_bid < dist_to_ask:
-                            side = "SELL"
-                        else:
-                            side = "BUY" # Default to BUY if exactly mid or closer to ask
-                else:
-                    # Use Tick Test for historical trades
-                    if last_price is not None:
-                        if price > last_price:
-                            side = "BUY"
-                        elif price < last_price:
-                            side = "SELL"
-                        else:
-                            side = last_side # Carry forward
-                    else:
-                        side = None # Default to None for first trade if unknown
+                if days_to_expiry < 0 or days_to_expiry > 30: continue
+            except: continue
 
-                
-                last_price = price
-                last_side = side
-                
-                # Calculate moneyness
-                moneyness = None
-                if current_price > 0:
-                    strike = parsed['strike']
-                    is_call = parsed['type'] == 'CALL'
-                    pct_diff = abs(strike - current_price) / current_price * 100
-                    
-                    if pct_diff <= 1:
-                        moneyness = "ATM"
-                    elif (is_call and strike < current_price) or (not is_call and strike > current_price):
-                        moneyness = "ITM"
-                    else:
-                        moneyness = "OTM"
-                
-                processed_trades.append({
-                    "ticker": symbol,
-                    "strike": parsed['strike'],
-                    "type": parsed['type'],
-                    "expiry": parsed['expiry'],
-                    "premium": f"${premium:,.0f}",
-                    "size": size,
-                    "price": price,
-                    "timestamp": timestamp,
-                    "timeStr": trade_time_display,
-                    "notional_value": premium,
-                    "moneyness": moneyness,
-                    "is_sweep": trade["condition"] == "I",
-                    "is_mega_whale": size >= 500,
-                    "side": side,
-                    "condition": trade["condition"],
-                    "exchange": trade["exchange"],
-                    "delta": contract_delta  # Delta from Alpaca Greeks
-                })
-        
-        # Sort by timestamp descending (most recent first) for display
+            # Calculate Premium
+            notional = volume * last_price * 100
+            
+            # Format Trade Time
+            trade_time_str = latest_trade.get("t", "")
+            try:
+                trade_dt = datetime.fromisoformat(trade_time_str.replace("Z", "+00:00"))
+                trade_dt_et = trade_dt.astimezone(tz_eastern)
+                trade_time_display = trade_dt_et.strftime("%H:%M:%S")
+                timestamp = trade_dt_et.timestamp()
+            except:
+                trade_time_display = "N/A"
+                timestamp = 0
+
+            processed_trades.append({
+                "ticker": symbol,
+                "strike": parsed['strike'],
+                "type": parsed['type'],
+                "expiry": parsed['expiry'],
+                "premium": f"${notional:,.0f}", # Simple formatting
+                "volume": volume,
+                "lastPrice": last_price,
+                "bid": float(latest_quote.get("bp", 0) or 0),
+                "ask": float(latest_quote.get("ap", 0) or 0),
+                "timestamp": timestamp,
+                "timeStr": trade_time_display,
+                "notional_value": notional
+            })
+            
+        # Sort by Timestamp Descending (Latest trades first)
         processed_trades.sort(key=lambda x: x['timestamp'], reverse=True)
-        
-        # Filter: Only show trades from current year (2026)
-        current_year = now_et.year
-        processed_trades = [t for t in processed_trades if datetime.fromtimestamp(t['timestamp'], tz_eastern).year == current_year]
         
         # Cache Result
         LIBRARY_CACHE[cache_key] = {
             "timestamp": current_time,
-            "data": {"data": processed_trades}
+            "data": {"data": processed_trades} # Wrap in data object to match frontend expectation
         }
         
         return jsonify({"data": processed_trades})
@@ -4027,9 +3803,7 @@ def api_library_options():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    # Start background worker
-    start_background_worker()
     
-    port = int(os.environ.get('PORT', 8001))
-    print(f"🚀 PigmentOS Server running on port {port}")
-    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)
+    port = int(os.environ.get("PORT", 8001))
+    print(f"🚀 PigmentOS Flask Server running on port {port}", flush=True)
+    app.run(host='0.0.0.0', port=port, threaded=True)

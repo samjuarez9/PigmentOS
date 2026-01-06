@@ -6,8 +6,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // === GLOBAL CONFIGURATION ===
     const IS_FILE_PROTOCOL = window.location.protocol === 'file:';
-    const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:8001' : 'https://pigmentos.onrender.com';
-    console.log('🚀 PigmentOS Config:', { API_BASE_URL, hostname: window.location.hostname });
+    const isLocal = window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        IS_FILE_PROTOCOL;
+    const API_BASE_URL = isLocal ? 'http://localhost:8001' : 'https://pigmentos.onrender.com';
+    console.log('🚀 PigmentOS Config:', { API_BASE_URL, hostname: window.location.hostname, isLocal });
 
     // === ANALYTICS HELPER ===
     function trackEvent(eventName, params = {}) {
@@ -1112,6 +1115,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // === WHALE TITLE CLICK → EXPANDED PAGE ===
+    const whaleTitle = document.getElementById('whale-widget-title');
+    if (whaleTitle) {
+        whaleTitle.addEventListener('click', () => {
+            trackEvent('whale_expand_click', { source: 'widget_title' });
+            window.location.href = '/whales.html';
+        });
+    }
+
     // Intel Feed Auto-Scroll Logic - Moved to startNewsTicker for sync
     // const newsFeedContainer = document.getElementById('news-feed-container');
     // ... logic moved ...
@@ -1425,7 +1437,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // === PRE-MARKET / AFTER HOURS / WEEKEND MODE: Show radar scanning animation ===
         const existingTrades = document.querySelectorAll('.whale-row');
-        if ((marketState.isPreMarket || marketState.isAfterHours || marketState.isWeekend) && existingTrades.length === 0) {
+        if (false && (marketState.isPreMarket || marketState.isAfterHours || marketState.isWeekend) && existingTrades.length === 0) {
             // Clear all tracking caches for fresh start at market open
             seenTrades.clear();
             tradeFirstSeen.clear();
@@ -2463,59 +2475,51 @@ document.addEventListener('DOMContentLoaded', () => {
         const colTag = document.createElement('div');
         colTag.className = 'col-tag';
 
-        // === SIMPLIFIED TAG LOGIC (Using Alpaca Bid/Ask Data) ===
-        // Industry Standard "Quote Rule" (Unusual Whales, Cheddar Flow, etc.):
-        // SWEEP: Trade price >= Ask (aggressive buyer) + significant size
-        // DUMP: Trade price <= Bid (aggressive seller) + significant size
-        // Note: bid, ask, tradePrice, notional, isPut, isSold already declared above
+        // === SIMPLIFIED TAG LOGIC (Using Backend Hybrid Logic) ===
+        // SWEEP: Calculated in backend (Trade >= Ask AND Vol > OI)
+        const isSweep = flow.is_sweep === true;
 
-        // Size threshold (industry standard)
-        const MIN_SWEEP_PREMIUM = 500000;  // $500k for SWEEP/DUMP
-
-        // SWEEP: Aggressive BUY at/above ask (applies to BOTH calls and puts)
-        // - CALL sweep = bullish conviction
-        // - PUT sweep = bearish conviction  
-        const isSweep = ask > 0 && tradePrice >= ask && notional >= MIN_SWEEP_PREMIUM;
-
-        // DUMP: ANY option SOLD at/below bid (aggressive exit/liquidation)
-        // Applies to both calls and puts - dumping a position
-        const isDump = bid > 0 && tradePrice <= bid && notional >= MIN_SWEEP_PREMIUM && isSold;
+        // DUMP: Removed as per user request
+        const isDump = false;
 
         // Combine MEGA with SWEEP/DUMP when both apply
         const isMega = flow.is_mega_whale;
 
+        // Calculate DTE for LOTTO logic
+        let daysToExpiry = 30; // Default
+        if (flow.expiry) {
+            const expiryDate = new Date(flow.expiry);
+            const now = new Date();
+            const diffTime = expiryDate - now;
+            daysToExpiry = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+
+        // LOTTO: High risk, short term (Delta < 0.20, DTE <= 7)
+        // Must be meaningful size (already filtered by feed > $500k usually, but good to check)
+        const delta = flow.delta || 0;
+        const isLotto = Math.abs(delta) < 0.20 && daysToExpiry <= 7;
+
         // Priority 1: MEGA SWEEP (Very high premium + aggressive buy)
         if (isMega && isSweep) {
-            colTag.textContent = 'MEGA SWEEP';
-            colTag.classList.add('tag-mega', 'tag-sweep');
+            colTag.innerHTML = `<span class="tag tag-mega-sweep pulse-mega">MEGA SWEEP</span>`;
         }
-        // Priority 2: MEGA DUMP (Very high premium + aggressive sell)
-        else if (isMega && isDump) {
-            colTag.textContent = 'MEGA DUMP';
-            colTag.classList.add('tag-mega', 'tag-dump');
-        }
-        // Priority 3: MEGA (Very high premium, not aggressive)
+        // Priority 2: MEGA (Very high premium, not aggressive)
         else if (isMega) {
-            colTag.textContent = 'MEGA';
-            colTag.classList.add('tag-mega');
+            colTag.innerHTML = `<span class="tag tag-mega">MEGA WHALE</span>`;
+        }
+        // Priority 3: LOTTO (High Risk / Short Term)
+        else if (isLotto) {
+            colTag.innerHTML = `<span class="tag tag-lotto">LOTTO 🎰</span>`;
         }
         // Priority 4: SWEEP (Aggressive Buy at Ask)
         else if (isSweep) {
-            colTag.textContent = 'SWEEP';
-            colTag.classList.add('tag-sweep');
+            colTag.innerHTML = `<span class="tag tag-sweep pulse-sweep">SWEEP</span>`;
         }
-        // Priority 5: DUMP (Aggressive Sell at Bid)
-        else if (isDump) {
-            colTag.textContent = 'DUMP';
-            colTag.classList.add('tag-dump');
-        }
-        // Priority 6: Standard Direction (BULL/BEAR)
+        // Priority 5: Standard Direction (BULL/BEAR)
         else if (isCall) {
-            colTag.textContent = 'BULL';
-            colTag.classList.add('tag-bull');
+            colTag.innerHTML = `<span class="tag tag-bull">BULL</span>`;
         } else {
-            colTag.textContent = 'BEAR';
-            colTag.classList.add('tag-bear');
+            colTag.innerHTML = `<span class="tag tag-bear">BEAR</span>`;
         }
 
         // Secondary Tag: ITM / OTM (Append if space allows or as a small badge)
@@ -2534,18 +2538,22 @@ document.addEventListener('DOMContentLoaded', () => {
             colTag.insertBefore(moneySpan, colTag.firstChild);
         }
 
-        // BOUGHT/SOLD Badge: Replace delta bar with prominent aggressor side indicator
-        if (flow.side) {
-            const sideWrapper = document.createElement('div');
-            sideWrapper.className = 'side-badge-wrapper';
+        // Delta Bar (Restored Production Style)
+        // delta is already declared above for LOTTO logic
+        const deltaPercent = Math.min(Math.abs(delta * 100), 100);
+        // Format: .65 instead of 0.65
+        const deltaLabel = Math.abs(delta).toFixed(2).replace(/^0+/, '');
 
-            const sideBadge = document.createElement('span');
-            sideBadge.className = flow.side === 'BUY' ? 'side-badge side-bought' : 'side-badge side-sold';
-            sideBadge.textContent = flow.side === 'BUY' ? 'BOUGHT' : 'SOLD';
+        const deltaWrapper = document.createElement('div');
+        deltaWrapper.className = 'delta-wrapper';
+        deltaWrapper.innerHTML = `
+            <span class="delta-label">${deltaLabel}</span>
+            <div class="delta-bar-mini">
+                <div class="delta-bar-fill" style="width: ${deltaPercent}%;"></div>
+            </div>
+        `;
 
-            sideWrapper.appendChild(sideBadge);
-            colTag.insertBefore(sideWrapper, colTag.firstChild);
-        }
+        colTag.insertBefore(deltaWrapper, colTag.firstChild);
 
         row.appendChild(colTicker);
         row.appendChild(colPremium);
