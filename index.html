@@ -403,6 +403,14 @@
         const db = getFirestore(app);
         const analytics = getAnalytics(app);
 
+        // SAFETY TIMEOUT: Force-show page after 3s even if Firebase is slow
+        // This prevents navigation hang when Firebase SDK takes too long to initialize
+        const safetyTimeout = setTimeout(() => {
+            console.warn('⚠️ Firebase took too long - force-showing page');
+            hideLoadingScreen();
+            document.body.style.visibility = 'visible';
+        }, 3000);
+
         // Track page view
         logEvent(analytics, 'page_view', { page_title: 'Dashboard' });
 

@@ -574,11 +574,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Start Polymarket refresh interval
-    fetchPolymarketData(); // Initial render
+    // fetchPolymarketData(); // Initial render - MOVED TO STAGGERED INIT
     setInterval(fetchPolymarketData, 30000); // Refresh every 30 seconds
 
     // Initialize Chart
-    createTradingViewWidget(currentTicker);
+    // createTradingViewWidget(currentTicker); // MOVED TO STAGGERED INIT
 
     // Render Odds (Legacy - kept for compatibility)
     function renderOdds(odds) {
@@ -817,7 +817,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let heatmapHasLoaded = false;
 
+    // Helper: LocalStorage cache for Heatmap (TTL 15 minutes)
+    const HEATMAP_CACHE_TTL = 15 * 60 * 1000;
+    function getHeatmapCache() {
+        const raw = localStorage.getItem('heatmap_cache');
+        if (!raw) return null;
+        try {
+            const parsed = JSON.parse(raw);
+            if (Date.now() - parsed.timestamp < HEATMAP_CACHE_TTL) return parsed.data;
+            return null;
+        } catch { return null; }
+    }
+    function setHeatmapCache(data) {
+        localStorage.setItem('heatmap_cache', JSON.stringify({ timestamp: Date.now(), data }));
+    }
+
     async function fetchHeatmapData(retryCount = 0) {
+        // 1. Check Cache & Render Immediately (only on first load)
+        if (!heatmapHasLoaded) {
+            const cached = getHeatmapCache();
+            if (cached) {
+                renderMarketMap(cached, false);
+                heatmapHasLoaded = true;
+                updateStatus('status-sectors', true);
+            }
+        }
+
         try {
             const response = await fetch(`${API_BASE_URL}/api/heatmap`);
             if (!response.ok) throw new Error('Heatmap API Error');
@@ -832,6 +857,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const data = result.data || result;
+
+            // 2. Update Cache & Re-render
+            setHeatmapCache(data);
             renderMarketMap(data, heatmapHasLoaded); // Pass isUpdate flag
             heatmapHasLoaded = true; // Subsequent calls are updates
             updateStatus('status-sectors', true);
@@ -843,8 +871,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error('Heatmap Fetch Error:', error);
-            updateStatus('status-sectors', false);
-            renderHeatmapError();
+            // Only show error if we have no data at all
+            if (!heatmapHasLoaded && !getHeatmapCache()) {
+                updateStatus('status-sectors', false);
+                renderHeatmapError();
+            }
         }
     }
 
@@ -1045,27 +1076,50 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Initialize TFI
-    async function fetchCNNFearGreed() {
+    // Helper: LocalStorage cache for TFI (TTL 1 hour)
+    const TFI_CACHE_TTL = 60 * 60 * 1000;
+    function getTFICache() {
+        const raw = localStorage.getItem('tfi_cache');
+        if (!raw) return null;
         try {
+            const parsed = JSON.parse(raw);
+            if (Date.now() - parsed.timestamp < TFI_CACHE_TTL) return parsed.data;
+            return null;
+        } catch { return null; }
+    }
+    function setTFICache(data) {
+        localStorage.setItem('tfi_cache', JSON.stringify({ timestamp: Date.now(), data }));
+    }
 
+    async function fetchCNNFearGreed() {
+        // 1. Check Cache & Render Immediately
+        const cached = getTFICache();
+        if (cached) {
+            updateTFI(cached.value, cached.rating, cached.source);
+            updateStatus('status-tfi', true);
+        }
+
+        try {
             const response = await fetch(`${API_BASE_URL}/api/cnn-fear-greed`);
             if (!response.ok) throw new Error('CNN Fear & Greed API Failed');
 
             const data = await response.json();
 
+            // 2. Update Cache & Re-render
+            setTFICache(data);
             updateTFI(data.value, data.rating, data.source);
 
             updateStatus('status-tfi', true);
         } catch (error) {
             console.error('CNN Fear & Greed API Failed:', error);
-            updateStatus('status-tfi', false);
+            if (!cached) updateStatus('status-tfi', false); // Only show offline if no cache
         }
     }
-    fetchCNNFearGreed();
+    // fetchCNNFearGreed(); // MOVED TO STAGGERED INIT
     setInterval(fetchCNNFearGreed, 300000); // Refresh every 5 minutes (was 12 hours)
 
     // Initialize Market Map
-    fetchHeatmapData();
+    // fetchHeatmapData(); // MOVED TO STAGGERED INIT
     setInterval(fetchHeatmapData, 300000); // Refresh every 5 minutes
 
     // Helper: Update API Status Indicator
@@ -1115,14 +1169,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // === WHALE TITLE CLICK → EXPANDED PAGE ===
-    const whaleTitle = document.getElementById('whale-widget-title');
-    if (whaleTitle) {
-        whaleTitle.addEventListener('click', () => {
-            trackEvent('whale_expand_click', { source: 'widget_title' });
-            window.location.href = '/whales.html';
-        });
-    }
+    // Whale title click -> Expanded page (DISABLED - Not ready for production)
 
     // Intel Feed Auto-Scroll Logic - Moved to startNewsTicker for sync
     // const newsFeedContainer = document.getElementById('news-feed-container');
@@ -1437,7 +1484,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // === PRE-MARKET / AFTER HOURS / WEEKEND MODE: Show radar scanning animation ===
         const existingTrades = document.querySelectorAll('.whale-row');
-        if (false && (marketState.isPreMarket || marketState.isAfterHours || marketState.isWeekend) && existingTrades.length === 0) {
+        if ((marketState.isPreMarket || marketState.isAfterHours || marketState.isWeekend) && existingTrades.length === 0) {
             // Clear all tracking caches for fresh start at market open
             seenTrades.clear();
             tradeFirstSeen.clear();
@@ -1669,8 +1716,33 @@ document.addEventListener('DOMContentLoaded', () => {
         // Initial Fetch
         fetchGammaWall(currentGammaTicker);
 
-        // Refresh every 5 minutes
+        // Refresh data every 5 minutes
         setInterval(() => fetchGammaWall(currentGammaTicker), 300000);
+
+        // Refresh PRICE every 60 seconds (Independent of full data refresh)
+        setInterval(() => updateGammaPrice(), 60000);
+    }
+
+    async function updateGammaPrice() {
+        if (!currentGammaTicker) return;
+
+        try {
+            const res = await fetch(`/api/price?symbol=${currentGammaTicker}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.price && window.currentGammaData) {
+                    // Update the cached data object with new price
+                    window.currentGammaData.current_price = data.price;
+                    window.currentGammaData._price_source = data.source; // Debug info
+
+                    // Re-render the chart with new price (updates ATM row and tooltips)
+                    renderGammaChart(window.currentGammaData);
+                    console.log(`[Gamma] Updated price for ${currentGammaTicker}: $${data.price} (${data.source})`);
+                }
+            }
+        } catch (e) {
+            console.error("Gamma Price Update Failed:", e);
+        }
     }
 
     async function fetchGammaWall(ticker = 'SPY') {
@@ -1703,6 +1775,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const cached = getGammaCache(ticker);
             if (cached) {
+                window.currentGammaData = cached; // Store for price updates
                 renderGammaChart(cached);
                 updateStatus('status-gamma-wall', true); // Show LIVE even from cache
                 return;
@@ -1727,6 +1800,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Cache Success
             setGammaCache(ticker, data);
+            window.currentGammaData = data; // Store for price updates
 
             // Reset Loading Bar
             const finishedLoadingBar = document.querySelector('.gamma-loading-bar');
@@ -2560,7 +2634,77 @@ document.addEventListener('DOMContentLoaded', () => {
         row.appendChild(colStrike);
         row.appendChild(colTag);
 
+        // Store trade data on element for saving
+        row._tradeData = flow;
+
+        // === LONG-PRESS TO SAVE ===
+        let pressTimer = null;
+        let pressStart = 0;
+
+        const startPress = (e) => {
+            pressStart = Date.now();
+            row.classList.add('pressing');
+
+            pressTimer = setTimeout(async () => {
+                // Long-press triggered (500ms)
+                row.classList.remove('pressing');
+                row.classList.add('saving');
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/whales/save`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(flow)
+                    });
+
+                    if (response.ok) {
+                        row.classList.add('saved');
+                        // Show saved toast
+                        showToast(`💾 Saved ${flow.ticker} to watchlist`);
+                    } else {
+                        row.classList.remove('saving');
+                        showToast(`❌ Failed to save trade`);
+                    }
+                } catch (err) {
+                    row.classList.remove('saving');
+                    console.error('Save failed:', err);
+                }
+            }, 500);
+        };
+
+        const endPress = () => {
+            if (pressTimer) {
+                clearTimeout(pressTimer);
+                pressTimer = null;
+            }
+            row.classList.remove('pressing');
+        };
+
+        // Mouse events
+        row.addEventListener('mousedown', startPress);
+        row.addEventListener('mouseup', endPress);
+        row.addEventListener('mouseleave', endPress);
+
+        // Touch events (mobile)
+        row.addEventListener('touchstart', startPress, { passive: true });
+        row.addEventListener('touchend', endPress);
+        row.addEventListener('touchcancel', endPress);
+
         return row;
+    }
+
+    // Toast notification helper
+    function showToast(message) {
+        let toast = document.getElementById('whale-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'whale-toast';
+            toast.style.cssText = 'position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #222; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 13px; z-index: 9999; opacity: 0; transition: opacity 0.3s;';
+            document.body.appendChild(toast);
+        }
+        toast.textContent = message;
+        toast.style.opacity = '1';
+        setTimeout(() => { toast.style.opacity = '0'; }, 2000);
     }
 
     // Start SSE Stream
@@ -2877,13 +3021,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Initial Fetch & Interval
-    safeExecute('News Feed', fetchNews);
+    // === STAGGERED INITIALIZATION (Optimized for Performance) ===
+    // Prevents "thundering herd" of API calls on load
+
+    // 1. Polymarket (Fast) - Immediate
+    setTimeout(() => safeExecute('Polymarket Init', fetchPolymarketData), 0);
+
+    // 2. Movers Tape (Fast) - +50ms
+    setTimeout(() => safeExecute('Ticker Tape', startMoversSlideshow), 50);
+
+    // 3. News Feed (Medium) - +100ms
+    setTimeout(() => safeExecute('News Feed', fetchNews), 100);
     setInterval(() => safeExecute('News Feed Update', fetchNews), 60000); // Every 1 minute
 
-    safeExecute('Gamma Wall', initGammaWall);
+    // 4. CNN Fear & Greed (Medium) - +150ms
+    setTimeout(() => safeExecute('CNN Fear/Greed', fetchCNNFearGreed), 150);
 
-    // Initialize TradingView Widget
-    safeExecute('TradingView Main', () => createTradingViewWidget(currentTicker));
+    // 5. Market Map (Medium) - +200ms
+    setTimeout(() => safeExecute('Market Map', fetchHeatmapData), 200);
+
+    // 6. Gamma Wall (Medium) - +250ms
+    setTimeout(() => safeExecute('Gamma Wall', initGammaWall), 250);
+
+    // 7. TradingView Widget (Heavy) - +500ms
+    setTimeout(() => safeExecute('TradingView Main', () => createTradingViewWidget(currentTicker)), 500);
 
     // Set initial selector value
     if (tickerSelect) {
@@ -2900,9 +3061,6 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         console.error("Mock Data Service not found!");
     }
-
-    // Start Movers Tape (Real Data)
-    safeExecute('Ticker Tape', startMoversSlideshow);
 
     // TFI Macro Update Loop (30 Minutes)
     // fetchVIX(); // Initial Render - DISABLED, using CNN Fear & Greed instead

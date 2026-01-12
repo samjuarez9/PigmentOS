@@ -662,8 +662,206 @@ def fetch_unusual_options_polygon(symbol):
         print(f"Polygon Whale Fetch Failed ({symbol}): {e}")
         return None
 
-        print(f"Polygon Whale Fetch Failed ({symbol}): {e}")
+
+def fetch_polygon_historical_aggs(contract_symbol, timespan="minute", multiplier=5, limit=5000):
+    """
+    Fetch historical aggregates (bars) for a specific option contract from Polygon.
+    Used for the "Trade Visualization" chart as a fallback for restricted Trades API.
+    """
+    if not POLYGON_API_KEY:
         return None
+        
+    try:
+        # Calculate date range (last 30 days)
+        end_date = datetime.now().strftime("%Y-%m-%d")
+        start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+        
+        # Polygon v2 Aggs Endpoint
+        # https://api.polygon.io/v2/aggs/ticker/{ticker}/range/{multiplier}/{timespan}/{from}/{to}
+        url = f"https://api.polygon.io/v2/aggs/ticker/{contract_symbol}/range/{multiplier}/{timespan}/{start_date}/{end_date}"
+        
+        params = {
+            "apiKey": POLYGON_API_KEY,
+            "limit": limit,
+            "adjusted": "true",
+            "sort": "asc"
+        }
+        
+        resp = requests.get(url, params=params, timeout=10)
+        
+        if resp.status_code == 200:
+            data = resp.json()
+            results = data.get("results", [])
+            return results
+        else:
+            print(f"Polygon Aggs Error ({contract_symbol}): {resp.status_code}")
+            return None
+            
+    except Exception as e:
+        print(f"Polygon Aggs Fetch Failed ({contract_symbol}): {e}")
+        return None
+
+@app.route('/api/options/history/<path:ticker>')
+def get_option_history(ticker):
+    """
+    Get historical bars for a specific option contract.
+    Ticker can be passed as OCC symbol (e.g., O:SPY...) or clean (SPY...).
+    """
+    # Clean ticker if needed
+    clean_ticker = ticker.replace("O:", "")
+    formatted_ticker = f"O:{clean_ticker}" if not ticker.startswith("O:") else ticker
+    
+    # Use Aggregates (5-minute bars)
+    bars = fetch_polygon_historical_aggs(formatted_ticker, timespan="minute", multiplier=5)
+    
+    if bars is None:
+        # Fallback: Try without "O:" prefix
+        if formatted_ticker.startswith("O:"):
+             bars = fetch_polygon_historical_aggs(clean_ticker, timespan="minute", multiplier=5)
+             
+    if bars is None:
+        return jsonify({"error": "Failed to fetch history"}), 500
+        
+    return jsonify({"results": bars})
+
+
+# === POLYGON WEBSOCKET VWAP MANAGER ===
+# Real-time trade streaming for per-contract VWAP charts
+
+import asyncio
+from collections import defaultdict
+from datetime import datetime
+
+# In-memory trade buffer for VWAP calculation
+# Structure: { contract_symbol: [ {timestamp, price, size, is_call} ] }
+VWAP_TRADE_BUFFER = defaultdict(list)
+VWAP_BUCKET_SIZE_MINUTES = 5
+
+# Active WebSocket subscriptions
+ACTIVE_WS_SUBSCRIPTIONS = set()
+
+# Firestore collection for lotto persistence
+LOTTO_TRADES_COLLECTION = "lotto_trades"
+
+def calculate_vwap_buckets(trades, bucket_minutes=5):
+    """
+    Aggregate trades into VWAP buckets.
+    Returns: [{ time: "HH:MM", vwap: float, call_volume: int, put_volume: int }]
+    """
+    if not trades:
+        return []
+    
+    tz_eastern = pytz.timezone('US/Eastern')
+    buckets = defaultdict(lambda: {"price_volume": 0, "total_volume": 0, "call_volume": 0, "put_volume": 0})
+    
+    for trade in trades:
+        ts = trade.get("timestamp")
+        if not ts:
+            continue
+        
+        # Parse timestamp
+        try:
+            if isinstance(ts, (int, float)):
+                dt = datetime.fromtimestamp(ts / 1000 if ts > 1e10 else ts, tz=tz_eastern)
+            else:
+                dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00")).astimezone(tz_eastern)
+        except:
+            continue
+        
+        # Calculate bucket key (round down to bucket_minutes)
+        bucket_minute = (dt.minute // bucket_minutes) * bucket_minutes
+        bucket_key = dt.replace(minute=bucket_minute, second=0, microsecond=0).strftime("%H:%M")
+        
+        price = trade.get("price", 0)
+        size = trade.get("size", 0)
+        is_call = trade.get("is_call", True)
+        
+        if price > 0 and size > 0:
+            buckets[bucket_key]["price_volume"] += price * size
+            buckets[bucket_key]["total_volume"] += size
+            if is_call:
+                buckets[bucket_key]["call_volume"] += size
+            else:
+                buckets[bucket_key]["put_volume"] += size
+    
+    # Calculate VWAP per bucket
+    result = []
+    for time_key in sorted(buckets.keys()):
+        bucket = buckets[time_key]
+        if bucket["total_volume"] > 0:
+            vwap = bucket["price_volume"] / bucket["total_volume"]
+            result.append({
+                "time": time_key,
+                "vwap": round(vwap, 4),
+                "call_volume": bucket["call_volume"],
+                "put_volume": bucket["put_volume"],
+                "total_volume": bucket["total_volume"]
+            })
+    
+    return result
+
+def add_trade_to_buffer(contract_symbol, price, size, timestamp, is_call=True):
+    """Add a trade to the in-memory buffer for VWAP calculation."""
+    global VWAP_TRADE_BUFFER
+    
+    trade = {
+        "timestamp": timestamp,
+        "price": price,
+        "size": size,
+        "is_call": is_call
+    }
+    VWAP_TRADE_BUFFER[contract_symbol].append(trade)
+    
+    # Limit buffer size per contract (keep last 1000 trades)
+    if len(VWAP_TRADE_BUFFER[contract_symbol]) > 1000:
+        VWAP_TRADE_BUFFER[contract_symbol] = VWAP_TRADE_BUFFER[contract_symbol][-1000:]
+
+def clear_trade_buffer(contract_symbol=None):
+    """Clear trade buffer for a specific contract or all contracts."""
+    global VWAP_TRADE_BUFFER
+    if contract_symbol:
+        VWAP_TRADE_BUFFER[contract_symbol] = []
+    else:
+        VWAP_TRADE_BUFFER.clear()
+
+@app.route('/api/vwap/<path:contract>')
+def get_vwap_data(contract):
+    """
+    Get VWAP buckets for a specific option contract.
+    Returns aggregated 5-minute VWAP data + call/put volume bars.
+    """
+    # Clean contract symbol
+    clean_contract = contract.replace("O:", "")
+    formatted_contract = f"O:{clean_contract}" if not contract.startswith("O:") else contract
+    
+    # Get trades from buffer
+    trades = VWAP_TRADE_BUFFER.get(formatted_contract, [])
+    
+    # If no buffered trades, try to fetch historical data from Polygon aggs
+    if not trades:
+        bars = fetch_polygon_historical_aggs(formatted_contract, timespan="minute", multiplier=5)
+        if bars:
+            # Convert agg bars to trade-like format for VWAP calculation
+            is_call = "C" in formatted_contract.upper()
+            trades = [
+                {
+                    "timestamp": bar.get("t"),
+                    "price": bar.get("vw", bar.get("c", 0)),  # Use VWAP or close
+                    "size": bar.get("v", 0),
+                    "is_call": is_call
+                }
+                for bar in bars
+            ]
+    
+    # Calculate VWAP buckets
+    buckets = calculate_vwap_buckets(trades, VWAP_BUCKET_SIZE_MINUTES)
+    
+    return jsonify({
+        "contract": formatted_contract,
+        "bucket_size_minutes": VWAP_BUCKET_SIZE_MINUTES,
+        "buckets": buckets,
+        "trade_count": len(trades)
+    })
 
 
 def get_polygon_contract_details(contract_symbol):
@@ -805,61 +1003,6 @@ def fetch_alpaca_options_snapshot_batch(symbols_list):
             
     return results
 
-# === SIDE PERSISTENCE (For Library Accuracy) ===
-WHALE_SIDES_FILE = "whale_sides.json"
-SIDE_CACHE = {}
-
-def load_side_cache():
-    global SIDE_CACHE
-    if os.path.exists(WHALE_SIDES_FILE):
-        try:
-            with open(WHALE_SIDES_FILE, 'r') as f:
-                SIDE_CACHE = json.load(f)
-            print(f"Loaded {len(SIDE_CACHE)} persistent trade sides.")
-        except Exception as e:
-            print(f"Error loading side cache: {e}")
-            SIDE_CACHE = {}
-
-def save_side_cache():
-    global SIDE_CACHE
-    try:
-        with open(WHALE_SIDES_FILE, 'w') as f:
-            json.dump(SIDE_CACHE, f)
-    except Exception as e:
-        print(f"Error saving side cache: {e}")
-
-def prune_side_cache():
-    """Remove entries older than 35 days to prevent unlimited growth."""
-    global SIDE_CACHE
-    load_side_cache()
-    
-    cutoff_ts = time.time() - (35 * 24 * 60 * 60) # 35 days ago
-    initial_count = len(SIDE_CACHE)
-    
-    keys_to_remove = []
-    for key in SIDE_CACHE:
-        try:
-            # Key format: {Symbol}_{TimestampStr}_{Price}_{Size}
-            parts = key.split('_')
-            if len(parts) >= 2:
-                ts_str = parts[1]
-                dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-                if dt.timestamp() < cutoff_ts:
-                    keys_to_remove.append(key)
-        except:
-            pass # Keep if can't parse
-            
-    for k in keys_to_remove:
-        del SIDE_CACHE[k]
-        
-    if keys_to_remove:
-        print(f"🧹 Pruned {len(keys_to_remove)} old entries from Side Cache (New size: {len(SIDE_CACHE)})")
-        save_side_cache()
-    else:
-        print(f"🧹 Side Cache Pruning: No old entries found (Size: {len(SIDE_CACHE)})")
-
-# Initialize Side Cache on startup
-prune_side_cache()
 
 def scan_whales_polygon():
     """
@@ -1188,12 +1331,7 @@ def scan_whales_alpaca():
                     continue
                 WHALE_HISTORY[trade_id] = timestamp_val
                 
-                # PERSIST SIDE (For Library Accuracy)
-                # Key: {Symbol}_{TimestampStr}_{Price}_{Size}
-                side_key = f"{option_symbol}_{trade_time_str}_{last_price}_{volume}"
-                SIDE_CACHE[side_key] = side
-                save_side_cache()
-                
+
                 # Hybrid Logic: Fetch Polygon OI & Greeks for ALL candidates to apply Global Filter
                 # Alpaca symbol: ORCL260109C00105000 -> Polygon: O:ORCL260109C00105000
                 poly_symbol = f"O:{option_symbol}"
@@ -1240,8 +1378,8 @@ def scan_whales_alpaca():
                     "moneyness": moneyness,
                     "is_mega_whale": volume >= 500,
                     "is_sweep": is_sweep,
-                    "is_sweep": is_sweep,
                     "delta": delta_val,
+                    "is_lotto": abs(delta_val) < 0.20,
                     "iv": iv_val,
                     "source": "alpaca",
                     "volume": volume,
@@ -1410,6 +1548,7 @@ def scan_single_whale_polygon(symbol):
                 # MEGA threshold: $12M for TSLA, $5M for all others
                 "is_mega_whale": notional > (12_000_000 if symbol.upper() == 'TSLA' else 5_000_000),
                 "delta": round(delta_val, 2),
+                "is_lotto": abs(delta_val) < 0.20, # Lotto Logic
                 "iv": round(iv_val, 2),
                 "source": "polygon",
                 "volume": current_vol
@@ -2169,12 +2308,100 @@ def stripe_webhook():
     
     return jsonify({'status': 'success'}), 200
 
+# --- User Saved Whales ---
+
+@app.route('/api/whales/save', methods=['POST'])
+def api_save_whale():
+    """
+    Save a whale trade to Firestore (user-initiated via long-press).
+    """
+    if not firestore_db:
+        return jsonify({"error": "Database not available"}), 500
+    
+    try:
+        trade = request.get_json()
+        if not trade:
+            return jsonify({"error": "No trade data provided"}), 400
+        
+        # Create a unique ID for the trade
+        doc_id = f"{trade.get('ticker', '')}_{trade.get('strike', '')}_{trade.get('type', '')}_{trade.get('expiry', '')}_{trade.get('timestamp', '')}"
+        doc_id = doc_id.replace("/", "-").replace(":", "").replace(" ", "")
+        
+        # Add saved timestamp
+        trade['savedAt'] = time.time()
+        
+        # Save to Firestore
+        doc_ref = firestore_db.collection('saved_whales').document(doc_id)
+        doc_ref.set(trade, merge=True)
+        
+        return jsonify({"success": True, "id": doc_id})
+        
+    except Exception as e:
+        print(f"❌ Failed to save whale: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/whales/saved')
+def api_get_saved_whales():
+    """
+    Fetch user-saved whale trades from Firestore.
+    """
+    if not firestore_db:
+        return jsonify({"data": []})
+    
+    try:
+        start_time = time.time()
+        def fetch_saved():
+            saved_ref = firestore_db.collection('saved_whales')
+            query = saved_ref.order_by('savedAt', direction=firestore.Query.DESCENDING).limit(100)
+            return [doc.to_dict() for doc in query.stream()]
+        
+        # Reduced timeout from 5s to 2s to prevent hanging
+        results = with_timeout(fetch_saved, timeout_seconds=2)
+        
+        duration = time.time() - start_time
+        if duration > 1.0:
+            print(f"⚠️ Slow Firebase Fetch: {duration:.2f}s")
+            
+        if results is None:
+            print("❌ Firebase Fetch Timed Out (2s)")
+            return jsonify({"data": []})
+        
+        return jsonify({"data": results})
+        
+    except Exception as e:
+        print(f"❌ Failed to fetch saved whales: {e}")
+        return jsonify({"data": []})
+
+@app.route('/api/whales/delete', methods=['POST'])
+def api_delete_whale():
+    """
+    Delete a saved whale trade from Firestore.
+    """
+    if not firestore_db:
+        return jsonify({"error": "Database not available"}), 500
+    
+    try:
+        data = request.get_json()
+        doc_id = data.get('id')
+        
+        if not doc_id:
+            return jsonify({"error": "No trade ID provided"}), 400
+        
+        firestore_db.collection('saved_whales').document(doc_id).delete()
+        return jsonify({"success": True})
+        
+    except Exception as e:
+        print(f"❌ Failed to delete whale: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/whales')
 def api_whales():
     from datetime import timedelta
     global CACHE
     limit = int(request.args.get('limit', 25))
     offset = int(request.args.get('offset', 0))
+    lotto_only = request.args.get('lotto') == 'true'
     
     # Check if data has been hydrated
     if CACHE["whales"]["timestamp"] == 0:
@@ -2202,8 +2429,42 @@ def api_whales():
         # 'timestamp' is unix epoch
         trade_dt = datetime.fromtimestamp(whale['timestamp'], tz_eastern)
         if trade_dt.date() == target_date:
+            # Lotto Filter
+            if lotto_only:
+                if not whale.get('is_lotto', False):
+                    continue
             clean_data.append(whale)
             
+    # If Lotto Mode, merge with persisted history
+    if lotto_only and firestore_db:
+        try:
+            # Fetch persisted lottos (limit 50 for speed)
+            lottos_ref = firestore_db.collection('lottos')
+            query = lottos_ref.order_by('timestamp', direction=firestore.Query.DESCENDING).limit(50)
+            docs = query.stream()
+            saved_lottos = [doc.to_dict() for doc in docs]
+            
+            # Merge and Deduplicate
+            # Use a dictionary keyed by unique signature to dedupe
+            merged = {}
+            
+            # 1. Add Saved Lottos
+            for l in saved_lottos:
+                sig = f"{l['ticker']}_{l['timestamp']}_{l['price']}"
+                merged[sig] = l
+                
+            # 2. Add Live Lottos (Overwrite saved if newer/same)
+            for l in clean_data:
+                sig = f"{l['ticker']}_{l['timestamp']}_{l['price']}"
+                merged[sig] = l
+                
+            # Convert back to list and sort
+            clean_data = list(merged.values())
+            clean_data.sort(key=lambda x: x['timestamp'], reverse=True)
+            
+        except Exception as e:
+            print(f"❌ Failed to merge saved lottos: {e}")
+
     sliced = clean_data[offset:offset+limit]
     
     return jsonify({
@@ -2211,6 +2472,64 @@ def api_whales():
         "stale": False,
         "timestamp": int(CACHE["whales"]["timestamp"])
     })
+
+@app.route('/api/whales/tickers')
+def api_whales_tickers():
+    """Return list of unique tickers currently in the whale feed."""
+    global CACHE
+    
+    # Check if data has been hydrated
+    if CACHE["whales"]["timestamp"] == 0:
+        return jsonify({"tickers": []})
+    
+    # Same date filtering logic as main feed
+    raw_data = CACHE["whales"]["data"]
+    tz_eastern = pytz.timezone('US/Eastern')
+    now_et = datetime.now(tz_eastern)
+    today_date = now_et.date()
+    weekday = now_et.weekday()
+    
+    if weekday == 5:  # Saturday -> Friday
+        target_date = today_date - timedelta(days=1)
+    elif weekday == 6:  # Sunday -> Friday
+        target_date = today_date - timedelta(days=2)
+    else:
+        target_date = today_date
+        
+    unique_tickers = set()
+    
+    for whale in raw_data:
+        try:
+            trade_dt = datetime.fromtimestamp(whale['timestamp'], tz_eastern)
+            if trade_dt.date() == target_date:
+                # Extract underlying ticker (e.g. "NVDA" from "O:NVDA...")
+                # The 'ticker' field in processed trades usually has the option symbol "O:..."
+                # But let's check what we actually store. 
+                # In run.py, 'ticker' is set to the option symbol.
+                # We want the underlying.
+                # Usually we can parse it or maybe it's available.
+                # Let's just parse it from the option symbol string if needed, 
+                # or use the 'symbol' field if it's the underlying?
+                # Wait, in run.py scan_whales_alpaca:
+                # trade["ticker"] = symbol (which is the option symbol)
+                # But we want to filter by UNDERLYING (e.g. NVDA).
+                
+                full_ticker = whale.get('ticker', '')
+                # Format is usually O:SYMBOL... or just SYMBOL...
+                # Let's strip O: and take alpha characters
+                clean = full_ticker.replace('O:', '')
+                # Regex to get leading letters
+                match = re.match(r"([A-Z]+)", clean)
+                if match:
+                    unique_tickers.add(match.group(1))
+        except:
+            continue
+            
+    # Also include tickers from persisted history if lotto mode is common?
+    # The user asked for "all of the tickers we fetch in the main dashboard unusual whales".
+    # So the above logic covers the main cache.
+    
+    return jsonify({"tickers": sorted(list(unique_tickers))})
 
 @app.route('/api/whales/stream')
 def api_whales_stream():
@@ -2892,8 +3211,8 @@ def refresh_news_logic():
 
     def fetch_single_feed(url):
         try:
-            # Individual timeout of 10s
-            response = requests.get(url, headers=headers, verify=False, timeout=10)
+            # Individual timeout of 3s (reduced from 10s for faster page loads)
+            response = requests.get(url, headers=headers, verify=False, timeout=3)
             
             if response.status_code != 200:
                 print(f"⚠️ Feed Error {url}: Status {response.status_code}", flush=True)
@@ -3131,7 +3450,7 @@ def debug_sources():
     for name, url in rss_feeds.items():
         start = time.time()
         try:
-            resp = requests.get(url, headers=headers, verify=False, timeout=10)
+            resp = requests.get(url, headers=headers, verify=False, timeout=3)
             duration = time.time() - start
             feed = feedparser.parse(resp.content)
             results["sources"][f"rss_{name}"] = {
@@ -3332,6 +3651,28 @@ def api_gamma():
         print(f"On-Demand Gamma Fetch Error: {e}")
         
     return jsonify({"error": "Loading or Failed..."})
+
+@app.route('/api/price')
+def api_price():
+    """
+    Lightweight endpoint to get just the current price.
+    Used for frequent UI updates (e.g. Gamma Wall ATM indicator) without heavy data fetching.
+    """
+    symbol = request.args.get('symbol', 'SPY').upper()
+    
+    # Try Finnhub first (Gamma Wall source)
+    price = get_finnhub_price(symbol)
+    source = "finnhub"
+    
+    # Fallback to YFinance/Cache
+    if not price:
+        price = get_cached_price(symbol)
+        source = "yfinance"
+        
+    if price:
+        return jsonify({"symbol": symbol, "price": price, "source": source, "timestamp": time.time()})
+    else:
+        return jsonify({"error": "Price unavailable"}), 404
 
 @app.route('/api/ping')
 def api_ping():
@@ -3584,6 +3925,7 @@ def start_background_worker():
             
             # Market Hours: 9:30 AM - 4:00 PM ET, Mon-Fri
             is_weekday = now.weekday() < 5
+            is_weekend = not is_weekday
             # Extended Hours for Heatmap/News: 4:00 AM - 8:00 PM ET (Weekdays)
             is_extended_hours = (is_weekday and (
                 (now.hour > 4 or (now.hour == 4 and now.minute >= 0)) and 
@@ -3933,45 +4275,8 @@ def api_library_options():
                     timestamp = 0
                     is_recent = False
                 
-                # Side Calculation (Hybrid with Persistence)
-                side = "BUY"
-                
-                # 1. Check Persistence Cache First (Most Accurate)
-                # Key: {Symbol}_{TimestampStr}_{Price}_{Size}
-                side_key = f"{option_symbol}_{trade['timestamp']}_{price}_{size}"
-                if side_key in SIDE_CACHE:
-                    side = SIDE_CACHE[side_key]
-                
-                # 2. Fallback to Live Quote / Tick Test
-                elif is_recent and bid > 0 and ask > 0:
-                    # Use Live Quote for recent trades
-                    if price <= bid:
-                        side = "SELL"
-                    elif price >= ask:
-                        side = "BUY"
-                    else:
-                        # Mid-Market: Use distance
-                        dist_to_bid = abs(price - bid)
-                        dist_to_ask = abs(price - ask)
-                        if dist_to_bid < dist_to_ask:
-                            side = "SELL"
-                        else:
-                            side = "BUY" # Default to BUY if exactly mid or closer to ask
-                else:
-                    # Use Tick Test for historical trades
-                    if last_price is not None:
-                        if price > last_price:
-                            side = "BUY"
-                        elif price < last_price:
-                            side = "SELL"
-                        else:
-                            side = last_side # Carry forward
-                    else:
-                        side = None # Default to None for first trade if unknown
-
-                
-                last_price = price
-                last_side = side
+                # Side is no longer calculated (removed side cache system)
+                side = None
                 
                 # Calculate moneyness
                 moneyness = None
@@ -3987,7 +4292,7 @@ def api_library_options():
                     else:
                         moneyness = "OTM"
                 
-                processed_trades.append({
+                trade_data = {
                     "ticker": symbol,
                     "strike": parsed['strike'],
                     "type": parsed['type'],
@@ -4004,8 +4309,11 @@ def api_library_options():
                     "side": side,
                     "condition": trade["condition"],
                     "exchange": trade["exchange"],
-                    "delta": contract_delta  # Delta from Alpaca Greeks
-                })
+                    "delta": contract_delta,  # Delta from Alpaca Greeks
+                    "is_lotto": abs(contract_delta) < 0.20 # Lotto Logic
+                }
+                    
+                processed_trades.append(trade_data)
         
         # Sort by timestamp descending (most recent first) for display
         processed_trades.sort(key=lambda x: x['timestamp'], reverse=True)
@@ -4017,10 +4325,10 @@ def api_library_options():
         # Cache Result
         LIBRARY_CACHE[cache_key] = {
             "timestamp": current_time,
-            "data": {"data": processed_trades}
+            "data": {"data": processed_trades, "current_price": current_price}
         }
         
-        return jsonify({"data": processed_trades})
+        return jsonify({"data": processed_trades, "current_price": current_price})
 
     except Exception as e:
         print(f"Library Fetch Error: {e}")

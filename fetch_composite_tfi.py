@@ -54,12 +54,19 @@ def get_cnn_anchor():
     Fetch CNN Fear & Greed Index as daily anchor.
     Cached at 9:30 AM EST, reused for the entire trading day.
     """
+    import concurrent.futures
     global _cnn_anchor_cache
     
     if should_refresh_cnn_anchor():
-        try:
+        def fetch_cnn():
             result = fear_and_greed.get()
-            cnn_value = result.value
+            return result.value
+        
+        try:
+            # Timeout after 2 seconds to prevent hangs
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(fetch_cnn)
+                cnn_value = future.result(timeout=2)
             
             now_et = get_current_et_time()
             _cnn_anchor_cache = {
@@ -68,6 +75,11 @@ def get_cnn_anchor():
             }
             
             return cnn_value
+        except concurrent.futures.TimeoutError:
+            # If timeout and we have a cached value, use it
+            if _cnn_anchor_cache["value"] is not None:
+                return _cnn_anchor_cache["value"]
+            return 50.0
         except Exception as e:
             # If fetch fails and we have a cached value, use it
             if _cnn_anchor_cache["value"] is not None:
@@ -88,18 +100,29 @@ def get_vix_pulse():
     
     Formula: vix_score = max(0, min(100, 100 - ((vix_val - 12) * 10)))
     """
-    try:
+    import concurrent.futures
+    
+    def fetch_vix():
         vix = yf.Ticker("^VIX")
         try:
-            vix_val = vix.fast_info['last_price']
+            return vix.fast_info['last_price']
         except:
-            vix_val = vix.history(period="1d")['Close'].iloc[-1]
+            return vix.history(period="1d")['Close'].iloc[-1]
+    
+    try:
+        # Timeout after 2 seconds to prevent hangs
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(fetch_vix)
+            vix_val = future.result(timeout=2)
         
         # Apply linear scale
         vix_score = 100 - ((vix_val - 12) * 10)
         vix_score = max(0, min(100, vix_score))
         
         return vix_val, vix_score
+    except concurrent.futures.TimeoutError:
+        # Return neutral if timeout
+        return 17.0, 50.0
     except Exception as e:
         # Fallback to neutral if VIX fetch fails
         return 17.0, 50.0

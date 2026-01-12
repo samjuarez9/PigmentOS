@@ -14,3 +14,4 @@ stripe
 firebase-admin
 python-dotenv
 fear-and-greed
+polygon-api-client
