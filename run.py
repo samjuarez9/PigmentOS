@@ -4004,36 +4004,11 @@ def start_background_worker():
             if is_market_open or can_hydrate_whales:
                 start_time = time.time()
                 
-                # Use Polygon scanning (Reverted per user request)
+                # Use Polygon scanning (Simplified to Polygon-only per user request)
                 try:
-                    # MIXED MODE: Fetch from both Polygon and Alpaca
-                    poly_whales = scan_whales_polygon()
-                    alpaca_whales = scan_whales_alpaca()
-                    
-                    # Combine and deduplicate
-                    # Prioritize Alpaca (has exact timestamps) over Polygon (snapshot time)
-                    unique_trades = []
-                    seen_signatures = set()
-                    
-                    # 1. Process Alpaca first
-                    for trade in alpaca_whales:
-                        # Signature: Ticker_Strike_Type_Expiry_Vol_Price
-                        sig = f"{trade['symbol']}_{trade['strikePrice']}_{trade['putCall']}_{trade['expirationDate']}_{trade['volume']}_{trade['lastPrice']}"
-                        if sig not in seen_signatures:
-                            seen_signatures.add(sig)
-                            unique_trades.append(trade)
-                            
-                    # 2. Process Polygon (skip if seen)
-                    for trade in poly_whales:
-                        sig = f"{trade['symbol']}_{trade['strikePrice']}_{trade['putCall']}_{trade['expirationDate']}_{trade['volume']}_{trade['lastPrice']}"
-                        if sig not in seen_signatures:
-                            seen_signatures.add(sig)
-                            unique_trades.append(trade)
-                    
-                    new_whales = unique_trades
+                    new_whales = scan_whales_polygon()
                     
                     if new_whales:
-                        # UPDATE CACHE (Atomic)
                         # UPDATE CACHE (Atomic)
                         with CACHE_LOCK:
                             current_data = CACHE["whales"]["data"]
@@ -4062,11 +4037,11 @@ def start_background_worker():
                             CACHE["whales_30dte"]["data"] = filtered_whales[:200]
                             CACHE["whales_30dte"]["timestamp"] = time.time()
                         
-                        print(f"✅ Added {len(new_whales)} new whales to feed.")
+                        print(f"✅ Added {len(new_whales)} new whales to feed (Polygon Only).")
                         save_whale_cache()
                         
                 except Exception as e:
-                    print(f"⚠️ Alpaca Whale Scan Error: {e}")
+                    print(f"⚠️ Polygon Whale Scan Error: {e}")
 
                 duration = time.time() - start_time
                 if duration > 1:

@@ -3010,10 +3010,7 @@ document.addEventListener('DOMContentLoaded', () => {
         xBtn.addEventListener('click', () => trackEvent('social_click', { platform: 'X' }));
     }
 
-    const discordBtn = document.getElementById('discord-link-btn');
-    if (discordBtn) {
-        discordBtn.addEventListener('click', () => trackEvent('social_click', { platform: 'Discord' }));
-    }
+
 
     const signOutBtn = document.getElementById('sign-out-btn');
     if (signOutBtn) {
@@ -3223,12 +3220,11 @@ document.addEventListener('DOMContentLoaded', () => {
         render: function () {
             if (!this.listContainer) return;
 
-            // Filter out events that are more than 24 hours past
             const now = new Date();
-            const ONE_DAY_MS = 24 * 60 * 60 * 1000;
             const activeEvents = this.events.filter(event => {
                 const eventTime = event.rawDate.getTime();
-                return (now.getTime() - eventTime) < ONE_DAY_MS;
+                // Filter out events that have passed (even by 1ms)
+                return (eventTime - now.getTime()) > 0;
             });
 
             if (activeEvents.length === 0) {

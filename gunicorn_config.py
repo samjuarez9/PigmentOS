@@ -1,5 +1,8 @@
 import os
 
+# Signal to run.py that we're running under gunicorn (enable gevent patching)
+os.environ['GUNICORN_WORKER'] = '1'
+
 # Render sets the PORT environment variable
 port = os.environ.get("PORT", "10000")
 bind = f"0.0.0.0:{port}"
