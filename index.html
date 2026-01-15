@@ -467,6 +467,9 @@
         }
 
         onAuthStateChanged(auth, async (user) => {
+            // CLEAR SAFETY TIMEOUT since we have a response
+            clearTimeout(safetyTimeout);
+
             // DEV MODE BYPASS
             const isDevMode = localStorage.getItem('devMode') === 'true' ||
                 window.location.hostname === 'localhost' ||
