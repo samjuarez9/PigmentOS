@@ -189,11 +189,6 @@ POLYGON_API_KEY = os.environ.get("POLYGON_API_KEY")
 FMP_API_KEY = os.environ.get("FMP_API_KEY")  # No longer used
 FRED_API_KEY = os.environ.get("FRED_API_KEY", "9832f887b004951ec7d53cb78f1063a0")
 FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY", "d56539pr01qu3qo8fk40d56539pr01qu3qo8fk4g")
-if FINNHUB_API_KEY:
-    print(f"🔑 LOADED FINNHUB KEY: {FINNHUB_API_KEY[:5]}...{FINNHUB_API_KEY[-4:]}")
-else:
-    print("❌ FINNHUB_API_KEY IS MISSING IN ENVIRONMENT")
-
 
 # Price cache to reduce redundant API calls (TTL: 15 minutes)
 PRICE_CACHE = {}  # {symbol: {"price": float, "timestamp": float}}
@@ -324,7 +319,7 @@ def get_cached_price(symbol):
 
 # Separate cache for Finnhub prices (used by Gamma Wall and Unusual Whales only)
 FINNHUB_PRICE_CACHE = {}  # {symbol: {"price": float, "timestamp": float}}
-FINNHUB_PRICE_CACHE_TTL = 300  # 5 minute TTL (safe with locking)
+FINNHUB_PRICE_CACHE_TTL = 120  # 2 minute TTL (safe with locking)
 FINNHUB_LOCK = threading.Lock()  # Prevent cache stampede
 
 def get_finnhub_price(symbol):
