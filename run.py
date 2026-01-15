@@ -319,7 +319,8 @@ def get_cached_price(symbol):
 
 # Separate cache for Finnhub prices (used by Gamma Wall and Unusual Whales only)
 FINNHUB_PRICE_CACHE = {}  # {symbol: {"price": float, "timestamp": float}}
-FINNHUB_PRICE_CACHE_TTL = 60  # 1 minute TTL (fresher than yfinance cache)
+FINNHUB_PRICE_CACHE_TTL = 120  # 2 minute TTL (safe with locking)
+FINNHUB_LOCK = threading.Lock()  # Prevent cache stampede
 
 def get_finnhub_price(symbol):
     """Get price from Finnhub API (used by Gamma Wall and Unusual Whales only).
@@ -341,19 +342,28 @@ def get_finnhub_price(symbol):
         if cached["price"] is not None and (now - cached["timestamp"] < FINNHUB_PRICE_CACHE_TTL):
             return cached["price"]
     
-    # Fetch from Finnhub
-    try:
-        url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={FINNHUB_API_KEY}"
-        resp = requests.get(url, timeout=5)
-        if resp.status_code == 200:
-            data = resp.json()
-            price = data.get("c")  # "c" = current price
-            if price and price > 0:
-                FINNHUB_PRICE_CACHE[symbol] = {"price": price, "timestamp": now}
-                print(f"📈 Finnhub price {symbol}: ${price:.2f}")
-                return price
-    except Exception as e:
-        print(f"Finnhub price error ({symbol}): {e}")
+    # Fetch from Finnhub (with locking to prevent stampede)
+    with FINNHUB_LOCK:
+        # Double-check cache inside lock
+        if symbol in FINNHUB_PRICE_CACHE:
+            cached = FINNHUB_PRICE_CACHE[symbol]
+            if cached["price"] is not None and (now - cached["timestamp"] < FINNHUB_PRICE_CACHE_TTL):
+                return cached["price"]
+
+        try:
+            url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={FINNHUB_API_KEY}"
+            resp = requests.get(url, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                price = data.get("c")  # "c" = current price
+                if price and price > 0:
+                    FINNHUB_PRICE_CACHE[symbol] = {"price": price, "timestamp": now}
+                    print(f"📈 Finnhub price {symbol}: ${price:.2f}")
+                    return price
+            else:
+                print(f"⚠️ Finnhub Error ({symbol}): Status {resp.status_code} - {resp.text}")
+        except Exception as e:
+            print(f"Finnhub price error ({symbol}): {e}")
     
     # Return stale cache if available
     if symbol in FINNHUB_PRICE_CACHE and FINNHUB_PRICE_CACHE[symbol]["price"]:

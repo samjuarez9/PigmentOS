@@ -5448,6 +5448,7 @@ td {
 }
 
 /* Tooltip Styles */
+
 .gamma-tooltip {
     position: fixed;
     background: rgba(0, 0, 0, 0.95);

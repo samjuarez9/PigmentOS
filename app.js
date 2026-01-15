@@ -1869,7 +1869,90 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Spot Price Line Removed per user request
+        // Spot Price Line Logic
+        // Remove existing line first
+        const existingLine = gammaChartBars.querySelector('.gamma-spot-line');
+        if (existingLine) existingLine.remove();
+
+        // Calculate position
+        // We need to find where the current price sits relative to the rendered rows
+        // Rows are sorted High -> Low (Top -> Bottom)
+
+        // Find the two strikes surrounding the price
+        let upperStrike = null;
+        let lowerStrike = null;
+        let upperRow = null;
+        let lowerRow = null;
+
+        const renderedRows = Array.from(gammaChartBars.children).filter(el => el.classList.contains('gamma-row'));
+
+        for (let i = 0; i < renderedRows.length; i++) {
+            const row = renderedRows[i];
+            const strike = parseFloat(row.dataset.strike);
+
+            if (strike >= data.current_price) {
+                upperStrike = strike;
+                upperRow = row;
+            } else {
+                lowerStrike = strike;
+                lowerRow = row;
+                break; // Found the crossover point
+            }
+        }
+
+        if (upperRow && lowerRow) {
+            // Interpolate position
+            const priceRange = upperStrike - lowerStrike;
+            const priceDelta = upperStrike - data.current_price; // Distance from top strike
+            const ratio = priceDelta / priceRange;
+
+            // Get DOM positions
+            const upperTop = upperRow.offsetTop;
+            const lowerTop = lowerRow.offsetTop;
+            const rowHeight = upperRow.offsetHeight; // Assuming uniform height
+
+            // Calculate pixel position (relative to container)
+            // Center of upper row to Center of lower row distance
+            const centerDist = lowerTop - upperTop;
+
+            // Start from center of upper row
+            const startY = upperTop + (rowHeight / 2);
+            const pixelOffset = centerDist * ratio;
+            const finalTop = startY + pixelOffset;
+
+            // Create Line
+            const line = document.createElement('div');
+            line.className = 'gamma-spot-line';
+            line.style.top = `${finalTop}px`;
+
+            const label = document.createElement('div');
+            label.className = 'gamma-spot-label';
+            label.textContent = data.current_price.toFixed(2);
+            line.appendChild(label);
+
+            gammaChartBars.appendChild(line);
+        } else if (upperRow && !lowerRow) {
+            // Price is below all visible strikes (at bottom)
+            const line = document.createElement('div');
+            line.className = 'gamma-spot-line';
+            line.style.top = `${upperRow.offsetTop + upperRow.offsetHeight}px`;
+            const label = document.createElement('div');
+            label.className = 'gamma-spot-label';
+            label.textContent = data.current_price.toFixed(2);
+            line.appendChild(label);
+            gammaChartBars.appendChild(line);
+        } else if (!upperRow && lowerRow) {
+            // Price is above all visible strikes (at top)
+            const line = document.createElement('div');
+            line.className = 'gamma-spot-line';
+            line.style.top = `${lowerRow.offsetTop}px`;
+            const label = document.createElement('div');
+            label.className = 'gamma-spot-label';
+            label.textContent = data.current_price.toFixed(2);
+            line.appendChild(label);
+            gammaChartBars.appendChild(line);
+        }
+
 
         // Cache DOM references on first render
         if (!gammaTitle) gammaTitle = document.querySelector('.gamma-title');
