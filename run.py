@@ -319,7 +319,7 @@ def get_cached_price(symbol):
 
 # Separate cache for Finnhub prices (used by Gamma Wall and Unusual Whales only)
 FINNHUB_PRICE_CACHE = {}  # {symbol: {"price": float, "timestamp": float}}
-FINNHUB_PRICE_CACHE_TTL = 120  # 2 minute TTL (safe with locking)
+FINNHUB_PRICE_CACHE_TTL = 180  # 3 minute TTL (safe with locking)
 FINNHUB_LOCK = threading.Lock()  # Prevent cache stampede
 
 def get_finnhub_price(symbol):
