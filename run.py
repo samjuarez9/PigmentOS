@@ -369,21 +369,13 @@ def get_finnhub_price(symbol):
     if symbol in FINNHUB_PRICE_CACHE and FINNHUB_PRICE_CACHE[symbol]["price"]:
         return FINNHUB_PRICE_CACHE[symbol]["price"]
     
-    # FALLBACK: Polygon previous close (works after hours when Finnhub fails)
-    if POLYGON_API_KEY:
-        try:
-            url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev?apiKey={POLYGON_API_KEY}"
-            resp = requests.get(url, timeout=5)
-            if resp.status_code == 200:
-                data = resp.json()
-                if data.get("results"):
-                    price = data["results"][0].get("c")  # Previous close
-                    if price and price > 0:
-                        FINNHUB_PRICE_CACHE[symbol] = {"price": price, "timestamp": now}
-                        print(f"📈 Polygon fallback price {symbol}: ${price:.2f}")
-                        return price
-        except Exception as e:
-            print(f"Polygon fallback price error ({symbol}): {e}")
+    # FINAL FALLBACK: Use yfinance (get_cached_price)
+    # This ensures we don't skip the scan just because Finnhub failed
+    print(f"⚠️ Finnhub failed for {symbol}, trying yfinance fallback...")
+    fallback_price = get_cached_price(symbol)
+    if fallback_price:
+        FINNHUB_PRICE_CACHE[symbol] = {"price": fallback_price, "timestamp": now}
+        return fallback_price
     
     return None
 
