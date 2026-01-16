@@ -2782,6 +2782,7 @@ def api_movers():
         
         # Consumer & Entertainment
         "NFLX", "DIS", "UBER", "DASH", "ABNB", "PTON", "NKE", "SBUX",
+        # Removed SQ due to delisting/API errors
     ]
     
     try:
@@ -2791,7 +2792,7 @@ def api_movers():
         def fetch_movers_tickers():
             return yf.Tickers(" ".join(MOVERS_TICKERS))
         
-        tickers_obj = with_timeout(fetch_movers_tickers, timeout_seconds=10)
+        tickers_obj = with_timeout(fetch_movers_tickers, timeout_seconds=20)
         if not tickers_obj:
             print("⏰ Movers tickers fetch timed out")
             return jsonify({"error": "timeout"})
@@ -2809,7 +2810,8 @@ def api_movers():
                         "change": round(change, 2),
                         "type": "gain" if change >= 0 else "loss"
                     }
-            except:
+            except Exception as e:
+                print(f"❌ Mover Fetch Error ({symbol}): {e}")
                 return None
             return None
         

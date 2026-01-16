@@ -555,6 +555,11 @@
                     } else if (status.status === 'active') {
                         // Show Billing Button for Paying Customers
                         setupBillingButton(user);
+                        
+                        // Show VIP Animation if applicable
+                        if (status.is_vip) {
+                            showVipAnimation();
+                        }
                     }
 
                 } catch (error) {
