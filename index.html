@@ -541,7 +541,7 @@
 
                     // Show appropriate UI based on status
                     if (status.status === 'trialing') {
-                        const days = status.days_remaining !== undefined ? status.days_remaining : 14;
+                        const days = status.days_remaining !== undefined ? status.days_remaining : 3;
                         showTrialBanner(days);
 
                         // Integrate with Critical Events (Economic Calendar)
@@ -561,7 +561,7 @@
                     // Fail OPEN on any error - user keeps access, we'll check again next time
                     console.warn('Background subscription check failed (user keeps access):', error.name || error.message);
                     // Show default trial banner as fallback so users know they're in trial
-                    showTrialBanner(14);
+                    showTrialBanner(3);
                 }
             }, 100); // Slight delay to ensure dashboard renders first
         });
@@ -610,7 +610,7 @@
                     <div class="price-modal-content">
                         <h2>Welcome Back! 👋</h2>
                         <p>Enjoying PigmentOS? Lock in your access for just</p>
-                        <div class="price-highlight">$15<span>/month</span></div>
+                        <div class="price-highlight">$30<span>/month</span></div>
                         <a href="/upgrade.html" class="price-cta" onclick="window.pigmentAnalytics && window.pigmentAnalytics.logEvent(window.pigmentAnalytics.analytics, 'upgrade_click', {location: 'price_modal'})">Secure My Rate →</a>
                         <button class="price-dismiss" onclick="this.parentElement.parentElement.remove()">Maybe later</button>
                     </div>

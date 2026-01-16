@@ -1793,7 +1793,7 @@ def start_trial():
             return jsonify({'status': 'success', 'message': 'Subscription already exists'})
 
         # 4. CREATE TRIAL SUBSCRIPTION
-        # 14 Days Free Trial
+        # 3 Days Free Trial
         try:
             new_sub = stripe.Subscription.create(
                 customer=customer.id,

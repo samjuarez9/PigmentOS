@@ -131,7 +131,7 @@
             Lock in your rate and get unlimited access to real-time market intelligence.
         </div>
 
-        <div class="price">$15</div>
+        <div class="price">$30</div>
         <div class="price-label">per month • cancel anytime</div>
 
         <div class="features">
@@ -179,7 +179,7 @@
             document.getElementById('page-title').innerHTML = '⚡ Trial Expired';
             document.getElementById('page-subtitle').textContent = 'Upgrade to continue trading';
             document.getElementById('trial-message').innerHTML =
-                'Your 14-day free trial has ended.<br>Subscribe to PigmentOS Pro to continue accessing real-time market data.';
+                'Your 3-day free trial has ended.<br>Subscribe to PigmentOS Pro to continue accessing real-time market data.';
             // Hide back to dashboard link for expired users
             document.querySelector('.logout-link a').textContent = '← Logout';
             document.querySelector('.logout-link a').href = '/login.html';
@@ -203,7 +203,7 @@
                 // Track checkout started
                 logEvent(analytics, 'subscription_checkout_started', {
                     user_email_domain: user.email.split('@')[1],
-                    price: '$15/month'
+                    price: '$30/month'
                 });
 
                 const response = await fetch('/api/create-checkout-session', {
