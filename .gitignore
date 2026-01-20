@@ -7,3 +7,5 @@ venv/
 server.log
 frontend.log
 monitor.log
+unusual_flow.html
+unusual_flow_backup.html
