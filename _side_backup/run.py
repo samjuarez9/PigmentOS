@@ -1,7 +1,20 @@
-from gevent import monkey
-monkey.patch_all()
+# Gevent monkey patching - ONLY for production (gunicorn)
+# Skip for local development to avoid SSL conflicts with requests library
+import os
+if os.environ.get('GUNICORN_WORKER') or os.environ.get('DYNO'):  # Render/Heroku sets DYNO
+    from gevent import monkey
+    monkey.patch_all(ssl=False)
+    print("🐒 Gevent monkey patching enabled (production mode)")
+else:
+    print("🔧 Running in local development mode (no gevent)")
+
+# === WEBSOCKET DISABLED ===
+# WebSocket causes SSL conflicts with other network calls.
+# Using REST snapshot polling instead (more reliable).
+DISABLE_WEBSOCKET = True
 
 import json
+import whales_service
 import time
 import random
 import threading
@@ -128,6 +141,474 @@ else:
 def preview_page():
     return send_from_directory('.', 'preview.html')
 
+@app.route('/api/whales/snapshot')
+def get_whale_snapshot():
+    """
+    Fetch daily snapshot for a specific ticker.
+    Used for the Aftermarket Recap view.
+    """
+    print("DEBUG: PREMIUM FILTER ACTIVE")
+    if not POLYGON_API_KEY:
+        return jsonify([])
+    
+    symbol = request.args.get('symbol', '').upper()
+    if not symbol:
+        return jsonify([])
+        
+    try:
+        # 1. Get Underlying Price for Smart Filtering
+        price_data = get_cached_price(symbol)
+        current_price = price_data.get("price", 0)
+        
+        # 2. Construct Params
+        params = {
+            "apiKey": POLYGON_API_KEY,
+            "limit": 1000,
+            "expiration_date.gte": datetime.now().strftime("%Y-%m-%d"),
+        }
+        
+        # Smart Strike Filter: +/- 50% of spot price
+        # This removes deep OTM garbage and reduces API load
+        if current_price > 0:
+            min_strike = current_price * 0.50
+            max_strike = current_price * 1.50
+            params["strike_price.gte"] = min_strike
+            params["strike_price.lte"] = max_strike
+            print(f"DEBUG: Smart Filter for {symbol} (${current_price:.2f}): Strikes {min_strike:.2f} - {max_strike:.2f}")
+        else:
+            print(f"DEBUG: No price found for {symbol}, scanning full chain.")
+
+        # 3. Fetch Snapshot (Paginated)
+        results = []
+        url = f"https://api.polygon.io/v3/snapshot/options/{symbol}"
+        
+        print(f"DEBUG: Fetching chain for {symbol}...")
+        
+        while url:
+            try:
+                resp = requests.get(url, params=params, timeout=10)
+                if resp.status_code != 200:
+                    print(f"Polygon Snapshot Error for {symbol}: {resp.text}")
+                    break
+                    
+                data = resp.json()
+                results.extend(data.get("results", []))
+                
+                # Check for next page
+                url = data.get("next_url")
+                if url:
+                    params = {"apiKey": POLYGON_API_KEY}
+                else:
+                    break
+            except Exception as e:
+                print(f"Pagination Error: {e}")
+                break
+                
+        print(f"DEBUG: Fetched {len(results)} total contracts. Filtering...")
+        
+        whales = []
+        for r in results:
+            details = r.get("details", {})
+            day = r.get("day", {})
+            greeks = r.get("greeks", {})
+            
+            # Construct a "Whale-like" object
+            strike = details.get("strike_price")
+            expiry = details.get("expiration_date")
+            put_call = "C" if details.get("contract_type") == "call" else "P"
+            
+            # Calculate implied premium
+            price = day.get("close", 0)
+            volume = day.get("volume", 0)
+            premium = price * volume * 100
+            
+            # Filter: Minimum Premium $300k (REMOVED)
+            if premium < 300_000:
+               print(f"DEBUG: Allowing Low Prem Trade: ${premium:,.0f} for {symbol} {strike}{put_call}")
+            
+            # Greeks
+            delta = greeks.get("delta", 0)
+            iv = greeks.get("implied_volatility", 0)
+            oi = r.get("open_interest", 0)
+            
+            # Filter for meaningful activity
+            if volume < 10:
+                continue
+                
+            # Filter: Volume > 1.2x Open Interest
+            if volume <= 1.2 * oi:
+                continue
+            
+            # Tags
+            is_lotto = abs(delta) < 0.20 if delta else False
+            is_mega = premium > 1_000_000
+            
+            # Moneyness (Simplified)
+            underlying_price = r.get("underlying_asset", {}).get("price", 0)
+            moneyness = "OTM"
+            if underlying_price > 0:
+                if put_call == "C" and underlying_price > strike: moneyness = "ITM"
+                elif put_call == "P" and underlying_price < strike: moneyness = "ITM"
+            
+            whales.append({
+                "baseSymbol": symbol,
+                "symbol": details.get("ticker"),
+                "strikePrice": strike,
+                "expirationDate": expiry,
+                "putCall": put_call,
+                "premium": f"${premium:,.0f}",
+                "volume": volume,
+                "openInterest": oi,
+                "vol_oi": (volume / oi) if oi > 0 else 0,
+                "delta": delta,
+                "iv": iv,
+                "is_lotto": is_lotto,
+                "is_mega_whale": is_mega,
+                "is_sweep": False,
+                "moneyness": moneyness
+            })
+            
+        # Sort final results by Premium (descending)
+        whales.sort(key=lambda x: float(x['premium'].replace('$','').replace(',','')), reverse=True)
+        
+        return jsonify(whales)
+        
+    except Exception as e:
+        print(f"Snapshot Error: {e}")
+        return jsonify([])
+
+@app.route('/api/whales/conviction')
+def get_whale_conviction():
+    """
+    Fetch T+0 and T+1 data for a specific option contract to analyze conviction.
+    Returns Day 1 Volume/OI and Day 2 OI/Volume.
+    
+    Strategy:
+    - Day 1 OI: Provided by frontend (from the original trade snapshot).
+    - Day 2 OI: Fetched from Polygon v3/snapshot (Current OI).
+    """
+    ticker = request.args.get('ticker')
+    date_str = request.args.get('date') # YYYY-MM-DD
+    initial_oi = request.args.get('initial_oi', 0, type=int)
+    
+    if not ticker or not date_str:
+        return jsonify({"error": "Missing ticker or date"}), 400
+        
+    if not POLYGON_API_KEY:
+        return jsonify({"error": "Polygon API Key missing"}), 500
+
+    try:
+        # Parse date
+        trade_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        
+        # Calculate Next Trading Day (Day 2)
+        next_day = trade_date + timedelta(days=1)
+        while next_day.weekday() >= 5: # Skip Sat/Sun
+            next_day += timedelta(days=1)
+            
+        next_date_str = next_day.strftime("%Y-%m-%d")
+        
+        # Check if Day 2 is in the future (or is Today)
+        tz_eastern = pytz.timezone('US/Eastern')
+        now_et = datetime.now(tz_eastern).date()
+        
+        # If next_day is in the future, we don't have Day 2 data yet
+        is_pending = next_day > now_et
+        
+        # Fetch Current Snapshot for Day 2 Data (or Day 1 Volume confirmation)
+        # v3/snapshot gives us the *current* state of the contract
+        snapshot_url = f"https://api.polygon.io/v3/snapshot/options/{ticker}"
+        snapshot_params = {"apiKey": POLYGON_API_KEY}
+        
+        print(f"DEBUG: Fetching Snapshot for Conviction {ticker}")
+        snap_resp = requests.get(snapshot_url, params=snapshot_params, timeout=5)
+        
+        current_oi = 0
+        current_volume = 0
+        
+        if snap_resp.status_code == 200:
+            snap_data = snap_resp.json()
+            res = snap_data.get("results", {})
+            # Handle both list and dict return types (snapshot usually returns dict for single ticker?)
+            # v3/snapshot/options/{ticker} returns a single object in 'results' usually? 
+            # Actually docs say it returns a wrapper. Let's be safe.
+            if isinstance(res, list):
+                if len(res) > 0:
+                    res = res[0]
+                else:
+                    res = {}
+            
+            current_oi = res.get("open_interest", 0)
+            day_stats = res.get("day", {})
+            current_volume = day_stats.get("volume", 0)
+            
+        # --- DATA MAPPING ---
+        
+        # Day 1 (Trade Day)
+        # Volume: We need Day 1 Volume. 
+        # If trade_date == Today, use current_volume.
+        # If trade_date < Today, we need historical volume.
+        
+        day1_volume = 0
+        if trade_date == now_et:
+            day1_volume = current_volume
+        else:
+            # Fetch historical volume from v1/open-close (reliable for Vol/Price)
+            hist_url = f"https://api.polygon.io/v1/open-close/{ticker}/{date_str}"
+            hist_resp = requests.get(hist_url, params={"apiKey": POLYGON_API_KEY}, timeout=5)
+            if hist_resp.status_code == 200:
+                day1_volume = hist_resp.json().get("volume", 0)
+        
+        # Day 2 (Follow-through)
+        # OI: If Day 2 is Today (or past), use current_oi (Snapshot).
+        # Note: Snapshot OI is updated morning of Today. So it represents "Today's" OI.
+        # If trade was Yesterday, Today's OI is the Day 2 OI.
+        
+        day2_oi = 0
+        day2_volume = 0
+        
+        if not is_pending:
+            # If Day 2 is Today or Past
+            if next_day == now_et:
+                # Day 2 is Today -> Use Snapshot OI
+                day2_oi = current_oi
+                day2_volume = current_volume # Volume for Day 2 so far
+            else:
+                # Day 2 was in the past -> We need historical OI? 
+                # We established we CANNOT get historical OI easily.
+                # Fallback: Use current_oi as the "latest" OI. 
+                # It's better than 0.
+                day2_oi = current_oi 
+                
+                # Fetch Day 2 Volume
+                hist_url_2 = f"https://api.polygon.io/v1/open-close/{ticker}/{next_date_str}"
+                hist_resp_2 = requests.get(hist_url_2, params={"apiKey": POLYGON_API_KEY}, timeout=5)
+                if hist_resp_2.status_code == 200:
+                    day2_volume = hist_resp_2.json().get("volume", 0)
+
+        # --- HISTORY (BASELINE) ---
+        # Fetch last 7 days to get ~5 trading days of history
+        history_data = []
+        try:
+            start_date = trade_date - timedelta(days=10) # Go back enough to ensure 5 bars
+            start_str = start_date.strftime("%Y-%m-%d")
+            # Range: start_date to trade_date (exclusive of trade_date usually, but aggs are inclusive)
+            # We want strictly BEFORE trade_date
+            aggs_url = f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_str}/{date_str}"
+            aggs_resp = requests.get(aggs_url, params={"apiKey": POLYGON_API_KEY}, timeout=5)
+            
+            if aggs_resp.status_code == 200:
+                aggs = aggs_resp.json().get('results', [])
+                # Filter out the trade_date itself if included (we show that as Day 1)
+                for bar in aggs:
+                    bar_date = datetime.fromtimestamp(bar['t']/1000).date()
+                    if bar_date < trade_date:
+                        history_data.append({
+                            "date": bar_date.strftime("%Y-%m-%d"),
+                            "volume": bar.get('v', 0),
+                            "oi": 0 # OI not available in aggs
+                        })
+                
+                # Take last 4-5 days
+                history_data = history_data[-5:]
+        except Exception as e:
+            print(f"History Fetch Error: {e}")
+
+        response_data = {
+            "ticker": ticker,
+            "history": history_data,
+            "day1": {
+                "date": date_str,
+                "volume": day1_volume,
+                "oi": initial_oi, # Use passed-in OI
+                "price": 0 
+            },
+            "day2": {
+                "date": next_date_str,
+                "volume": day2_volume,
+                "oi": day2_oi,
+                "price": 0,
+                "pending": is_pending
+            }
+        }
+        
+        # Calculate Conviction
+        # Only if we have valid Day 2 data
+        if not is_pending and day2_oi > 0:
+            delta_oi = day2_oi - initial_oi
+            response_data["delta_oi"] = delta_oi
+            
+            # Logic: If Delta OI > 0 and significant relative to volume
+            # Threshold: 50% of Day 1 Volume? Or just positive?
+            # User said: "If Delta OI is positive and close to Monday's Volume"
+            
+            if delta_oi > 0:
+                ratio = delta_oi / day1_volume if day1_volume > 0 else 0
+                if ratio > 0.5:
+                    response_data["label"] = "POSITION OPENED"
+                    response_data["conviction_score"] = "HIGH"
+                else:
+                    response_data["label"] = "POSITION BUILDING"
+                    response_data["conviction_score"] = "MEDIUM"
+            elif delta_oi < 0:
+                 response_data["label"] = "POSITION CLOSED"
+                 response_data["conviction_score"] = "LOW"
+            else:
+                response_data["label"] = "DAY TRADE / CHURN"
+                response_data["conviction_score"] = "NEUTRAL"
+        else:
+            response_data["label"] = "PENDING"
+            response_data["conviction_score"] = "UNKNOWN"
+            
+        return jsonify(response_data)
+
+    except Exception as e:
+        print(f"Conviction Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+def save_daily_snapshot():
+    """
+    Fetches daily snapshot for all watchlist tickers, filters them,
+    and saves to Firestore for historical viewing.
+    """
+    print("📸 Starting Daily Whale Snapshot...")
+    all_trades = []
+    
+    for symbol in WHALE_WATCHLIST:
+        try:
+            # 1. Get Underlying Price
+            price_data = get_cached_price(symbol)
+            current_price = price_data.get("price", 0)
+            
+            # 2. Construct Params
+            params = {
+                "apiKey": POLYGON_API_KEY,
+                "limit": 1000,
+                "expiration_date.gte": datetime.now().strftime("%Y-%m-%d"),
+            }
+            
+            if current_price > 0:
+                params["strike_price.gte"] = current_price * 0.50
+                params["strike_price.lte"] = current_price * 1.50
+            
+            # 3. Fetch Snapshot (Paginated)
+            results = []
+            url = f"https://api.polygon.io/v3/snapshot/options/{symbol}"
+            
+            while url:
+                try:
+                    resp = requests.get(url, params=params, timeout=10)
+                    if resp.status_code != 200:
+                        print(f"  ❌ Snapshot failed for {symbol}: {resp.status_code}")
+                        break
+                        
+                    data = resp.json()
+                    results.extend(data.get("results", []))
+                    
+                    url = data.get("next_url")
+                    if url:
+                        params = {"apiKey": POLYGON_API_KEY}
+                    else:
+                        break
+                except Exception as e:
+                    print(f"  ⚠️ Pagination Error {symbol}: {e}")
+                    break
+            
+            # Get current time in ET for date validation
+            tz_eastern = pytz.timezone('US/Eastern')
+            now_et = datetime.now(tz_eastern)
+            is_weekend = now_et.weekday() >= 5  # Saturday=5, Sunday=6
+            
+            for r in results:
+                details = r.get("details", {})
+                day = r.get("day", {})
+                greeks = r.get("greeks", {})
+                
+                # === DATE VALIDATION ===
+                # Polygon returns last_updated as nanoseconds since epoch (UTC)
+                # Convert to ET and ensure data is from today's market session
+                last_updated = day.get("last_updated", 0)
+                if last_updated:
+                    # Convert nanoseconds to seconds, then to ET datetime
+                    polygon_time_obj = datetime.fromtimestamp(last_updated / 1_000_000_000, tz=tz_eastern)
+                    
+                    if not is_weekend:
+                        # On weekdays, only accept today's data
+                        if polygon_time_obj.date() != now_et.date():
+                            continue
+                    else:
+                        # On weekends, allow data from up to 3 days ago (Friday's data)
+                        days_diff = (now_et.date() - polygon_time_obj.date()).days
+                        if days_diff > 3:
+                            continue
+                
+                volume = day.get("volume", 0)
+                oi = r.get("open_interest", 0)
+                
+                # === FILTERS ===
+                # 1. Minimum Volume
+                if volume < 10: continue
+                
+                # 2. Vol/OI Ratio > 1.2 (Unusual Activity)
+                if volume <= 1.2 * oi: continue
+                
+                # Construct Whale Object
+                strike = details.get("strike_price")
+                expiry = details.get("expiration_date")
+                put_call = "C" if details.get("contract_type") == "call" else "P"
+                price = day.get("close", 0)
+                premium = price * volume * 100
+                
+                # Filter: Minimum Premium $300k
+                # if premium < 300_000: continue
+                
+                delta = greeks.get("delta", 0)
+                
+                # Moneyness
+                underlying_price = r.get("underlying_asset", {}).get("price", 0)
+                moneyness = "OTM"
+                if underlying_price > 0:
+                    if put_call == "C" and underlying_price > strike: moneyness = "ITM"
+                    elif put_call == "P" and underlying_price < strike: moneyness = "ITM"
+
+                trade = {
+                    "baseSymbol": symbol,
+                    "symbol": details.get("ticker"),
+                    "strikePrice": strike,
+                    "expirationDate": expiry,
+                    "putCall": put_call,
+                    "premium": f"${premium:,.0f}",
+                    "volume": volume,
+                    "openInterest": oi,
+                    "vol_oi": (volume / oi) if oi > 0 else 0,
+                    "delta": delta,
+                    "iv": greeks.get("implied_volatility", 0),
+                    "is_lotto": abs(delta) < 0.20 if delta else False,
+                    "is_mega_whale": premium > 1_000_000,
+                    "is_sweep": False,
+                    "moneyness": moneyness
+                }
+                all_trades.append(trade)
+                
+        except Exception as e:
+            print(f"  ⚠️ Error processing {symbol}: {e}")
+            
+    # Save to Firestore
+    try:
+        if all_trades:
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            db.collection('whale_snapshots').document(today_str).set({
+                'date': today_str,
+                'trades': all_trades,
+                'timestamp': time.time()
+            })
+            print(f"✅ Saved {len(all_trades)} trades to Firestore snapshot '{today_str}'")
+        else:
+            print("⚠️ No trades found for snapshot.")
+            
+    except Exception as e:
+        print(f"❌ Firestore Save Error: {e}")
+
 # Watchlist for "Whale" Scan
 WATCHLIST = [
     "NVDA", "TSLA", "AAPL", "MSFT", "AMZN", "META", "GOOGL", "GOOG",
@@ -137,6 +618,7 @@ WATCHLIST = [
 ]
 
 MEGA_WHALE_THRESHOLD = 8_000_000  # $8M
+MEGA_WHALE_THRESHOLD_TSLA = 30_000_000  # $30M for TSLA
 
 # Cache structure
 CACHE_DURATION = 120 # 2 minutes (was 300)
@@ -146,6 +628,7 @@ POLY_STATE = {}
 
 CACHE = {
     "whales": {"data": [], "timestamp": 0},
+    "whales_rest": {"data": [], "timestamp": 0}, # REST Polling (Expanded View)
     "whales_30dte": {"data": [], "timestamp": 0},
     "vix": {"data": {"value": 0, "rating": "Neutral"}, "timestamp": 0},
     "cnn_fear_greed": {"data": {"value": 50, "rating": "Neutral"}, "timestamp": 0},
@@ -198,87 +681,7 @@ PRICE_CACHE_TTL = 900  # seconds (15 mins)
 WHALE_CACHE_FILE = "/tmp/pigmentos_whale_cache.json"
 WHALE_CACHE_LAST_CLEAR = 0  # Track when we last cleared
 
-def save_whale_cache():
-    """Save whale data to file for persistence across restarts."""
-    try:
-        with CACHE_LOCK:
-            data = {
-                "whales": CACHE["whales"]["data"],
-                "timestamp": CACHE["whales"]["timestamp"],
-                "last_clear": WHALE_CACHE_LAST_CLEAR
-            }
-        with open(WHALE_CACHE_FILE, 'w') as f:
-            json.dump(data, f)
-    except Exception as e:
-        print(f"Failed to save whale cache: {e}")
 
-def load_whale_cache():
-    """Load whale data from file on startup."""
-    global WHALE_CACHE_LAST_CLEAR
-    try:
-        if os.path.exists(WHALE_CACHE_FILE):
-            with open(WHALE_CACHE_FILE, 'r') as f:
-                data = json.load(f)
-            
-            # Check if we should clear (pre-market of next trading day)
-            if should_clear_whale_cache(data.get("last_clear", 0)):
-                print("🧹 Clearing stale whale cache (pre-market)")
-                return
-            
-            with CACHE_LOCK:
-                raw_whales = data.get("whales", [])
-                
-                # Apply 30-day DTE filter to ALL cached data (Main Dash + Expansion)
-                filtered_whales = []
-                tz_eastern = pytz.timezone('US/Eastern')
-                now_et = datetime.now(tz_eastern)
-                
-                for w in raw_whales:
-                    try:
-                        # Check DTE
-                        expiry = w.get("expirationDate")
-                        if expiry:
-                            expiry_date = datetime.strptime(expiry, "%Y-%m-%d").date()
-                            days_to_expiry = (expiry_date - now_et.date()).days
-                            if days_to_expiry <= 30:
-                                filtered_whales.append(w)
-                    except:
-                        pass
-                
-                CACHE["whales"]["data"] = filtered_whales
-                CACHE["whales"]["timestamp"] = data.get("timestamp", 0)
-                
-                # 30 DTE Cache (Now redundant but kept for endpoint compatibility)
-                CACHE["whales_30dte"]["data"] = filtered_whales
-                CACHE["whales_30dte"]["timestamp"] = data.get("timestamp", 0)
-                
-            WHALE_CACHE_LAST_CLEAR = data.get("last_clear", 0)
-            print(f"📂 Loaded {len(filtered_whales)} whale trades from cache (Filtered <= 30 DTE)")
-    except Exception as e:
-        print(f"Failed to load whale cache: {e}")
-
-def should_clear_whale_cache(last_clear_ts):
-    """
-    Clear whale cache during pre-market (4 AM - 9:30 AM ET) on weekdays.
-    Returns True if we're in pre-market and should show scanner animation.
-    """
-    tz_eastern = pytz.timezone('US/Eastern')
-    now_et = datetime.now(tz_eastern)
-    
-    # Only clear on weekdays
-    if now_et.weekday() >= 5:  # Saturday or Sunday
-        return False
-    
-    # Pre-market is 4:00 AM - 9:30 AM ET
-    current_time = now_et.hour + now_et.minute / 60
-    is_premarket = 4.0 <= current_time < 9.5
-    
-    return is_premarket
-
-def mark_whale_cache_cleared():
-    """Mark the current time as when we cleared the cache."""
-    global WHALE_CACHE_LAST_CLEAR
-    WHALE_CACHE_LAST_CLEAR = time.time()
 
 def get_cached_price(symbol):
     """Get price from cache or fetch from yfinance if stale/missing."""
@@ -319,8 +722,7 @@ def get_cached_price(symbol):
 
 # Separate cache for Finnhub prices (used by Gamma Wall and Unusual Whales only)
 FINNHUB_PRICE_CACHE = {}  # {symbol: {"price": float, "timestamp": float}}
-FINNHUB_PRICE_CACHE_TTL = 180  # 3 minute TTL (safe with locking)
-FINNHUB_LOCK = threading.Lock()  # Prevent cache stampede
+FINNHUB_PRICE_CACHE_TTL = 60  # 1 minute TTL (fresher than yfinance cache)
 
 def get_finnhub_price(symbol):
     """Get price from Finnhub API (used by Gamma Wall and Unusual Whales only).
@@ -342,40 +744,39 @@ def get_finnhub_price(symbol):
         if cached["price"] is not None and (now - cached["timestamp"] < FINNHUB_PRICE_CACHE_TTL):
             return cached["price"]
     
-    # Fetch from Finnhub (with locking to prevent stampede)
-    with FINNHUB_LOCK:
-        # Double-check cache inside lock
-        if symbol in FINNHUB_PRICE_CACHE:
-            cached = FINNHUB_PRICE_CACHE[symbol]
-            if cached["price"] is not None and (now - cached["timestamp"] < FINNHUB_PRICE_CACHE_TTL):
-                return cached["price"]
-
-        try:
-            url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={FINNHUB_API_KEY}"
-            resp = requests.get(url, timeout=5)
-            if resp.status_code == 200:
-                data = resp.json()
-                price = data.get("c")  # "c" = current price
-                if price and price > 0:
-                    FINNHUB_PRICE_CACHE[symbol] = {"price": price, "timestamp": now}
-                    print(f"📈 Finnhub price {symbol}: ${price:.2f}")
-                    return price
-            else:
-                print(f"⚠️ Finnhub Error ({symbol}): Status {resp.status_code} - {resp.text}")
-        except Exception as e:
-            print(f"Finnhub price error ({symbol}): {e}")
+    # Fetch from Finnhub
+    try:
+        url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={FINNHUB_API_KEY}"
+        resp = requests.get(url, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            price = data.get("c")  # "c" = current price
+            if price and price > 0:
+                FINNHUB_PRICE_CACHE[symbol] = {"price": price, "timestamp": now}
+                print(f"📈 Finnhub price {symbol}: ${price:.2f}")
+                return price
+    except Exception as e:
+        print(f"Finnhub price error ({symbol}): {e}")
     
     # Return stale cache if available
     if symbol in FINNHUB_PRICE_CACHE and FINNHUB_PRICE_CACHE[symbol]["price"]:
         return FINNHUB_PRICE_CACHE[symbol]["price"]
     
-    # FINAL FALLBACK: Use yfinance (get_cached_price)
-    # This ensures we don't skip the scan just because Finnhub failed
-    print(f"⚠️ Finnhub failed for {symbol}, trying yfinance fallback...")
-    fallback_price = get_cached_price(symbol)
-    if fallback_price:
-        FINNHUB_PRICE_CACHE[symbol] = {"price": fallback_price, "timestamp": now}
-        return fallback_price
+    # FALLBACK: Polygon previous close (works after hours when Finnhub fails)
+    if POLYGON_API_KEY:
+        try:
+            url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev?apiKey={POLYGON_API_KEY}"
+            resp = requests.get(url, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("results"):
+                    price = data["results"][0].get("c")  # Previous close
+                    if price and price > 0:
+                        FINNHUB_PRICE_CACHE[symbol] = {"price": price, "timestamp": now}
+                        print(f"📈 Polygon fallback price {symbol}: ${price:.2f}")
+                        return price
+        except Exception as e:
+            print(f"Polygon fallback price error ({symbol}): {e}")
     
     return None
 
@@ -425,32 +826,6 @@ def fetch_options_chain_polygon(symbol, strike_limit=40):
         
         is_weekend = today_weekday >= 5
         
-        # US Market Holiday Calendar (2024-2027)
-        # These are the major holidays when US stock markets are CLOSED
-        US_MARKET_HOLIDAYS = {
-            # 2024
-            "2024-01-01", "2024-01-15", "2024-02-19", "2024-03-29", "2024-05-27",
-            "2024-06-19", "2024-07-04", "2024-09-02", "2024-11-28", "2024-12-25",
-            # 2025
-            "2025-01-01", "2025-01-20", "2025-02-17", "2025-04-18", "2025-05-26",
-            "2025-06-19", "2025-07-04", "2025-09-01", "2025-11-27", "2025-12-25",
-            # 2026
-            "2026-01-01", "2026-01-19", "2026-02-16", "2026-04-03", "2026-05-25",
-            "2026-06-19", "2026-07-03", "2026-09-07", "2026-11-26", "2026-12-25",
-            # 2027
-            "2027-01-01", "2027-01-18", "2027-02-15", "2027-03-26", "2027-05-31",
-            "2027-06-18", "2027-07-05", "2027-09-06", "2027-11-25", "2027-12-24",
-        }
-        
-        def get_next_trading_day(start_date):
-            """Find next valid trading day (skip weekends and US holidays)."""
-            check_date = start_date
-            for _ in range(7):  # Max 7 days lookahead
-                if check_date.weekday() < 5 and check_date.strftime("%Y-%m-%d") not in US_MARKET_HOLIDAYS:
-                    return check_date
-                check_date = check_date + timedelta(days=1)
-            return start_date + timedelta(days=1)  # Fallback
-        
         # Tickers with daily expirations (0DTE available)
         daily_expiry_tickers = ['SPY', 'QQQ', 'IWM', 'DIA']
         has_daily = symbol.upper() in daily_expiry_tickers
@@ -467,21 +842,26 @@ def fetch_options_chain_polygon(symbol, strike_limit=40):
         if is_weekend:
             is_next_trading_day = True
             if has_daily:
-                # Weekend + daily ticker: find next valid trading day (skips holidays)
-                next_day = get_next_trading_day(now_et.date() + timedelta(days=1))
-                expiry_date = next_day.strftime("%Y-%m-%d")
-                # Format: "TUE JAN 20" (or MON if not holiday)
+                # Weekend + daily ticker: use next Monday (Polygon has Monday options ready)
+                days_until_monday = (7 - today_weekday) % 7
+                if days_until_monday == 0:
+                    days_until_monday = 1
+                expiry_date = (now_et + timedelta(days=days_until_monday)).strftime("%Y-%m-%d")
+                # Format: "MON DEC 23"
+                next_day = now_et + timedelta(days=days_until_monday)
                 date_label = next_day.strftime("%a %b %d").upper()
-                print(f"Polygon: Weekend - using next trading day {expiry_date} for {symbol}")
+                print(f"Polygon: Weekend - using Monday {expiry_date} for {symbol}")
             else:
-                # Weekend + non-daily ticker: use next Friday for DATA, but label as next trading day for UI
+                # Weekend + non-daily ticker: use next Friday for DATA, but label as Monday for UI consistency
                 days_until_friday = (4 - today_weekday + 7) % 7
                 if days_until_friday == 0:
                     days_until_friday = 7
                 expiry_date = (now_et + timedelta(days=days_until_friday)).strftime("%Y-%m-%d")
                 
-                # UI LABEL: Show next trading day (may skip holidays)
-                next_trading_day = get_next_trading_day(now_et.date() + timedelta(days=1))
+                # UI LABEL: Always show next trading day (Monday) to match SPY/QQQ
+                days_until_monday = (7 - today_weekday) % 7
+                if days_until_monday == 0: days_until_monday = 1
+                next_trading_day = now_et + timedelta(days=days_until_monday)
                 date_label = next_trading_day.strftime("%a %b %d").upper()
                 
                 print(f"Polygon: Weekend - using Friday {expiry_date} for {symbol} (Label: {date_label})")
@@ -636,6 +1016,8 @@ def parse_polygon_to_gamma_format(polygon_data, current_price=None):
     return gamma_data, underlying_price
 
 
+
+
 def fetch_unusual_options_polygon(symbol):
     """
     Fetch options data from Polygon and detect unusual activity (whale trades).
@@ -748,353 +1130,7 @@ def get_option_history(ticker):
     return jsonify({"results": bars})
 
 
-@app.route('/unusual_flow')
-def unusual_flow_page():
-    return send_from_directory('.', 'unusual_flow.html')
-
-
-# === UNUSUAL FLOW (SINGLE CONTRACT) ENDPOINTS ===
-
-@app.route('/api/flow/contracts')
-def get_flow_contracts():
-    """
-    Get ACTIVE option contracts for a specific ticker to populate dropdowns.
-    Uses Polygon Snapshot API and filters by:
-    - Open Interest > 0
-    - Strike within ±20% of current spot price
-    """
-    ticker = request.args.get('ticker')
-    if not ticker:
-        return jsonify({"error": "Ticker required"}), 400
-        
-    if not POLYGON_API_KEY:
-        return jsonify({"error": "API Key missing"}), 500
-
-    try:
-        # 1. Get current underlying price
-        current_price = get_finnhub_price(ticker) or get_cached_price(ticker)
-        if not current_price:
-            current_price = 100  # Fallback
-        
-        # Calculate strike range (±20% of spot)
-        min_strike = current_price * 0.80
-        max_strike = current_price * 1.20
-        
-        # 2. Use Option Chain Snapshot API with strike filters
-        url = f"https://api.polygon.io/v3/snapshot/options/{ticker}"
-        params = {
-            "apiKey": POLYGON_API_KEY,
-            "limit": 250,
-            "strike_price.gte": min_strike,
-            "strike_price.lte": max_strike,
-            "order": "asc",
-            "sort": "strike_price"
-        }
-        
-        all_contracts = []
-        
-        # Fetch with pagination if needed
-        while url:
-            resp = requests.get(url, params=params, timeout=15)
-            if resp.status_code != 200:
-                print(f"Snapshot Error: {resp.status_code}")
-                break
-                
-            data = resp.json()
-            results = data.get("results", [])
-            
-            # Filter for contracts with OI > 0
-            for contract in results:
-                oi = contract.get("open_interest", 0) or 0
-                if oi > 0:
-                    details = contract.get("details", {})
-                    all_contracts.append({
-                        "ticker": details.get("ticker"),
-                        "expiration_date": details.get("expiration_date"),
-                        "strike_price": details.get("strike_price"),
-                        "contract_type": details.get("contract_type"),
-                        "open_interest": oi
-                    })
-            
-            # Check for next page
-            next_url = data.get("next_url")
-            if next_url:
-                url = next_url
-                params = {"apiKey": POLYGON_API_KEY}
-            else:
-                break
-        
-        print(f"Flow Contracts: Found {len(all_contracts)} active contracts for {ticker} (strike range: ${min_strike:.0f}-${max_strike:.0f})")
-        
-        return jsonify({
-            "results": all_contracts,
-            "count": len(all_contracts),
-            "spot_price": current_price,
-            "strike_range": {"min": min_strike, "max": max_strike}
-        })
-            
-    except Exception as e:
-        print(f"Flow Contracts Error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/flow/snapshot/<path:contract_symbol>')
-def get_flow_snapshot(contract_symbol):
-    """
-    Get snapshot for a SINGLE option contract.
-    Uses: /v3/snapshot/options/{underlyingAsset}/{optionContract}
-    Also fetches prior day close to calculate accurate percent change.
-    """
-    if not POLYGON_API_KEY:
-        return jsonify({"error": "API Key missing"}), 500
-
-    # Extract underlying from contract (e.g. O:NVDA... -> NVDA)
-    # Regex to find the ticker part before the date
-    # Format: O:NVDA230616C...
-    try:
-        # Simple parsing: assume ticker is characters between O: and the first digit
-        clean_contract = contract_symbol.replace("O:", "")
-        match = re.match(r"([A-Z]+)", clean_contract)
-        if not match:
-             return jsonify({"error": "Invalid contract format"}), 400
-        
-        underlying = match.group(1)
-        formatted_contract = f"O:{clean_contract}" if not contract_symbol.startswith("O:") else contract_symbol
-        
-        # Polygon Endpoint for Single Contract
-        url = f"https://api.polygon.io/v3/snapshot/options/{underlying}/{contract_symbol}"
-        params = {
-            "apiKey": POLYGON_API_KEY
-        }
-        
-        resp = requests.get(url, params=params, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            
-            # Fetch previous trading day's close to calculate accurate percent change
-            # The Polygon day.change_percent only reflects intra-day change
-            try:
-                # Use previous close endpoint for the option contract
-                prev_close_url = f"https://api.polygon.io/v2/aggs/ticker/{formatted_contract}/prev"
-                prev_params = {"apiKey": POLYGON_API_KEY, "adjusted": "true"}
-                prev_resp = requests.get(prev_close_url, params=prev_params, timeout=5)
-                
-                if prev_resp.status_code == 200:
-                    prev_data = prev_resp.json()
-                    prev_results = prev_data.get("results", [])
-                    if prev_results and len(prev_results) > 0:
-                        prev_close = prev_results[0].get("c", 0)  # Previous day's close
-                        
-                        # Get current price from snapshot
-                        results = data.get("results", {})
-                        day_data = results.get("day", {})
-                        current_price = day_data.get("close") or day_data.get("vwap") or results.get("last_quote", {}).get("ask", 0)
-                        
-                        # Calculate percent change from prior day's close
-                        if prev_close and prev_close > 0 and current_price:
-                            pct_change = ((current_price - prev_close) / prev_close) * 100
-                            # Inject the calculated change into the response
-                            if "results" in data:
-                                if "day" not in data["results"]:
-                                    data["results"]["day"] = {}
-                                data["results"]["day"]["change_percent"] = round(pct_change, 2)
-                                data["results"]["day"]["prev_close"] = prev_close
-                                print(f"Flow Snapshot: {formatted_contract} prev_close=${prev_close:.2f}, current=${current_price:.2f}, change={pct_change:.2f}%")
-            except Exception as prev_err:
-                print(f"Previous close fetch error: {prev_err}")
-            
-            return jsonify(data)
-        else:
-            return jsonify({"error": f"Polygon Error: {resp.status_code}"}), 500
-            
-    except Exception as e:
-        print(f"Flow Snapshot Error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route('/api/whales/conviction')
-def get_whale_conviction():
-    """
-    Fetch 5-day volume history for a specific option contract (Friday to Friday).
-    Simple volume chart data without conviction scoring.
-    """
-    ticker = request.args.get('ticker')
-    date_str = request.args.get('date') # YYYY-MM-DD
-    
-    if not ticker or not date_str:
-        return jsonify({"error": "Missing ticker or date"}), 400
-        
-    if not POLYGON_API_KEY:
-        return jsonify({"error": "Polygon API Key missing"}), 500
-
-    try:
-        # Parse date
-        trade_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-        
-        # Fetch 5 trading days of history (Friday to Friday)
-        history_data = []
-        try:
-            # Go back 10 calendar days to ensure we get 5 trading days
-            start_date = trade_date - timedelta(days=10)
-            start_str = start_date.strftime("%Y-%m-%d")
-            end_str = trade_date.strftime("%Y-%m-%d")
-            
-            aggs_url = f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_str}/{end_str}"
-            aggs_resp = requests.get(aggs_url, params={"apiKey": POLYGON_API_KEY}, timeout=5)
-            
-            print(f"DEBUG: Fetching 5-day history for {ticker}")
-            
-            if aggs_resp.status_code == 200:
-                aggs = aggs_resp.json().get('results', [])
-                for bar in aggs:
-                    bar_date = datetime.fromtimestamp(bar['t']/1000).date()
-                    history_data.append({
-                        "date": bar_date.strftime("%Y-%m-%d"),
-                        "volume": bar.get('v', 0)
-                    })
-                # Keep only last 5 trading days (Friday to Friday)
-                history_data = history_data[-5:]
-        except Exception as e:
-            print(f"History Fetch Error: {e}")
-
-        response_data = {
-            "ticker": ticker,
-            "history": history_data
-        }
-            
-        return jsonify(response_data)
-
-    except Exception as e:
-        print(f"Conviction Error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/flow/vol_oi_history/<path:contract_symbol>')
-def get_vol_oi_history(contract_symbol):
-    """
-    Fetch 10-day Vol/OI ratio history for a specific option contract.
-    Returns:
-    - history: List of {date, volume, oi, vol_oi_ratio} (last 6 days for display)
-    - avg_vol_oi: 10-day average Vol/OI ratio (baseline for comparison)
-    - is_unusual: Boolean if today's ratio exceeds 1.5x average
-    """
-    if not POLYGON_API_KEY:
-        return jsonify({"error": "API Key missing"}), 500
-    
-    try:
-        # Clean contract symbol
-        clean_contract = contract_symbol.replace("O:", "")
-        formatted_contract = f"O:{clean_contract}" if not contract_symbol.startswith("O:") else contract_symbol
-        
-        # Extract underlying from OCC symbol
-        match = re.match(r"O?:?([A-Z]+)", formatted_contract)
-        if not match:
-            return jsonify({"error": "Invalid contract format"}), 400
-        underlying = match.group(1)
-        
-        # Calculate date range (18 days back to get ~10 trading days)
-        today = datetime.now().strftime("%Y-%m-%d")
-        start_date = (datetime.now() - timedelta(days=18)).strftime("%Y-%m-%d")
-        
-        # 1. Fetch historical volume from Polygon Aggs
-        aggs_url = f"https://api.polygon.io/v2/aggs/ticker/{formatted_contract}/range/1/day/{start_date}/{today}"
-        aggs_params = {
-            "apiKey": POLYGON_API_KEY,
-            "adjusted": "true",
-            "sort": "asc"
-        }
-        
-        history_data = []
-        try:
-            aggs_resp = requests.get(aggs_url, params=aggs_params, timeout=8)
-            if aggs_resp.status_code == 200:
-                aggs = aggs_resp.json().get('results', [])
-                for bar in aggs:
-                    bar_datetime = datetime.fromtimestamp(bar['t']/1000)
-                    # Skip weekends (Saturday=5, Sunday=6)
-                    if bar_datetime.weekday() >= 5:
-                        continue
-                    bar_date = bar_datetime.strftime("%Y-%m-%d")
-                    history_data.append({
-                        "date": bar_date,
-                        "volume": int(bar.get('v', 0)),
-                        "oi": 0,
-                        "vol_oi_ratio": 0,
-                        "price": bar.get('c', 0)
-                    })
-        except Exception as e:
-            print(f"Aggs fetch error: {e}")
-        
-        # 2. Get current snapshot for today's OI
-        current_oi = 0
-        current_volume = 0
-        try:
-            snap_url = f"https://api.polygon.io/v3/snapshot/options/{underlying}/{formatted_contract}"
-            snap_params = {"apiKey": POLYGON_API_KEY}
-            snap_resp = requests.get(snap_url, params=snap_params, timeout=5)
-            
-            if snap_resp.status_code == 200:
-                snap_data = snap_resp.json().get("results", {})
-                current_oi = snap_data.get("open_interest", 0) or 0
-                day_data = snap_data.get("day", {})
-                current_volume = day_data.get("volume", 0) or 0
-                
-                # Update today's entry if exists, or add it (skip weekends)
-                today_str = datetime.now().strftime("%Y-%m-%d")
-                today_weekday = datetime.now().weekday()
-                is_weekend = today_weekday >= 5
-                
-                today_found = False
-                for entry in history_data:
-                    if entry["date"] == today_str:
-                        entry["volume"] = current_volume
-                        entry["oi"] = current_oi
-                        entry["vol_oi_ratio"] = current_volume / current_oi if current_oi > 0 else 0
-                        today_found = True
-                        break
-                
-                if not today_found and current_volume > 0 and not is_weekend:
-                    history_data.append({
-                        "date": today_str,
-                        "volume": current_volume,
-                        "oi": current_oi,
-                        "vol_oi_ratio": current_volume / current_oi if current_oi > 0 else 0,
-                        "price": day_data.get("close", 0)
-                    })
-        except Exception as e:
-            print(f"Snapshot fetch error: {e}")
-        
-        # 3. Calculate Vol/OI for historical days (use current OI as approximation)
-        for entry in history_data:
-            if entry["oi"] == 0 and current_oi > 0:
-                entry["oi"] = current_oi
-                entry["vol_oi_ratio"] = entry["volume"] / current_oi if current_oi > 0 else 0
-        
-        # Keep last 6 days max for display
-        history_data = history_data[-6:]
-        
-        # 4. Calculate stats
-        vol_oi_ratios = [d["vol_oi_ratio"] for d in history_data if d["vol_oi_ratio"] > 0]
-        avg_vol_oi = sum(vol_oi_ratios) / len(vol_oi_ratios) if vol_oi_ratios else 0
-        
-        # Is today unusual?
-        today_ratio = current_volume / current_oi if current_oi > 0 else 0
-        is_unusual = today_ratio > (avg_vol_oi * 1.5) if avg_vol_oi > 0 else False
-        
-        return jsonify({
-            "contract": formatted_contract,
-            "history": history_data,
-            "current_oi": current_oi,
-            "current_volume": current_volume,
-            "avg_vol_oi": round(avg_vol_oi, 2),
-            "is_unusual": is_unusual,
-            "unusual_threshold": round(avg_vol_oi * 1.5, 2) if avg_vol_oi > 0 else 0
-        })
-        
-    except Exception as e:
-        print(f"Vol/OI History Error: {e}")
-        return jsonify({"error": str(e)}), 500
-
 # === POLYGON WEBSOCKET VWAP MANAGER ===
-
 # Real-time trade streaming for per-contract VWAP charts
 
 import asyncio
@@ -1233,6 +1269,784 @@ def get_vwap_data(contract):
     })
 
 
+# === POLYGON WEBSOCKET WHALE STREAMING ===
+# Delayed (15-min) trade streaming for real-time whale detection
+# Using official polygon-api-client for reliable WebSocket handling
+from polygon import WebSocketClient
+from polygon.websocket import Feed, Market
+import ssl
+
+# WebSocket state
+POLYGON_WS_STATUS = {"connected": False, "error": None, "last_trade": None}
+POLYGON_WS_TRADE_BUFFER = []  # Buffer for incoming trades before processing
+
+def format_money_ws(val):
+    """Format money for display."""
+    if val >= 1_000_000: return f"${val/1_000_000:.1f}M"
+    if val >= 1_000: return f"${val/1_000:.0f}k"
+    return f"${val:.0f}"
+
+def parse_occ_symbol_ws(symbol):
+    """Parse OCC option symbol like O:SPY260117C00600000"""
+    try:
+        clean = symbol.replace("O:", "")
+        i = 0
+        while i < len(clean) and clean[i].isalpha():
+            i += 1
+        underlying = clean[:i]
+        rest = clean[i:]
+        date_str = rest[:6]
+        put_call = rest[6]
+        strike_raw = rest[7:]
+        strike = float(strike_raw) / 1000
+        year = 2000 + int(date_str[:2])
+        month = int(date_str[2:4])
+        day = int(date_str[4:6])
+        expiry = f"{year}-{month:02d}-{day:02d}"
+        return {"underlying": underlying, "expiry": expiry, "put_call": put_call, "strike": strike}
+    except:
+        return None
+
+def fetch_polygon_trades_rest(ticker, limit=50):
+    """
+    Fetch recent trades for a specific option contract using Polygon REST API.
+    Used for the Expanded View (REST Polling).
+    """
+    if not POLYGON_API_KEY:
+        return []
+        
+    url = f"https://api.polygon.io/v3/trades/{ticker}"
+    params = {
+        "apiKey": POLYGON_API_KEY,
+        "limit": limit,
+        "sort": "timestamp",
+        "order": "desc"
+    }
+    
+    try:
+        resp = requests.get(url, params=params, timeout=5)
+        if resp.status_code != 200:
+            return []
+            
+        data = resp.json()
+        return data.get("results", [])
+    except Exception as e:
+        print(f"REST Trade Fetch Error ({ticker}): {e}")
+        return []
+
+def refresh_single_whale_polygon(symbol):
+    """
+    Polls Polygon for unusual activity using REST API.
+    Uses Aggregates endpoint (works after hours) + Trades endpoint.
+    Populates CACHE["whales_rest"] for the Expanded View.
+    """
+    if not POLYGON_API_KEY:
+        return
+
+    try:
+        from datetime import timedelta
+        
+        # 1. Get current price (use yfinance-based cache which works with gevent)
+        current_price = get_cached_price(symbol)
+        if not current_price:
+            return
+            
+        # 2. Get Snapshot to find contracts with Greeks/OI data
+        snapshot_data = fetch_unusual_options_polygon(symbol)
+        snapshot_map = {}
+        if snapshot_data and snapshot_data.get("results"):
+            for r in snapshot_data.get("results", []):
+                ticker = r.get("details", {}).get("ticker")
+                if ticker:
+                    snapshot_map[ticker] = r
+        
+        # 3. Use Aggregates endpoint to find contracts with volume TODAY
+        # This works after market hours unlike snapshot's day.v
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        # Calculate strike range (±15% for broader coverage)
+        strike_low = int(current_price * 0.85)
+        strike_high = int(current_price * 1.15)
+        
+        # Get contracts from snapshot (they have the ticker format we need)
+        url = f"https://api.polygon.io/v3/snapshot/options/{symbol}"
+        params = {
+            "apiKey": POLYGON_API_KEY,
+            "limit": 250,
+            "strike_price.gte": strike_low,
+            "strike_price.lte": strike_high
+        }
+        resp = requests.get(url, params=params, timeout=15)
+        if resp.status_code != 200:
+            return
+            
+        contracts = resp.json().get("results", [])
+        if not contracts:
+            return
+            
+        # 4. Check Aggregates for each contract to find those with volume today
+        active_contracts = []
+        for contract in contracts[:50]:  # Limit to 50 to avoid too many API calls
+            ticker = contract.get("details", {}).get("ticker")
+            if not ticker:
+                continue
+                
+            # Fetch daily aggregates for this contract
+            agg_url = f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{today}/{today}"
+            try:
+                agg_resp = requests.get(agg_url, params={"apiKey": POLYGON_API_KEY}, timeout=5)
+                if agg_resp.status_code == 200:
+                    agg_data = agg_resp.json()
+                    if agg_data.get("resultsCount", 0) > 0:
+                        bar = agg_data["results"][0]
+                        volume = bar.get("v", 0)
+                        if volume >= 100:  # Minimum volume filter
+                            contract["_agg_volume"] = volume
+                            active_contracts.append(contract)
+            except:
+                continue
+                
+            # Rate limit - don't hammer the API
+            time.sleep(0.1)
+            
+            # Stop early if we have enough active contracts
+            if len(active_contracts) >= 10:
+                break
+        
+        # Sort by volume and take top 5
+        active_contracts.sort(key=lambda x: x.get("_agg_volume", 0), reverse=True)
+        active_contracts = active_contracts[:5]
+        
+        new_whales = []
+        
+        # 5. Fetch Trades for Active Contracts
+        for contract in active_contracts:
+            ticker = contract.get("details", {}).get("ticker")
+            strike = contract.get("details", {}).get("strike_price")
+            contract_type = contract.get("details", {}).get("contract_type")
+            expiry = contract.get("details", {}).get("expiration_date")
+            oi = contract.get("open_interest", 0)
+            
+            trades = fetch_polygon_trades_rest(ticker)
+            
+            for t in trades:
+                # Filter for Size/Premium
+                size = t.get("size", 0)
+                price = t.get("price", 0)
+                premium = size * price * 100
+                
+                if premium < 25000:  # $25k Minimum
+                    continue
+                    
+                # Get Greeks from snapshot if available
+                snapshot_contract = snapshot_map.get(ticker, contract)
+                delta = snapshot_contract.get("greeks", {}).get("delta", 0)
+                
+                # Build Whale Object
+                whale = {
+                    "ticker": ticker,
+                    "baseSymbol": symbol,
+                    "strikePrice": strike,
+                    "putCall": "C" if contract_type == "call" else "P",
+                    "expirationDate": expiry,
+                    "price": price,
+                    "size": size,
+                    "premium": int(premium),
+                    "timestamp": t.get("participant_timestamp") / 1e9,  # Nanoseconds to Seconds
+                    "vol_oi": (contract.get("_agg_volume", size) / (oi or 1)),
+                    "delta": delta,
+                    "moneyness": "ITM" if (contract_type == "call" and current_price > strike) or (contract_type == "put" and current_price < strike) else "OTM",
+                    "is_sweep": False,  # Hard to detect via REST without conditions map
+                    "is_lotto": abs(delta) < 0.2,
+                    "is_mega_whale": premium > 1000000
+                }
+                new_whales.append(whale)
+                
+        # 6. Update Cache (Deduplicate)
+        current_rest_cache = CACHE["whales_rest"]["data"]
+        existing_sigs = {f"{w['ticker']}_{w['timestamp']}_{w['size']}" for w in current_rest_cache}
+        
+        # Also track main dashboard cache for whale-grade additions
+        main_cache = CACHE["whales"]["data"]
+        main_sigs = {f"{w.get('symbol', w.get('ticker'))}_{w.get('timestamp')}_{w.get('volume', w.get('size'))}" for w in main_cache}
+        
+        added_count = 0
+        main_added_count = 0
+        
+        for w in new_whales:
+            sig = f"{w['ticker']}_{w['timestamp']}_{w['size']}"
+            if sig not in existing_sigs:
+                current_rest_cache.append(w)
+                existing_sigs.add(sig)
+                added_count += 1
+            
+            # Check if this trade meets MAIN DASHBOARD whale thresholds
+            # Premium thresholds: $500k base, $6M for TSLA, $8M for SPY/QQQ
+            premium = w.get('premium', 0)
+            base_symbol = w.get('baseSymbol', '')
+            
+            if base_symbol in ['SPY', 'QQQ']:
+                min_premium = 8_000_000
+            elif base_symbol == 'TSLA':
+                min_premium = 6_000_000
+            else:
+                min_premium = 500_000
+            
+            if premium >= min_premium:
+                # Convert to main dashboard format if needed
+                main_sig = f"{w.get('ticker')}_{w.get('timestamp')}_{w.get('size')}"
+                if main_sig not in main_sigs:
+                    # Create whale object in main dashboard format
+                    main_whale = {
+                        "baseSymbol": w.get('baseSymbol'),
+                        "symbol": w.get('ticker'),
+                        "strikePrice": w.get('strikePrice'),
+                        "expirationDate": w.get('expirationDate'),
+                        "putCall": w.get('putCall'),
+                        "openInterest": int(w.get('size', 0) / (w.get('vol_oi', 1) or 1)),
+                        "lastPrice": w.get('price'),
+                        "tradeTime": datetime.fromtimestamp(w.get('timestamp', 0), tz=pytz.timezone('US/Eastern')).strftime("%H:%M:%S"),
+                        "timestamp": w.get('timestamp'),
+                        "vol_oi": w.get('vol_oi', 0),
+                        "premium": f"${premium:,.0f}",
+                        "notional_value": premium,
+                        "volume": w.get('size'),
+                        "moneyness": w.get('moneyness'),
+                        "is_mega_whale": w.get('is_mega_whale', False),
+                        "is_sweep": w.get('is_sweep', False),
+                        "delta": w.get('delta', 0),
+                        "is_lotto": w.get('is_lotto', False),
+                        "iv": 0,
+                        "source": "rest_snapshot",
+                        "side": None,
+                        "bid": 0,
+                        "ask": 0
+                    }
+                    main_cache.append(main_whale)
+                    main_sigs.add(main_sig)
+                    main_added_count += 1
+                
+        # Keep cache size manageable (last 1000 items)
+        current_rest_cache.sort(key=lambda x: x['timestamp'], reverse=True)
+        CACHE["whales_rest"]["data"] = current_rest_cache[:1000]
+        CACHE["whales_rest"]["timestamp"] = time.time()
+        
+        # Update main cache too (last 50 items for main dashboard)
+        main_cache.sort(key=lambda x: x['timestamp'], reverse=True)
+        CACHE["whales"]["data"] = main_cache[:50]
+        CACHE["whales"]["timestamp"] = time.time()
+        
+        # Also update 30 DTE cache
+        CACHE["whales_30dte"]["data"] = main_cache[:200]
+        CACHE["whales_30dte"]["timestamp"] = time.time()
+        
+        if added_count > 0 or main_added_count > 0:
+            print(f"🐳 REST: Added {added_count} to expanded, {main_added_count} to main dashboard for {symbol}")
+
+    except Exception as e:
+        print(f"REST Whale Scan Error ({symbol}): {e}")
+
+def fetch_polygon_trades_rest(ticker, limit=50):
+    """
+    Fetch recent trades for a specific option contract using Polygon REST API.
+    Used for the Expanded View (REST Polling).
+    """
+    if not POLYGON_API_KEY:
+        return []
+        
+    url = f"https://api.polygon.io/v3/trades/{ticker}"
+    params = {
+        "apiKey": POLYGON_API_KEY,
+        "limit": limit,
+        "sort": "timestamp",
+        "order": "desc"
+    }
+    
+    try:
+        resp = requests.get(url, params=params, timeout=5)
+        if resp.status_code != 200:
+            return []
+            
+        data = resp.json()
+        return data.get("results", [])
+    except Exception as e:
+        print(f"REST Trade Fetch Error ({ticker}): {e}")
+        return []
+
+def refresh_single_whale_polygon(symbol):
+    """
+    Polls Polygon for unusual activity using REST API (Snapshot + Trades).
+    Populates CACHE["whales_rest"] for the Expanded View.
+    """
+    if not POLYGON_API_KEY:
+        return
+
+    try:
+        # 1. Get Snapshot to find active contracts
+        # Use existing logic but filter for high volume
+        snapshot_data = fetch_unusual_options_polygon(symbol)
+        if not snapshot_data or not snapshot_data.get("results"):
+            return
+
+        current_price = snapshot_data.get("_current_price", 0)
+        results = snapshot_data.get("results", [])
+        
+        # Filter for active contracts (Volume > 500 OR High Vol/OI)
+        active_contracts = []
+        for r in results:
+            day = r.get("day", {})
+            volume = day.get("v", 0)
+            oi = r.get("open_interest", 0)
+            
+            # Basic Noise Filter
+            if volume < 100: 
+                continue
+                
+            # Interesting Criteria
+            if volume > 500 or (oi > 0 and volume > oi * 1.2):
+                active_contracts.append(r)
+                
+        # Limit to top 5 most active to save API calls
+        active_contracts.sort(key=lambda x: x.get("day", {}).get("v", 0), reverse=True)
+        active_contracts = active_contracts[:5]
+        
+        new_whales = []
+        
+        # 2. Fetch Trades for Active Contracts
+        for contract in active_contracts:
+            ticker = contract.get("details", {}).get("ticker")
+            strike = contract.get("details", {}).get("strike_price")
+            contract_type = contract.get("details", {}).get("contract_type")
+            expiry = contract.get("details", {}).get("expiration_date")
+            
+            trades = fetch_polygon_trades_rest(ticker)
+            
+            for t in trades:
+                # Filter for Size/Premium
+                size = t.get("size", 0)
+                price = t.get("price", 0)
+                premium = size * price * 100
+                
+                if premium < 25000: # $25k Minimum
+                    continue
+                    
+                # Build Whale Object
+                whale = {
+                    "ticker": ticker,
+                    "baseSymbol": symbol,
+                    "strikePrice": strike,
+                    "putCall": "C" if contract_type == "call" else "P",
+                    "expirationDate": expiry,
+                    "price": price,
+                    "size": size,
+                    "premium": int(premium),
+                    "timestamp": t.get("participant_timestamp") / 1e9, # Nanoseconds to Seconds
+                    "vol_oi": size / (contract.get("open_interest", 1) or 1), # Approx
+                    "delta": contract.get("greeks", {}).get("delta", 0),
+                    "moneyness": "ITM" if (contract_type == "call" and current_price > strike) or (contract_type == "put" and current_price < strike) else "OTM",
+                    "is_sweep": False, # Hard to detect via REST without conditions map
+                    "is_lotto": abs(contract.get("greeks", {}).get("delta", 0)) < 0.2,
+                    "is_mega_whale": premium > 1000000
+                }
+                new_whales.append(whale)
+                
+        # 3. Update Cache (Deduplicate)
+        # We use a composite key to avoid duplicates
+        current_rest_cache = CACHE["whales_rest"]["data"]
+        existing_sigs = {f"{w['ticker']}_{w['timestamp']}_{w['size']}" for w in current_rest_cache}
+        
+        added_count = 0
+        for w in new_whales:
+            sig = f"{w['ticker']}_{w['timestamp']}_{w['size']}"
+            if sig not in existing_sigs:
+                current_rest_cache.append(w)
+                existing_sigs.add(sig)
+                added_count += 1
+                
+        # Keep cache size manageable (last 1000 items)
+        current_rest_cache.sort(key=lambda x: x['timestamp'], reverse=True)
+        CACHE["whales_rest"]["data"] = current_rest_cache[:1000]
+        CACHE["whales_rest"]["timestamp"] = time.time()
+        
+        # 4. Update Main Dashboard Cache (High Value Only)
+        # Filter for significant whales to show on the main HUD (Unusual Whales Feed)
+        main_cache = CACHE["whales"]["data"]
+        main_sigs = {f"{w.get('symbol', w.get('ticker'))}_{w.get('timestamp')}_{w.get('volume', w.get('size'))}" for w in main_cache}
+        main_added_count = 0
+        
+        for w in new_whales:
+            # Main HUD Thresholds (Stricter than Expanded Flow)
+            premium = w.get('premium', 0)
+            base_symbol = w.get('baseSymbol', '')
+            
+            if base_symbol in ['SPY', 'QQQ']:
+                min_premium = 8_000_000
+            elif base_symbol == 'TSLA':
+                min_premium = 6_000_000
+            else:
+                min_premium = 500_000
+            
+            if premium >= min_premium:
+                # Convert to main dashboard format
+                main_sig = f"{w.get('ticker')}_{w.get('timestamp')}_{w.get('size')}"
+                if main_sig not in main_sigs:
+                    main_whale = {
+                        "baseSymbol": w.get('baseSymbol'),
+                        "symbol": w.get('ticker'),
+                        "strikePrice": w.get('strikePrice'),
+                        "expirationDate": w.get('expirationDate'),
+                        "putCall": w.get('putCall'),
+                        "openInterest": int(w.get('size', 0) / (w.get('vol_oi', 1) or 1)),
+                        "lastPrice": w.get('price'),
+                        "tradeTime": datetime.fromtimestamp(w.get('timestamp', 0), tz=pytz.timezone('US/Eastern')).strftime("%H:%M:%S"),
+                        "timestamp": w.get('timestamp'),
+                        "vol_oi": w.get('vol_oi', 0),
+                        "premium": f"${premium:,.0f}",
+                        "notional_value": premium,
+                        "volume": w.get('size'),
+                        "moneyness": w.get('moneyness'),
+                        "is_mega_whale": w.get('is_mega_whale', False),
+                        "is_sweep": w.get('is_sweep', False),
+                        "delta": w.get('delta', 0),
+                        "is_lotto": w.get('is_lotto', False),
+                        "iv": 0,
+                        "source": "rest_snapshot",
+                        "side": None,
+                        "bid": 0,
+                        "ask": 0
+                    }
+                    main_cache.append(main_whale)
+                    main_sigs.add(main_sig)
+                    main_added_count += 1
+        
+        # Keep main cache size manageable (last 50 items)
+        main_cache.sort(key=lambda x: x['timestamp'], reverse=True)
+        CACHE["whales"]["data"] = main_cache[:50]
+        CACHE["whales"]["timestamp"] = time.time()
+        
+        if main_added_count > 0:
+            print(f"🐳 Main Feed: Added {main_added_count} high-value whales for {symbol}")
+        
+        if added_count > 0:
+            print(f"🐳 REST: Added {added_count} new whales for {symbol}")
+
+    except Exception as e:
+        print(f"REST Whale Scan Error ({symbol}): {e}")
+
+def process_ws_trade(trade_data):
+    """
+    Process a single trade from the WebSocket stream.
+    Apply whale filters and add to cache if qualifying.
+    """
+    global CACHE, WHALE_HISTORY
+    
+    try:
+        symbol = trade_data.get("sym", "")  # O:TSLA260117C00400000
+        price = float(trade_data.get("p", 0))  # Trade price
+        size = int(trade_data.get("s", 0))  # Trade size (contracts)
+        timestamp_ns = trade_data.get("t", 0)  # SIP timestamp in nanoseconds
+        conditions = trade_data.get("c", [])  # Trade conditions
+        
+        if not symbol or price <= 0 or size <= 0:
+            return None
+        
+        # Parse the OCC symbol
+        parsed = parse_occ_symbol_ws(symbol)
+        if not parsed:
+            return None
+        
+        underlying = parsed["underlying"]
+        
+        # Check if in watchlist
+        if underlying not in WHALE_WATCHLIST:
+            return None
+        
+        # Calculate premium
+        notional = size * price * 100
+        
+        # Check threshold (same as snapshot logic)
+        if underlying in ['SPY', 'QQQ']:
+            min_whale_val = 8_000_000
+        elif underlying == 'TSLA':
+            min_whale_val = 6_000_000
+        else:
+            min_whale_val = 500_000
+        
+        # Quick filter - skip small trades
+        if notional < min_whale_val:
+            return None
+        
+        # Volume filter (single trade must be significant)
+        if size < 100:  # At least 100 contracts for a whale trade
+            return None
+        
+        # Convert timestamp
+        tz_eastern = pytz.timezone('US/Eastern')
+        if timestamp_ns > 1e15:  # Nanoseconds
+            trade_dt = datetime.fromtimestamp(timestamp_ns / 1e9, tz=tz_eastern)
+        else:
+            trade_dt = datetime.fromtimestamp(timestamp_ns, tz=tz_eastern)
+        
+        trade_time_display = trade_dt.strftime("%H:%M:%S")
+        timestamp_val = trade_dt.timestamp()
+        
+        # Deduplication
+        trade_id = f"{symbol}_{timestamp_ns}_{size}"
+        if trade_id in WHALE_HISTORY:
+            return None
+        WHALE_HISTORY[trade_id] = timestamp_val
+        
+        # Fetch Greeks from snapshot API (enrichment)
+        poly_details = get_polygon_contract_details(symbol)
+        open_interest = poly_details.get("open_interest", 0)
+        delta_val = poly_details.get("delta", 0)
+        iv_val = poly_details.get("iv", 0)
+        
+        # Vol/OI check (use size as proxy for "volume" in this single trade)
+        # For streaming, we relax this since we see individual trades
+        vol_oi_ratio = size / open_interest if open_interest > 0 else 999
+        
+        # Moneyness
+        underlying_price = get_cached_price(underlying) or 0
+        if underlying_price > 0:
+            price_diff_pct = abs(underlying_price - parsed["strike"]) / underlying_price
+            if price_diff_pct <= 0.005:
+                moneyness = "ATM"
+            elif parsed["put_call"] == "C":
+                moneyness = "ITM" if underlying_price > parsed["strike"] else "OTM"
+            else:
+                moneyness = "ITM" if underlying_price < parsed["strike"] else "OTM"
+        else:
+            moneyness = "ATM"
+        
+        # Determine side from conditions (if available)
+        # Condition codes: https://polygon.io/docs/options/get_v3_trades__optionsticker
+        is_sweep = 'I' in conditions  # Intermarket Sweep
+        
+        # Mega whale check
+        mega_threshold = MEGA_WHALE_THRESHOLD_TSLA if underlying == 'TSLA' else MEGA_WHALE_THRESHOLD
+        is_mega = notional >= mega_threshold
+        
+        whale_data = {
+            "baseSymbol": underlying,
+            "symbol": symbol,
+            "strikePrice": parsed["strike"],
+            "expirationDate": parsed["expiry"],
+            "putCall": parsed["put_call"],
+            "openInterest": open_interest,
+            "lastPrice": price,
+            "tradeTime": trade_time_display,
+            "timestamp": timestamp_val,
+            "vol_oi": vol_oi_ratio,
+            "premium": format_money_ws(notional),
+            "notional_value": notional,
+            "volume": size,
+            "moneyness": moneyness,
+            "is_mega_whale": is_mega,
+            "is_sweep": is_sweep,
+            "delta": delta_val,
+            "is_lotto": abs(delta_val) < 0.20,
+            "iv": iv_val,
+            "source": "polygon_ws",
+            "side": None,  # WS doesn't provide side easily
+            "bid": 0,
+            "ask": 0
+        }
+        
+        print(f"🐳 WS WHALE: {underlying} {parsed['put_call']} ${parsed['strike']} | {format_money_ws(notional)} | {size} contracts")
+        
+        return whale_data
+        
+    except Exception as e:
+        print(f"⚠️ WS Trade Processing Error: {e}")
+        return None
+
+def on_polygon_ws_message(ws, message):
+    """Handle incoming WebSocket messages."""
+    global POLYGON_WS_STATUS, CACHE
+    
+    try:
+        data = json.loads(message)
+        
+        if isinstance(data, list):
+            for item in data:
+                ev = item.get("ev", "")
+                
+                if ev == "status":
+                    status = item.get("status", "")
+                    msg = item.get("message", "")
+                    
+                    if status == "connected":
+                        print("✅ Polygon WS: Connected")
+                        POLYGON_WS_STATUS["connected"] = True
+                        POLYGON_WS_STATUS["error"] = None
+                    elif status == "auth_success":
+                        print("✅ Polygon WS: Authenticated")
+                        # Subscribe to all watchlist symbols
+                        symbols = ",".join([f"T.O:{sym}*" for sym in WHALE_WATCHLIST])
+                        sub_msg = json.dumps({"action": "subscribe", "params": symbols})
+                        ws.send(sub_msg)
+                        print(f"📡 Polygon WS: Subscribed to {len(WHALE_WATCHLIST)} symbols")
+                    elif status == "error":
+                        print(f"⚠️ Polygon WS Error: {msg}")
+                        POLYGON_WS_STATUS["error"] = msg
+                    elif status == "success":
+                        print(f"✅ Polygon WS: {msg}")
+                
+                elif ev == "T":  # Trade event
+                    whale = process_ws_trade(item)
+                    if whale:
+                        # Add to cache
+                        with CACHE_LOCK:
+                            current_data = CACHE["whales"]["data"]
+                            updated_data = [whale] + current_data  # Prepend new trade
+                            updated_data.sort(key=lambda x: x['timestamp'], reverse=True)
+                            CACHE["whales"]["data"] = updated_data[:50]
+                            CACHE["whales"]["timestamp"] = time.time()
+                            
+                            # Also update 30 DTE cache
+                            current_30dte = CACHE["whales_30dte"]["data"]
+                            updated_30dte = [whale] + current_30dte
+                            updated_30dte.sort(key=lambda x: x['timestamp'], reverse=True)
+                            CACHE["whales_30dte"]["data"] = updated_30dte[:200]
+                            CACHE["whales_30dte"]["timestamp"] = time.time()
+                        
+                        POLYGON_WS_STATUS["last_trade"] = time.time()
+                        
+    except Exception as e:
+        print(f"⚠️ Polygon WS Message Error: {e}")
+
+def on_polygon_ws_error(ws, error):
+    """Handle WebSocket errors."""
+    global POLYGON_WS_STATUS
+    print(f"❌ Polygon WS Error: {error}")
+    POLYGON_WS_STATUS["error"] = str(error)
+    POLYGON_WS_STATUS["connected"] = False
+
+def on_polygon_ws_close(ws, close_status_code, close_msg):
+    """Handle WebSocket close."""
+    global POLYGON_WS_STATUS
+    print(f"🔌 Polygon WS Closed: {close_status_code} - {close_msg}")
+    POLYGON_WS_STATUS["connected"] = False
+
+def on_polygon_ws_open(ws):
+    """Handle WebSocket open - authenticate."""
+    print("🔗 Polygon WS: Connection opened, authenticating...")
+    auth_msg = json.dumps({"action": "auth", "params": POLYGON_API_KEY})
+    ws.send(auth_msg)
+
+def handle_polygon_msg(msgs):
+    """
+    Callback for polygon-api-client WebSocket messages.
+    Processes incoming trade messages and updates the cache.
+    """
+    global POLYGON_WS_STATUS, CACHE
+    
+    # Debug: Log message count
+    if msgs:
+        print(f"📨 WS Received {len(msgs)} messages")
+    
+    for msg in msgs:
+        try:
+            # The polygon client provides parsed message objects (EquityTrade)
+            # Attributes: event_type, symbol, price, size, timestamp, conditions, exchange, etc.
+            if hasattr(msg, 'event_type') and msg.event_type == 'T':  # Trade event
+                trade_data = {
+                    "ev": "T",
+                    "sym": msg.symbol,
+                    "p": msg.price,
+                    "s": msg.size,
+                    "t": msg.timestamp,  # Unix nanoseconds
+                    "c": msg.conditions if hasattr(msg, 'conditions') and msg.conditions else []
+                }
+                
+                whale = process_ws_trade(trade_data)
+                if whale:
+                    with CACHE_LOCK:
+                        current_data = CACHE["whales"]["data"]
+                        updated_data = [whale] + current_data
+                        updated_data.sort(key=lambda x: x['timestamp'], reverse=True)
+                        CACHE["whales"]["data"] = updated_data[:50]
+                        CACHE["whales"]["timestamp"] = time.time()
+                        
+                        current_30dte = CACHE["whales_30dte"]["data"]
+                        updated_30dte = [whale] + current_30dte
+                        updated_30dte.sort(key=lambda x: x['timestamp'], reverse=True)
+                        CACHE["whales_30dte"]["data"] = updated_30dte[:200]
+                        CACHE["whales_30dte"]["timestamp"] = time.time()
+                    
+                    POLYGON_WS_STATUS["last_trade"] = time.time()
+                    
+        except Exception as e:
+            print(f"⚠️ Polygon Msg Processing Error: {e}")
+
+def start_polygon_ws_thread():
+    """
+    Start the Polygon WebSocket using the official polygon-api-client.
+    This handles connection, authentication, and SSL properly.
+    """
+    global POLYGON_WS_STATUS
+    
+    # DISABLED: WebSocket causes SSL conflicts with other network calls
+    if DISABLE_WEBSOCKET:
+        print("🔌 Polygon WebSocket DISABLED - using REST polling instead")
+        POLYGON_WS_STATUS["error"] = "Disabled (using REST)"
+        return
+    
+    if not POLYGON_API_KEY:
+        print("⚠️ Polygon WS: No API key configured")
+        POLYGON_WS_STATUS["error"] = "No API key"
+        return
+
+    
+    def run_ws():
+        while True:
+            try:
+                print("🚀 Starting Polygon WebSocket (official client, delayed)...")
+                
+                # Build subscription list for all watchlist symbols
+                # Format: T.O:SYMBOL* for options trades
+                subscriptions = [f"T.O:{sym}*" for sym in WHALE_WATCHLIST]
+                print(f"📡 Subscribing to {len(WHALE_WATCHLIST)} symbols: {subscriptions[:3]}...")
+                
+                # Create client with delayed feed (free tier)
+                client = WebSocketClient(
+                    api_key=POLYGON_API_KEY,
+                    feed=Feed.Delayed,
+                    market=Market.Options,
+                    subscriptions=subscriptions,
+                    verbose=True  # Log connection status
+                )
+                
+                # Mark as connected
+                POLYGON_WS_STATUS["connected"] = True
+                POLYGON_WS_STATUS["error"] = None
+                print("✅ Polygon WS: Connected and subscribed")
+                
+                # Run synchronously (blocks in this thread)
+                # The client handles auth, reconnects, and SSL properly
+                client.run(handle_polygon_msg)
+                
+            except Exception as e:
+                print(f"⚠️ Polygon WS Thread Error: {e}")
+                POLYGON_WS_STATUS["error"] = str(e)
+                POLYGON_WS_STATUS["connected"] = False
+            
+            # Wait before reconnecting
+            print("⏳ Polygon WS: Reconnecting in 10s...")
+            time.sleep(10)
+    
+    thread = threading.Thread(target=run_ws, daemon=True)
+    thread.start()
+    print("🧵 Polygon WS Thread Started")
+
+# API endpoint to check WS status
+@app.route('/api/ws/status')
+def get_ws_status():
+    """Return WebSocket connection status."""
+    return jsonify(POLYGON_WS_STATUS)
+
+
 def get_polygon_contract_details(contract_symbol):
     """
     Fetch Open Interest and Greeks (Delta, IV) for a single option contract from Polygon.
@@ -1280,411 +2094,6 @@ def get_polygon_contract_details(contract_symbol):
     
     return {"open_interest": 0, "delta": 0, "iv": 0}
 
-
-def fetch_alpaca_options_snapshot(contract_symbol):
-    """
-    Fetch real-time (or 15m delayed) NBBO and latest trade from Alpaca
-    to determine aggressor side (Buy/Sell).
-    """
-    if not ALPACA_API_KEY or not ALPACA_SECRET_KEY:
-        return None
-
-    headers = {
-        "APCA-API-KEY-ID": ALPACA_API_KEY,
-        "APCA-API-SECRET-KEY": ALPACA_SECRET_KEY,
-        "Accept": "application/json"
-    }
-    
-    # Alpaca Snapshot Endpoint (Combines Quote and Trade)
-    # /v1beta1/options/snapshots?symbols={symbol}
-    url = f"{ALPACA_DATA_URL}/snapshots"
-    params = {"symbols": contract_symbol}
-    
-    try:
-        resp = requests.get(url, headers=headers, params=params, timeout=5)
-        if resp.status_code == 200:
-            data = resp.json()
-            snapshot = data.get("snapshots", {}).get(contract_symbol)
-            if snapshot:
-                return {
-                    "quote": snapshot.get("latestQuote", {}),
-                    "trade": snapshot.get("latestTrade", {})
-                }
-    except Exception as e:
-        print(f"⚠️ Alpaca Fetch Error ({contract_symbol}): {e}")
-    
-    return None
-
-def fetch_alpaca_options_snapshot_batch(symbols_list):
-    """
-    Fetch real-time NBBO/Trade for multiple symbols in one request.
-    Handles chunking (max 50 symbols) and prefix stripping.
-    Returns dict: {symbol: {quote: {}, trade: {}}}
-    """
-    if not ALPACA_API_KEY or not ALPACA_SECRET_KEY or not symbols_list:
-        return {}
-
-    headers = {
-        "APCA-API-KEY-ID": ALPACA_API_KEY,
-        "APCA-API-SECRET-KEY": ALPACA_SECRET_KEY,
-        "Accept": "application/json"
-    }
-    
-    results = {}
-    
-    # 1. Clean symbols (remove 'O:' prefix)
-    # Map cleaned -> original to restore keys later
-    clean_map = {} 
-    clean_symbols = []
-    for s in symbols_list:
-        clean = s.replace("O:", "")
-        clean_symbols.append(clean)
-        clean_map[clean] = s
-        
-    # 2. Chunk into groups of 50
-    chunk_size = 50
-    chunks = [clean_symbols[i:i + chunk_size] for i in range(0, len(clean_symbols), chunk_size)]
-    
-    for chunk in chunks:
-        try:
-            url = f"{ALPACA_DATA_URL}/snapshots"
-            params = {"symbols": ",".join(chunk)}
-            
-            resp = requests.get(url, headers=headers, params=params, timeout=5)
-            if resp.status_code == 200:
-                data = resp.json()
-                snapshots = data.get("snapshots", {})
-                
-                for clean_sym, snap in snapshots.items():
-                    # Restore original symbol key (e.g. add O: back if needed, or just use what we have)
-                    # The caller expects the symbol they passed in.
-                    original_sym = clean_map.get(clean_sym, clean_sym)
-                    if snap:
-                        results[original_sym] = {
-                            "quote": snap.get("latestQuote", {}),
-                            "trade": snap.get("latestTrade", {})
-                        }
-            else:
-                print(f"⚠️ Alpaca Batch Error ({resp.status_code}): {resp.text}")
-                
-        except Exception as e:
-            print(f"⚠️ Alpaca Batch Exception: {e}")
-            
-    return results
-
-
-def scan_whales_polygon():
-    """
-    Scan for unusual whale activity using Polygon.io API.
-    Fetches options snapshots and filters by premium/volume thresholds.
-    Returns list of whale trades with Delta and OI data.
-    """
-    global WHALE_HISTORY
-    
-    if not POLYGON_API_KEY:
-        print("⚠️ Polygon API key not configured")
-        return []
-    
-    tz_eastern = pytz.timezone('US/Eastern')
-    now_et = datetime.now(tz_eastern)
-    
-    def format_money(val):
-        if val >= 1_000_000: return f"${val/1_000_000:.1f}M"
-        if val >= 1_000: return f"${val/1_000:.0f}k"
-        return f"${val:.0f}"
-    
-    all_whales = []
-    
-    for symbol in WHALE_WATCHLIST:
-        try:
-            # Fetch raw Polygon data
-            data = fetch_unusual_options_polygon(symbol)
-            if not data:
-                continue
-                
-            results = data.get("results", [])
-            current_price = data.get("_current_price", 0)
-            
-            for contract in results:
-                details = contract.get("details", {})
-                day_data = contract.get("day", {})
-                greeks = contract.get("greeks", {})
-
-                # Check date for weekend logic
-                last_updated = day_data.get("last_updated", 0)
-                if last_updated:
-                    polygon_time_obj = datetime.fromtimestamp(last_updated / 1_000_000_000, tz=tz_eastern)
-                    is_weekend = now_et.weekday() >= 5
-                    if not is_weekend and polygon_time_obj.date() != now_et.date():
-                        continue
-                    if is_weekend:
-                         days_diff = (now_et.date() - polygon_time_obj.date()).days
-                         if days_diff > 3:
-                             continue
-                
-                # Extract key data
-                volume = int(day_data.get("volume", 0) or 0)
-                last_price = float(day_data.get("close", 0) or day_data.get("vwap", 0) or 0)
-                open_interest = int(contract.get("open_interest", 0) or 0)
-                
-                # Skip if no meaningful data
-                if volume == 0 or last_price == 0:
-                    continue
-                    
-                # Calculate premium
-                notional = volume * last_price * 100
-                
-                # THRESHOLDS
-                if symbol.upper() in ['SPY', 'QQQ']:
-                    min_whale_val = 8_000_000
-                elif symbol.upper() == 'TSLA':
-                    min_whale_val = 6_000_000
-                else:
-                    min_whale_val = 500_000
-                
-                is_significant_premium = notional >= min_whale_val
-                is_meaningful_volume = volume >= 500
-                
-                if not (is_significant_premium and is_meaningful_volume):
-                    continue
-                
-                # GLOBAL FILTER: Volume > 1.2x Open Interest (Unusual Activity)
-                # Must be strictly unusual to enter the feed
-                open_interest = contract.get("open_interest", 0)
-                if volume <= (open_interest * 1.2):
-                    continue
-                
-                # Extract contract details
-                strike = details.get("strike_price")
-                contract_type = details.get("contract_type", "").upper() # CALL/PUT
-                expiry = details.get("expiration_date")
-                ticker = details.get("ticker") # O:SPY...
-                
-                # Moneyness
-                if current_price > 0:
-                    price_diff_pct = abs(current_price - strike) / current_price
-                    if price_diff_pct <= 0.005:
-                        moneyness = "ATM"
-                    elif contract_type == "CALL":
-                        moneyness = "ITM" if current_price > strike else "OTM"
-                    else:
-                        moneyness = "ITM" if current_price < strike else "OTM"
-                else:
-                    moneyness = "ATM"
-                
-                # Delta
-                greeks = contract.get("greeks") or {}
-                delta = float(greeks.get("delta", 0) or 0)
-                
-
-
-                # Deduplication (Polygon doesn't give trade IDs easily in snapshot, use ticker+vol+time approx)
-                # Actually, for snapshot, we might just use ticker + volume as a rough ID for the session
-                # Or just rely on the fact that we clear cache daily.
-                # Let's use a composite ID.
-                trade_id = f"{ticker}_{volume}_{last_price}"
-                if trade_id in WHALE_HISTORY:
-                    continue
-                WHALE_HISTORY[trade_id] = time.time()
-                
-                whale_data = {
-                    "baseSymbol": symbol,
-                    "symbol": ticker,
-                    "strikePrice": strike,
-                    "expirationDate": expiry,
-                    "putCall": "C" if contract_type == "CALL" else "P",
-                    "openInterest": open_interest,
-                    "lastPrice": last_price,
-                    "tradeTime": now_et.strftime("%H:%M:%S"), # Snapshot doesn't give trade time, use current
-                    "timestamp": time.time(),
-                    "premium": format_money(notional),
-                    "volume": volume,
-                    "notional_value": notional,
-                    "delta": delta,
-                    "side": "BUY" if delta > 0 else "SELL", # Rough approx for Polygon snapshot if no quote
-                    "moneyness": moneyness,
-                    "bid": 0, # Polygon snapshot doesn't give bid/ask easily in this endpoint
-                    "ask": 0,
-                    "is_mega_whale": is_significant_premium and notional >= MEGA_WHALE_THRESHOLD,
-                    "is_mega_whale": is_significant_premium and notional >= MEGA_WHALE_THRESHOLD,
-                    "is_sweep": (delta > 0) and is_significant_premium, # Vol > OI guaranteed by global filter
-                    "source": "polygon"
-                }
-                
-                all_whales.append(whale_data)
-                
-        except Exception as e:
-            print(f"Polygon Scan Error ({symbol}): {e}")
-            continue
-            
-    return all_whales
-
-
-def scan_single_whale_polygon(symbol):
-    """
-    Fetch unusual options activity for a single ticker using Polygon.io.
-    Returns a list of whale_candidate dictionaries (without Alpaca side/bid/ask).
-    """
-    print(f"🐢 Scanning {symbol}...", end="\r")
-    
-    global CACHE, WHALE_HISTORY
-    
-    tz_eastern = pytz.timezone('US/Eastern')
-    now_et = datetime.now(tz_eastern)
-    
-    def format_money(val):
-        if val >= 1_000_000: return f"${val/1_000_000:.1f}M"
-        if val >= 1_000: return f"${val/1_000:.0f}k"
-        return f"${val:.0f}"
-    
-    # Check for daily reset (if server runs overnight)
-    global WHALE_CACHE_LAST_CLEAR
-    if should_clear_whale_cache(WHALE_CACHE_LAST_CLEAR):
-        print("🧹 Clearing stale whale history (new trading day)")
-        WHALE_HISTORY.clear()
-        mark_whale_cache_cleared()
-    
-    new_whales = []
-    
-    try:
-        polygon_data = fetch_unusual_options_polygon(symbol)
-        
-        if not polygon_data or not polygon_data.get("results"):
-            # print(f"Polygon: No data for {symbol}, skipping")
-            return []
-        
-        current_price = polygon_data.get("_current_price", 0)
-        
-        # Thresholds - tiered by ticker liquidity
-        vol_oi_multiplier = 4 if symbol.upper() in ['SPY', 'QQQ', 'IWM'] else 3
-        # SPY/QQQ = $8M (index ETFs), TSLA = $4M (mega cap single stock), others = $500k
-        if symbol.upper() in ['SPY', 'QQQ']:
-            min_whale_val = 8_000_000
-        elif symbol.upper() == 'TSLA':
-            min_whale_val = 6_000_000
-        else:
-            min_whale_val = 500_000
-        
-        for contract in polygon_data.get("results", []):
-            details = contract.get("details", {})
-            day_data = contract.get("day", {})
-            greeks = contract.get("greeks", {})
-            
-            volume = int(day_data.get("volume", 0) or 0)
-            open_interest = int(contract.get("open_interest", 0) or 0)
-            last_price = float(day_data.get("close", 0) or 0)
-            strike = float(details.get("strike_price", 0))
-            contract_type = details.get("contract_type", "").upper()  # "CALL" or "PUT"
-            expiry = details.get("expiration_date", "")
-            ticker_symbol = details.get("ticker", "")
-            
-            # Skip if no volume
-            if volume == 0 or last_price == 0:
-                continue
-            
-            # Calculate premium (notional value)
-            notional = volume * last_price * 100
-            
-            # Vol/OI ratio - KEY indicator of unusual activity
-            vol_oi_ratio = volume / open_interest if open_interest > 0 else 999
-            
-            # INDUSTRY-STANDARD FILTERS (aligned with Unusual Whales, Cheddar Flow)
-            is_unusual = vol_oi_ratio > 1.05
-            is_significant_premium = notional >= min_whale_val  # Use ticker-specific threshold
-            is_meaningful_volume = volume >= 500
-            
-            # Calculate DTE (Days to Expiration)
-            try:
-                exp_date = datetime.strptime(expiry, "%Y-%m-%d").date()
-                dte = (exp_date - now_et.date()).days
-                is_short_term = 0 <= dte <= 30
-            except:
-                is_short_term = False
-            
-            # Must pass ALL criteria to be "unusual"
-            if not (is_unusual and is_significant_premium and is_meaningful_volume and is_short_term):
-                continue
-            
-            # Moneyness calculation with 0.5% ATM buffer
-            is_call = contract_type == "CALL"
-            price_diff_pct = abs(current_price - strike) / current_price
-            
-            if price_diff_pct <= 0.005:
-                moneyness = "ATM"
-            elif is_call:
-                moneyness = "ITM" if current_price > strike else "OTM"
-            else:
-                moneyness = "ITM" if current_price < strike else "OTM"
-            
-            # Get delta from Greeks
-            delta_val = greeks.get("delta", 0) or 0
-            iv_val = contract.get("implied_volatility", 0) or 0
-            
-            # Trade time: Polygon's day.last_updated is start of trading day (midnight),
-            # NOT actual trade time. Use server time when whale is detected instead.
-            last_updated = day_data.get("last_updated", 0)
-            if last_updated:
-                polygon_time_obj = datetime.fromtimestamp(last_updated / 1_000_000_000, tz=tz_eastern)
-                
-                # CRITICAL: Filter out stale trades from previous days
-                # At 9:30 AM, we only want TODAY's trades
-                # UPDATE: On weekends, allow Friday's trades to populate the feed
-                is_weekend = now_et.weekday() >= 5
-                if not is_weekend and polygon_time_obj.date() != now_et.date():
-                    continue
-                
-                # If weekend, allow Friday's trades (last 3 days to be safe)
-                if is_weekend:
-                     days_diff = (now_et.date() - polygon_time_obj.date()).days
-                     if days_diff > 3: # Only allow Fri/Sat/Sun
-                         continue
-                    
-                # Use CURRENT server time as the detection time (more accurate for feed)
-                trade_time_str = now_et.strftime("%H:%M:%S")
-                timestamp_val = now_et.timestamp()
-            else:
-                # If no timestamp, skip it to be safe
-                continue
-            
-            # Volume tracking (same as yfinance version)
-            contract_id = ticker_symbol
-            current_vol = volume
-            last_vol = WHALE_HISTORY.get(contract_id, 0)
-            delta = current_vol - last_vol
-            
-            whale_data = {
-                "baseSymbol": symbol,
-                "symbol": ticker_symbol,
-                "strikePrice": strike,
-                "expirationDate": expiry,
-                "putCall": 'C' if is_call else 'P',
-                "openInterest": open_interest,
-                "lastPrice": last_price,
-                "tradeTime": trade_time_str,
-                "timestamp": timestamp_val,
-                "vol_oi": round(vol_oi_ratio, 1),
-                "premium": format_money(notional),
-                "notional_value": notional,
-                "moneyness": moneyness,
-                # MEGA threshold: $12M for TSLA, $5M for all others
-                "is_mega_whale": notional > (12_000_000 if symbol.upper() == 'TSLA' else 5_000_000),
-                "delta": round(delta_val, 2),
-                "is_lotto": abs(delta_val) < 0.20, # Lotto Logic
-                "iv": round(iv_val, 2),
-                "source": "polygon",
-                "volume": current_vol
-                # Missing: side, bid, ask (will be filled by worker)
-            }
-            
-            if last_vol == 0 or delta >= VOLUME_THRESHOLD:
-                WHALE_HISTORY[contract_id] = current_vol
-                new_whales.append(whale_data)
-        
-        return new_whales
-        
-    except Exception as e:
-        print(f"Polygon Whale Scan Failed ({symbol}): {e}")
-        return []
 
 def fetch_options_chain_marketdata(symbol, expiry=None, dte=None, strike_limit=None, min_volume=None):
     """
@@ -1936,12 +2345,16 @@ def subscription_status():
                 })
             
         # 3. CHECK VIP/ADMIN LIST (Bypass all checks)
-        ADMIN_EMAILS = [
-            'sam.juarez092678@gmail.com', 
-            'jaxnailedit@gmail.com', 
-            'gtmichael9218@gmail.com',
-            'Montoyamiguel35@gmail.com'
-        ]
+        ADMIN_EMAILS = ['sam.juarez092678@gmail.com', 'jaxnailedit@gmail.com', 'Gtmichael9218@gmail.com']
+        if user_email in ADMIN_EMAILS:
+            return jsonify({
+                'status': 'active',
+                'has_access': True,
+                'is_vip': True
+            })
+            
+        # 3. CHECK VIP/ADMIN LIST (Bypass all checks)
+        ADMIN_EMAILS = ['sam.juarez092678@gmail.com', 'jaxnailedit@gmail.com', 'gtmichael9218@gmail.com']
         
         if user_email.lower().strip() in [e.lower() for e in ADMIN_EMAILS]:
             return jsonify({
@@ -2004,36 +2417,18 @@ def subscription_status():
                     print(f"Stripe Status for {user_email}: {sub.status}")
                     
                     if sub.status in ['active', 'trialing']:
-                        # If Stripe says active, they are premium (paying customer)
+                        # If Stripe says active, they are premium
                         if sub.status == 'active':
                             is_premium = True
-                            # Active subscribers always have access
-                            return jsonify({
-                                'status': sub.status,
-                                'days_remaining': days_remaining,
-                                'has_access': True,
-                                'login_count': login_count,
-                                'is_premium': is_premium
-                            })
                         
-                        # STRICT TRIAL EXPIRATION CHECK
-                        # If status is 'trialing' but Firestore shows 0 days remaining,
-                        # lock them out. VIPs are already handled above and won't reach here.
-                        if sub.status == 'trialing' and days_remaining <= 0:
-                            print(f"⚠️ TRIAL EXPIRED for {user_email} (days_remaining={days_remaining})")
-                            return jsonify({
-                                'status': 'expired',
-                                'has_access': False,
-                                'reason': 'trial_expired'
-                            })
-                        
-                        # Trial still active
+                        # If Stripe has a more accurate trial_end, we could use it, 
+                        # but per requirements we stick to Firestore for the countdown.
                         return jsonify({
                             'status': sub.status,
                             'days_remaining': days_remaining,
                             'has_access': True,
                             'login_count': login_count,
-                            'is_premium': False
+                            'is_premium': is_premium
                         })
                     else:
                         # Hard Lockout for expired/bad status
@@ -2178,7 +2573,7 @@ def start_trial():
             return jsonify({'status': 'success', 'message': 'Subscription already exists'})
 
         # 4. CREATE TRIAL SUBSCRIPTION
-        # 3 Days Free Trial
+        # 14 Days Free Trial
         try:
             new_sub = stripe.Subscription.create(
                 customer=customer.id,
@@ -2530,230 +2925,12 @@ def api_delete_whale():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/api/whales')
-def api_whales():
-    from datetime import timedelta
-    global CACHE
-    limit = int(request.args.get('limit', 25))
-    offset = int(request.args.get('offset', 0))
-    lotto_only = request.args.get('lotto') == 'true'
-    
-    # Check if data has been hydrated
-    if CACHE["whales"]["timestamp"] == 0:
-        return jsonify({"loading": True, "data": [], "stale": False, "timestamp": 0})
-    
-    # FILTER: Ensure we only show TODAY'S trades (Server-side safety)
-    # The worker might be sleeping (Pre-market), holding yesterday's data.
-    # We filter it here to ensure the frontend sees a clean slate.
-    raw_data = CACHE["whales"]["data"]
-    tz_eastern = pytz.timezone('US/Eastern')
-    now_et = datetime.now(tz_eastern)
-    today_date = now_et.date()
-    weekday = now_et.weekday()
-    
-    # On weekends, show Friday's trades; on weekdays show today's trades
-    if weekday == 5:  # Saturday
-        target_date = today_date - timedelta(days=1)  # Friday
-    elif weekday == 6:  # Sunday
-        target_date = today_date - timedelta(days=2)  # Friday
-    else:
-        target_date = today_date
-    
-    clean_data = []
-    for whale in raw_data:
-        # 'timestamp' is unix epoch
-        trade_dt = datetime.fromtimestamp(whale['timestamp'], tz_eastern)
-        if trade_dt.date() == target_date:
-            # Lotto Filter
-            if lotto_only:
-                if not whale.get('is_lotto', False):
-                    continue
-            clean_data.append(whale)
-            
-    # If Lotto Mode, merge with persisted history
-    if lotto_only and firestore_db:
-        try:
-            # Fetch persisted lottos (limit 50 for speed)
-            lottos_ref = firestore_db.collection('lottos')
-            query = lottos_ref.order_by('timestamp', direction=firestore.Query.DESCENDING).limit(50)
-            docs = query.stream()
-            saved_lottos = [doc.to_dict() for doc in docs]
-            
-            # Merge and Deduplicate
-            # Use a dictionary keyed by unique signature to dedupe
-            merged = {}
-            
-            # 1. Add Saved Lottos
-            for l in saved_lottos:
-                sig = f"{l['ticker']}_{l['timestamp']}_{l['price']}"
-                merged[sig] = l
-                
-            # 2. Add Live Lottos (Overwrite saved if newer/same)
-            for l in clean_data:
-                sig = f"{l['ticker']}_{l['timestamp']}_{l['price']}"
-                merged[sig] = l
-                
-            # Convert back to list and sort
-            clean_data = list(merged.values())
-            clean_data.sort(key=lambda x: x['timestamp'], reverse=True)
-            
-        except Exception as e:
-            print(f"❌ Failed to merge saved lottos: {e}")
 
-    sliced = clean_data[offset:offset+limit]
-    
-    return jsonify({
-        "data": sliced,
-        "stale": False,
-        "timestamp": int(CACHE["whales"]["timestamp"])
-    })
 
-@app.route('/api/whales/tickers')
-def api_whales_tickers():
-    """Return list of unique tickers currently in the whale feed."""
-    global CACHE
-    
-    # Check if data has been hydrated
-    if CACHE["whales"]["timestamp"] == 0:
-        return jsonify({"tickers": []})
-    
-    # Same date filtering logic as main feed
-    raw_data = CACHE["whales"]["data"]
-    tz_eastern = pytz.timezone('US/Eastern')
-    now_et = datetime.now(tz_eastern)
-    today_date = now_et.date()
-    weekday = now_et.weekday()
-    
-    if weekday == 5:  # Saturday -> Friday
-        target_date = today_date - timedelta(days=1)
-    elif weekday == 6:  # Sunday -> Friday
-        target_date = today_date - timedelta(days=2)
-    else:
-        target_date = today_date
-        
-    unique_tickers = set()
-    
-    for whale in raw_data:
-        try:
-            trade_dt = datetime.fromtimestamp(whale['timestamp'], tz_eastern)
-            if trade_dt.date() == target_date:
-                # Extract underlying ticker (e.g. "NVDA" from "O:NVDA...")
-                # The 'ticker' field in processed trades usually has the option symbol "O:..."
-                # But let's check what we actually store. 
-                # In run.py, 'ticker' is set to the option symbol.
-                # We want the underlying.
-                # Usually we can parse it or maybe it's available.
-                # Let's just parse it from the option symbol string if needed, 
-                # or use the 'symbol' field if it's the underlying?
-                # Wait, in run.py scan_whales_alpaca:
-                # trade["ticker"] = symbol (which is the option symbol)
-                # But we want to filter by UNDERLYING (e.g. NVDA).
-                
-                full_ticker = whale.get('ticker', '')
-                # Format is usually O:SYMBOL... or just SYMBOL...
-                # Let's strip O: and take alpha characters
-                clean = full_ticker.replace('O:', '')
-                # Regex to get leading letters
-                match = re.match(r"([A-Z]+)", clean)
-                if match:
-                    unique_tickers.add(match.group(1))
-        except:
-            continue
-            
-    # Also include tickers from persisted history if lotto mode is common?
-    # The user asked for "all of the tickers we fetch in the main dashboard unusual whales".
-    # So the above logic covers the main cache.
-    
-    return jsonify({"tickers": sorted(list(unique_tickers))})
 
-@app.route('/api/whales/stream')
-def api_whales_stream():
-    def generate():
 
-        # Initial Data
-        current_time = time.time()
-        # Just yield the cache periodically
-        while True:
-            # Send immediately on connect
-            # FILTER: Ensure we only show TODAY'S trades (Server-side safety)
-            raw_data = CACHE["whales"]["data"]
-            tz_eastern = pytz.timezone('US/Eastern')
-            now_et = datetime.now(tz_eastern)
-            today_date = now_et.date()
-            weekday = now_et.weekday()
-            
-            # On weekends, show Friday's trades; on weekdays show today's trades
-            # UPDATE: Main Dashboard should ALWAYS show empty state on weekends (Scanner Mode)
-            # So we strictly filter for TODAY's date.
-            target_date = today_date
-            
-            clean_data = []
-            for whale in raw_data:
-                # 'timestamp' is unix epoch
-                trade_dt = datetime.fromtimestamp(whale['timestamp'], tz_eastern)
-                if trade_dt.date() == target_date:
-                    clean_data.append(whale)
 
-            yield f"data: {json.dumps({'data': clean_data, 'stale': False, 'timestamp': int(CACHE['whales']['timestamp'])})}\n\n"
-            # Optimization: Slow down stream when market is closed
-            tz_eastern = pytz.timezone('US/Eastern')
-            now = datetime.now(tz_eastern)
-            # Options trade 9:30 AM - 4:15 PM ET
-            is_market_hours = (now.weekday() < 5) and (
-                (now.hour > 9 or (now.hour == 9 and now.minute >= 30)) and 
-                (now.hour < 16 or (now.hour == 16 and now.minute < 15))
-            )
-            
-            sleep_time = 5 if is_market_hours else 60
-            time.sleep(sleep_time)
 
-    return Response(stream_with_context(generate()), mimetype='text/event-stream')
-
-@app.route('/api/whales/30dte/stream')
-def api_whales_30dte_stream():
-    def generate():
-
-        # Initial Data
-        current_time = time.time()
-        # Just yield the cache periodically
-        while True:
-            # Send immediately on connect
-            # FILTER: Ensure we only show TODAY'S trades (Server-side safety)
-            raw_data = CACHE["whales_30dte"]["data"]
-            tz_eastern = pytz.timezone('US/Eastern')
-            now_et = datetime.now(tz_eastern)
-            today_date = now_et.date()
-            weekday = now_et.weekday()
-            
-            # On weekends, show Friday's trades; on weekdays show today's trades
-            if weekday == 5:  # Saturday
-                target_date = today_date - timedelta(days=1)  # Friday
-            elif weekday == 6:  # Sunday
-                target_date = today_date - timedelta(days=2)  # Friday
-            else:
-                target_date = today_date
-            
-            clean_data = []
-            for whale in raw_data:
-                # 'timestamp' is unix epoch
-                trade_dt = datetime.fromtimestamp(whale['timestamp'], tz_eastern)
-                if trade_dt.date() == target_date:
-                    clean_data.append(whale)
-
-            yield f"data: {json.dumps({'data': clean_data, 'stale': False, 'timestamp': int(CACHE['whales_30dte']['timestamp'])})}\n\n"
-            # Optimization: Slow down stream when market is closed
-            tz_eastern = pytz.timezone('US/Eastern')
-            now = datetime.now(tz_eastern)
-            # Options trade 9:30 AM - 4:15 PM ET
-            is_market_hours = (now.weekday() < 5) and (
-                (now.hour > 9 or (now.hour == 9 and now.minute >= 30)) and 
-                (now.hour < 16 or (now.hour == 16 and now.minute < 15))
-            )
-            
-            sleep_time = 5 if is_market_hours else 60
-            time.sleep(sleep_time)
-
-    return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
 @app.route('/api/polymarket')
 def api_polymarket():
@@ -3167,7 +3344,6 @@ def api_movers():
         
         # Consumer & Entertainment
         "NFLX", "DIS", "UBER", "DASH", "ABNB", "PTON", "NKE", "SBUX",
-        # Removed SQ due to delisting/API errors
     ]
     
     try:
@@ -3177,7 +3353,7 @@ def api_movers():
         def fetch_movers_tickers():
             return yf.Tickers(" ".join(MOVERS_TICKERS))
         
-        tickers_obj = with_timeout(fetch_movers_tickers, timeout_seconds=20)
+        tickers_obj = with_timeout(fetch_movers_tickers, timeout_seconds=10)
         if not tickers_obj:
             print("⏰ Movers tickers fetch timed out")
             return jsonify({"error": "timeout"})
@@ -3195,8 +3371,7 @@ def api_movers():
                         "change": round(change, 2),
                         "type": "gain" if change >= 0 else "loss"
                     }
-            except Exception as e:
-                print(f"❌ Mover Fetch Error ({symbol}): {e}")
+            except:
                 return None
             return None
         
@@ -3241,8 +3416,8 @@ def api_economic_calendar():
         data = response.json()
         release_dates = data.get('release_dates', [])
         
-        # High-impact releases (FOMC, CPI, Jobs, GDP)
-        HIGH_IMPACT_KEYWORDS = ['FOMC', 'CPI', 'Employment', 'GDP', 'Nonfarm', 'Jobless', 'Retail Sales', 'Consumer Price', 'Federal Reserve']
+        # High-impact releases (FOMC, Jobs, GDP)
+        HIGH_IMPACT_KEYWORDS = ['FOMC', 'Employment', 'GDP', 'Nonfarm', 'Jobless', 'Retail Sales', 'Federal Reserve']
         MEDIUM_IMPACT_KEYWORDS = ['ADP', 'PMI', 'Housing', 'Durable', 'Industrial', 'Trade Balance', 'Treasury']
         
         formatted_events = []
@@ -4054,6 +4229,7 @@ def start_background_worker():
         last_gamma_update = 0
         last_heatmap_update = 0
         last_news_update = 0
+        last_snapshot_save = 0 # Track day of last save
         
         while True:
             # === MARKET HOURS CHECK ===
@@ -4073,6 +4249,20 @@ def start_background_worker():
                 (now.hour > 9 or (now.hour == 9 and now.minute >= 30)) and 
                 (now.hour < 16 or (now.hour == 16 and now.minute < 15))
             )
+            
+            # Daily Snapshot Save Trigger (4:30 PM ET)
+            # Check if it's a weekday, time is past 16:30, and we haven't saved today
+            today_date_str = now.strftime("%Y-%m-%d")
+            last_save_date_str = datetime.fromtimestamp(last_snapshot_save, tz=tz_eastern).strftime("%Y-%m-%d") if last_snapshot_save > 0 else ""
+            
+            if is_weekday and now.hour == 16 and now.minute >= 30:
+                if today_date_str != last_save_date_str:
+                    print(f"⏰ Triggering Daily Snapshot Save for {today_date_str}...")
+                    try:
+                        whales_service.save_daily_snapshot()
+                        last_snapshot_save = time.time()
+                    except Exception as e:
+                        print(f"❌ Scheduler Snapshot Error: {e}")
             
             # News Slowdown: After 9 PM ET or Weekends
             is_late_night = now.hour >= 21 or now.hour < 4
@@ -4138,63 +4328,18 @@ def start_background_worker():
             whales_needs_hydration = not CACHE.get("whales", {}).get("data")
             can_hydrate_whales = is_extended_hours or (whales_needs_hydration and is_weekend)
             
-            if is_market_open or can_hydrate_whales:
-                start_time = time.time()
-                
-                # Use Polygon scanning (Simplified to Polygon-only per user request)
-                try:
-                    new_whales = scan_whales_polygon()
-                    
-                    if new_whales:
-                        # UPDATE CACHE (Atomic)
-                        with CACHE_LOCK:
-                            current_data = CACHE["whales"]["data"]
-                            updated_data = current_data + new_whales
-                            updated_data.sort(key=lambda x: x['timestamp'], reverse=True)
-                            
-                            # Apply 30 DTE Filter Globally
-                            tz_eastern = pytz.timezone('US/Eastern')
-                            now_et = datetime.now(tz_eastern)
-                            filtered_whales = []
-                            for w in updated_data:
-                                try:
-                                    expiry = w.get("expirationDate")
-                                    if expiry:
-                                        expiry_date = datetime.strptime(expiry, "%Y-%m-%d").date()
-                                        days_to_expiry = (expiry_date - now_et.date()).days
-                                        if days_to_expiry <= 30:
-                                            filtered_whales.append(w)
-                                except:
-                                    pass
-                            
-                            CACHE["whales"]["data"] = filtered_whales[:50]
-                            CACHE["whales"]["timestamp"] = time.time()
-                            
-                            # Update 30 DTE Cache (Same data)
-                            CACHE["whales_30dte"]["data"] = filtered_whales[:200]
-                            CACHE["whales_30dte"]["timestamp"] = time.time()
-                        
-                        print(f"✅ Added {len(new_whales)} new whales to feed (Polygon Only).")
-                        save_whale_cache()
-                        
-                except Exception as e:
-                    print(f"⚠️ Polygon Whale Scan Error: {e}")
+            # 4. Whales - REST Polling (Expanded View)
+            # Run this loop to populate CACHE["whales_rest"]
+            rest_needs_hydration = not CACHE.get("whales_rest", {}).get("data")
+            
+            if can_hydrate_whales or rest_needs_hydration:
+                 # Cycle through watchlist
+                 # for symbol in WHALE_WATCHLIST:
+                 #     refresh_single_whale_polygon(symbol)
+                 #     time.sleep(1) # Pace API calls
+                 pass
 
-                duration = time.time() - start_time
-                if duration > 1:
-                    print(f"🐢 Whale Scan took {duration:.2f}s for {len(WHALE_WATCHLIST)} symbols", flush=True)
-                
-                # CRITICAL: Sleep to prevent hammering APIs (30s for Alpaca rate limit sustainability)
-                time.sleep(30)
-            else:
-                # If market closed AND cache populated, stop polling whales/gamma
-                # Just sleep and check News/Heatmap occasionally
-                
-                # PRE-MARKET WAKEUP: If it's 9:25-9:30 AM, sleep only 1s to catch the open
-                is_pre_market_wakeup = is_weekday and (now.hour == 9 and now.minute >= 25)
-
-                sleep_time = 1 if is_pre_market_wakeup else 60
-                time.sleep(sleep_time)
+            time.sleep(60)
 
     t = threading.Thread(target=worker, daemon=True)
     t.start()
@@ -4202,254 +4347,26 @@ def start_background_worker():
 # Start the background worker immediately on import
 # Guard ensures it only runs once even if module is imported multiple times
 if not hasattr(start_background_worker, '_started'):
-    load_whale_cache()  # Restore persisted whale data
-    mark_whale_cache_cleared()  # Mark this session's start time
+    # load_whale_cache() handled by setup_whales
+    whales_service.mark_whale_cache_cleared()  # Mark this session's start time
     start_background_worker()  # Enabled for local dev (production uses gunicorn_config.py)
     start_background_worker._started = True
 
 
-@app.route('/api/library/options')
-def api_library_options():
-    """
-    Fetch full option chain snapshots for a specific ticker (0-30 DTE) from Alpaca.
-    Used for the "Upcoming Options Library" visualization (Trade List).
-    """
-    symbol = request.args.get('symbol')
-    if not symbol:
-        return jsonify({"error": "Symbol required"}), 400
-        
-    if not ALPACA_API_KEY or not ALPACA_SECRET_KEY:
-        return jsonify({"error": "Alpaca API key missing"}), 500
 
-    # Cache Key (Symbol + Date + Hour to keep it relatively fresh but cached)
-    current_time = time.time()
-    cache_key = f"library_alpaca_{symbol}_v4"
-    
-    global LIBRARY_CACHE
-    if 'LIBRARY_CACHE' not in globals():
-        LIBRARY_CACHE = {}
-        
-    if cache_key in LIBRARY_CACHE:
-        cached = LIBRARY_CACHE[cache_key]
-        if current_time - cached['timestamp'] < 300: # 5 min cache for rate limit safety
-            return jsonify(cached['data'])
 
-    try:
-        # Use Trade-by-Trade API instead of Snapshots for accurate intel
-        headers = {
-            "APCA-API-KEY-ID": ALPACA_API_KEY,
-            "APCA-API-SECRET-KEY": ALPACA_SECRET_KEY,
-            "Accept": "application/json"
-        }
-        
-        tz_eastern = pytz.timezone('US/Eastern')
-        now_et = datetime.now(tz_eastern)
-        
-        # Get current stock price for moneyness calculation
-        current_price = 0
-        try:
-            stock_url = f"https://data.alpaca.markets/v2/stocks/{symbol}/trades/latest"
-            stock_resp = requests.get(stock_url, headers=headers, timeout=5)
-            if stock_resp.status_code == 200:
-                stock_data = stock_resp.json()
-                current_price = float(stock_data.get('trade', {}).get('p', 0) or 0)
-        except:
-            pass
-        
-        # First, get snapshots to find all active option contracts for this symbol
-        snapshot_url = f"{ALPACA_DATA_URL}/snapshots/{symbol}"
-        snapshot_resp = requests.get(snapshot_url, headers=headers, params={"limit": 500}, timeout=15)
-        
-        if snapshot_resp.status_code != 200:
-            return jsonify({"error": f"Alpaca Snapshot Error: {snapshot_resp.status_code}"}), 500
-        
-        snapshots = snapshot_resp.json().get("snapshots", {})
-        
-        # Helper to parse OCC
-        def parse_occ(sym):
-            try:
-                clean = sym.replace("O:", "")
-                i = 0
-                while i < len(clean) and clean[i].isalpha(): i += 1
-                rest = clean[i:]
-                date_str = rest[:6]
-                put_call = rest[6]
-                strike = float(rest[7:]) / 1000
-                year = 2000 + int(date_str[:2])
-                month = int(date_str[2:4])
-                day = int(date_str[4:6])
-                expiry = f"{year}-{month:02d}-{day:02d}"
-                return {"expiry": expiry, "type": "CALL" if put_call == "C" else "PUT", "strike": strike}
-            except: return None
-        
-        # Filter contracts: 0-30 DTE only
-        valid_contracts = []
-        for option_symbol in snapshots.keys():
-            parsed = parse_occ(option_symbol)
-            if not parsed: continue
-            
-            try:
-                expiry_date = datetime.strptime(parsed['expiry'], "%Y-%m-%d").date()
-                days_to_expiry = (expiry_date - now_et.date()).days
-                if 0 <= days_to_expiry <= 30:
-                    valid_contracts.append(option_symbol)
-            except:
-                continue
-        
-        # Fetch trades for valid contracts (in batches to avoid URL length limits)
-        all_trades = []
-        batch_size = 20  # Alpaca allows multiple symbols per request
-        
-        # 30-day lookback for stateless history
-        start_date = (now_et - timedelta(days=30)).strftime("%Y-%m-%dT00:00:00Z")
-        
-        for i in range(0, len(valid_contracts), batch_size):
-            batch = valid_contracts[i:i+batch_size]
-            symbols_param = ",".join(batch)
-            
-            trades_url = "https://data.alpaca.markets/v1beta1/options/trades"
-            params = {
-                "symbols": symbols_param,
-                "start": start_date,
-                "limit": 1000
-            }
-            
-            try:
-                trades_resp = requests.get(trades_url, headers=headers, params=params, timeout=15)
-                if trades_resp.status_code == 200:
-                    trades_data = trades_resp.json().get("trades", {})
-                    for option_symbol, trades in trades_data.items():
-                        for trade in trades:
-                            all_trades.append({
-                                "symbol": option_symbol,
-                                "price": float(trade.get("p", 0)),
-                                "size": int(trade.get("s", 0)),
-                                "timestamp": trade.get("t", ""),
-                                "condition": trade.get("c", ""),
-                                "exchange": trade.get("x", "")
-                            })
-            except Exception as e:
-                print(f"Trade fetch error for batch: {e}")
-                continue
-        
-        # Process trades: calculate premium, filter by size, etc.
-        MIN_PREMIUM = 100000  # $100k minimum per trade for significant flow
-        MIN_SIZE = 100  # Minimum contracts per trade
-        
-        # Group trades by contract to apply Tick Test
-        trades_by_contract = {}
-        for trade in all_trades:
-            option_symbol = trade["symbol"]
-            if option_symbol not in trades_by_contract:
-                trades_by_contract[option_symbol] = []
-            trades_by_contract[option_symbol].append(trade)
-            
-        processed_trades = []
-        
-        for option_symbol, contract_trades in trades_by_contract.items():
-            # Sort trades for this contract by timestamp (ascending) for Tick Test
-            contract_trades.sort(key=lambda x: x.get("t", ""))
-            
-            last_price = None
-            last_side = "BUY" # Default starting side
-            
-            parsed = parse_occ(option_symbol)
-            if not parsed:
-                continue
-                
-            snapshot = snapshots.get(option_symbol, {})
-            quote = snapshot.get("latestQuote", {})
-            bid = float(quote.get("bp", 0) or 0)
-            ask = float(quote.get("ap", 0) or 0)
-            
-            # Get Delta from Greeks (Alpaca provides this in snapshots)
-            greeks = snapshot.get("greeks", {})
-            contract_delta = float(greeks.get("delta", 0) or 0)
-            
-            for trade in contract_trades:
-                price = float(trade["price"])
-                size = int(trade["size"])
-                premium = price * size * 100
-                
-                if premium < MIN_PREMIUM or size < MIN_SIZE:
-                    last_price = price # Still update price for tick test
-                    continue
-                
-                # Parse timestamp
-                try:
-                    trade_dt = datetime.fromisoformat(trade["timestamp"].replace("Z", "+00:00"))
-                    trade_dt_et = trade_dt.astimezone(tz_eastern)
-                    trade_time_display = trade_dt_et.strftime("%H:%M:%S")
-                    timestamp = trade_dt_et.timestamp()
-                    is_recent = (now_et - trade_dt_et).total_seconds() < 900 # Last 15 minutes
-                except:
-                    trade_time_display = "N/A"
-                    timestamp = 0
-                    is_recent = False
-                
-                # Side is no longer calculated (removed side cache system)
-                side = None
-                
-                # Calculate moneyness
-                moneyness = None
-                if current_price > 0:
-                    strike = parsed['strike']
-                    is_call = parsed['type'] == 'CALL'
-                    pct_diff = abs(strike - current_price) / current_price * 100
-                    
-                    if pct_diff <= 1:
-                        moneyness = "ATM"
-                    elif (is_call and strike < current_price) or (not is_call and strike > current_price):
-                        moneyness = "ITM"
-                    else:
-                        moneyness = "OTM"
-                
-                trade_data = {
-                    "ticker": symbol,
-                    "strike": parsed['strike'],
-                    "type": parsed['type'],
-                    "expiry": parsed['expiry'],
-                    "premium": f"${premium:,.0f}",
-                    "size": size,
-                    "price": price,
-                    "timestamp": timestamp,
-                    "timeStr": trade_time_display,
-                    "notional_value": premium,
-                    "moneyness": moneyness,
-                    "is_sweep": trade["condition"] == "I",
-                    "is_mega_whale": size >= 500,
-                    "side": side,
-                    "condition": trade["condition"],
-                    "exchange": trade["exchange"],
-                    "delta": contract_delta,  # Delta from Alpaca Greeks
-                    "is_lotto": abs(contract_delta) < 0.20 # Lotto Logic
-                }
-                    
-                processed_trades.append(trade_data)
-        
-        # Sort by timestamp descending (most recent first) for display
-        processed_trades.sort(key=lambda x: x['timestamp'], reverse=True)
-        
-        # Filter: Only show trades from current year (2026)
-        current_year = now_et.year
-        processed_trades = [t for t in processed_trades if datetime.fromtimestamp(t['timestamp'], tz_eastern).year == current_year]
-        
-        # Cache Result
-        LIBRARY_CACHE[cache_key] = {
-            "timestamp": current_time,
-            "data": {"data": processed_trades, "current_price": current_price}
-        }
-        
-        return jsonify({"data": processed_trades, "current_price": current_price})
-
-    except Exception as e:
-        print(f"Library Fetch Error: {e}")
-        return jsonify({"error": str(e)}), 500
+# Setup Whales Service
+whales_service.setup_whales(app, CACHE, POLYGON_API_KEY, firestore_db, WHALE_WATCHLIST, get_cached_price, get_finnhub_price)
 
 if __name__ == "__main__":
-    # Start background worker
-    start_background_worker()
+    # Background worker is already started at module level (line 4795)
+    # start_background_worker()
+    
+    # Polygon WebSocket disabled - using REST snapshot polling instead
+    # (Polygon only allows 1 WS connection per asset class, production uses it)
+    # start_polygon_ws_thread()
     
     port = int(os.environ.get('PORT', 8001))
     print(f"🚀 PigmentOS Server running on port {port}")
-    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)
+    # Disable debug mode for stability
+    app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)

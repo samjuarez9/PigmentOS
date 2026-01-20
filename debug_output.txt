@@ -1,0 +1,9 @@
+✅ Firebase Admin SDK initialized successfully
+📂 Loaded 50 whale trades from cache (Filtered <= 30 DTE)
+📈 Market hours - warming price cache...
+📈 Market hours - warming price cache...
+🚀 Starting Polygon WebSocket (delayed)...
+🧵 Polygon WS Thread Started
+🚀 PigmentOS Server running on port 8001
+ * Serving Flask app 'run'
+ * Debug mode: on

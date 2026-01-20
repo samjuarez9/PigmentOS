@@ -131,7 +131,7 @@
             Lock in your rate and get unlimited access to real-time market intelligence.
         </div>
 
-        <div class="price">$30</div>
+        <div class="price">$15</div>
         <div class="price-label">per month • cancel anytime</div>
 
         <div class="features">
@@ -203,7 +203,7 @@
                 // Track checkout started
                 logEvent(analytics, 'subscription_checkout_started', {
                     user_email_domain: user.email.split('@')[1],
-                    price: '$30/month'
+                    price: '$15/month'
                 });
 
                 const response = await fetch('/api/create-checkout-session', {

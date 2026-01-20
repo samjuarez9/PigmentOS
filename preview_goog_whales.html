@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GOOG Whales Preview</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            background-color: #0a0a0a;
+            color: #e0e0e0;
+            font-family: 'JetBrains Mono', monospace;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .preview-container {
+            width: 100%;
+            max-width: 800px;
+            background: #111;
+            border: 1px solid #333;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .header h2 {
+            margin: 0;
+            color: #9D4EDD;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 16px;
+        }
+
+        .trade-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .trade-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #555;
+            font-family: 'VT323', monospace;
+            font-size: 18px;
+        }
+
+        .trade-item.call {
+            border-left-color: #00ff00;
+        }
+
+        .trade-item.put {
+            border-left-color: #ff0000;
+        }
+
+        .ticker {
+            font-weight: bold;
+            width: 60px;
+        }
+
+        .details {
+            flex-grow: 1;
+            display: flex;
+            gap: 15px;
+        }
+
+        .strike {
+            color: #fff;
+        }
+
+        .expiry {
+            color: #888;
+        }
+
+        .premium {
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        .tags {
+            display: flex;
+            gap: 5px;
+        }
+
+        .tag {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .tag.mega {
+            background: #9D4EDD;
+            color: #fff;
+        }
+
+        .tag.sweep {
+            background: #ff9900;
+            color: #000;
+        }
+
+        .tag.lotto {
+            background: #ffff00;
+            color: #000;
+        }
+
+        .tag.itm {
+            background: #004400;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+        }
+
+        .tag.otm {
+            background: #440000;
+            color: #ff0000;
+            border: 1px solid #ff0000;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="preview-container">
+        <div class="header">
+            <h2>UNUSUAL WHALES: GOOG</h2>
+            <div style="color: #00ff00;">● LIVE</div>
+        </div>
+        <div id="trade-list" class="trade-list">
+            <div style="text-align: center; color: #666;">Loading GOOG trades...</div>
+        </div>
+    </div>
+
+    <script>
+        async function fetchGoogWhales() {
+            try {
+                // Use the dedicated preview endpoint
+                const response = await fetch('/api/preview/goog');
+                const googTrades = await response.json();
+
+                const list = document.getElementById('trade-list');
+                list.innerHTML = '';
+
+                if (googTrades.length === 0) {
+                    list.innerHTML = '<div style="text-align: center; color: #666;">No recent GOOG whales found (Market Closed).</div>';
+                    return;
+                }
+
+                googTrades.forEach(t => {
+                    const isCall = t.putCall === 'C';
+                    const sideClass = isCall ? 'call' : 'put';
+                    const sideIcon = isCall ? '🟢' : '🔴';
+
+                    let tagsHtml = '';
+                    if (t.is_mega_whale) tagsHtml += '<span class="tag mega">MEGA</span>';
+                    if (t.is_sweep) tagsHtml += '<span class="tag sweep">SWEEP</span>';
+                    if (t.is_lotto) tagsHtml += '<span class="tag lotto">LOTTO</span>';
+                    if (t.moneyness === 'ITM') tagsHtml += '<span class="tag itm">ITM</span>';
+                    if (t.moneyness === 'OTM') tagsHtml += '<span class="tag otm">OTM</span>';
+
+                    const item = document.createElement('div');
+                    item.className = `trade-item ${sideClass}`;
+                    item.innerHTML = `
+                    <div class="ticker">${t.baseSymbol}</div>
+                    <div class="details">
+                        <span class="expiry">${t.expirationDate}</span>
+                        <span class="strike">$${t.strikePrice} ${t.putCall}</span>
+                        <span class="premium">${t.premium}</span>
+                        <span style="color: #aaa;">Vol/OI: ${t.vol_oi.toFixed(1)}</span>
+                    </div>
+                    <div class="tags">
+                        ${tagsHtml}
+                    </div>
+                `;
+                    list.appendChild(item);
+                });
+
+            } catch (e) {
+                console.error(e);
+                document.getElementById('trade-list').innerHTML = '<div style="color: red;">Error fetching data</div>';
+            }
+        }
+
+        fetchGoogWhales();
+        setInterval(fetchGoogWhales, 5000);
+    </script>
+
+</body>
+
+</html>

@@ -1491,8 +1491,8 @@ h1 {
 }
 
 #whale-widget-title:hover {
-    color: #FF3366;
-    text-shadow: 0 0 10px rgba(255, 51, 102, 0.5);
+    color: #00FFFF;
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
 }
 
 /* Make whale emoji slightly bigger to match text */
@@ -3851,7 +3851,9 @@ td {
 }
 
 .tag-sweep {
-    color: #00bcd4;
+    color: #7C4DFF;
+    /* Electric Violet - unique, not used elsewhere */
+    text-shadow: 0 0 6px rgba(124, 77, 255, 0.6);
 }
 
 .tag-dump {
@@ -4076,37 +4078,7 @@ td {
     box-shadow: 0 0 8px rgba(0, 200, 83, 0.3);
 }
 
-/* Fixed Discord Button next to X */
-.discord-fixed-btn {
-    position: fixed;
-    top: 35px;
-    left: 100px;
-    /* Offset to sit next to X button */
-    background: rgba(255, 165, 0, 0.2);
-    /* Orange tint */
-    border: 1px solid #FFA500;
-    /* Orange border */
-    color: #FFFFFF;
-    padding: 4px 8px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    text-decoration: none;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    z-index: 900;
-    transition: all 0.2s ease;
-    letter-spacing: 1px;
-    box-shadow: 0 0 10px rgba(255, 165, 0, 0.2);
-}
 
-.discord-fixed-btn:hover {
-    background: #FFA500;
-    /* Solid orange on hover */
-    border-color: #FFA500;
-    color: #FFFFFF;
-    box-shadow: 0 0 15px rgba(255, 165, 0, 0.6);
-}
 
 .delta-up {
     color: #00ff00;
@@ -5448,7 +5420,6 @@ td {
 }
 
 /* Tooltip Styles */
-
 .gamma-tooltip {
     position: fixed;
     background: rgba(0, 0, 0, 0.95);

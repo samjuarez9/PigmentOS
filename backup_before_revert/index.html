@@ -142,7 +142,7 @@
                 <div class="widget" id="unusual-whales">
                     <div class="widget-header">
                         <h2 id="whale-widget-title" style="cursor: pointer;"
-                            onclick="window.location.href='/unusual_flow'">UNUSUAL WHALES <span
+                            onclick="window.location.href='whales.html'">UNUSUAL WHALES <span
                                 class="whale-emoji">🐳</span></h2>
                         <button id="market-status-btn" class="market-status-btn after-market">AFTER MARKET</button>
                         <div class="status-container" id="status-whales">
@@ -175,8 +175,6 @@
                             <option value="MU">MU</option>
                             <option value="ORCL">ORCL</option>
                             <option value="TSM">TSM</option>
-                            <option value="LITE">LITE</option>
-                            <option value="SNDK">SNDK</option>
                         </select>
                         <div class="status-container" id="status-gamma-wall">
                             <span class="status-text">LIVE</span>
@@ -369,7 +367,6 @@
     </a>
 
 
-
     <!-- Sign Out Button - Fixed below X/Discord -->
     <button id="sign-out-btn" class="sign-out-btn">SIGN OUT</button>
 
@@ -469,9 +466,6 @@
         }
 
         onAuthStateChanged(auth, async (user) => {
-            // CLEAR SAFETY TIMEOUT since we have a response
-            clearTimeout(safetyTimeout);
-
             // DEV MODE BYPASS
             const isDevMode = localStorage.getItem('devMode') === 'true' ||
                 window.location.hostname === 'localhost' ||
@@ -490,7 +484,7 @@
             }
 
             // Admin/Owner Bypass
-            const adminEmails = ['sam.juarez092678@gmail.com', 'jaxnailedit@gmail.com', 'gtmichael9218@gmail.com', 'Montoyamiguel35@gmail.com'];
+            const adminEmails = ['sam.juarez092678@gmail.com', 'jaxnailedit@gmail.com', 'gtmichael9218@gmail.com'];
             const userEmailLower = user.email.toLowerCase().trim();
 
             if (adminEmails.map(e => e.toLowerCase()).includes(userEmailLower)) {
@@ -543,7 +537,7 @@
 
                     // Show appropriate UI based on status
                     if (status.status === 'trialing') {
-                        const days = status.days_remaining !== undefined ? status.days_remaining : 3;
+                        const days = status.days_remaining !== undefined ? status.days_remaining : 14;
                         showTrialBanner(days);
 
                         // Integrate with Critical Events (Economic Calendar)
@@ -557,18 +551,13 @@
                     } else if (status.status === 'active') {
                         // Show Billing Button for Paying Customers
                         setupBillingButton(user);
-
-                        // Show VIP Animation if applicable
-                        if (status.is_vip) {
-                            showVipAnimation();
-                        }
                     }
 
                 } catch (error) {
                     // Fail OPEN on any error - user keeps access, we'll check again next time
                     console.warn('Background subscription check failed (user keeps access):', error.name || error.message);
                     // Show default trial banner as fallback so users know they're in trial
-                    showTrialBanner(3);
+                    showTrialBanner(14);
                 }
             }, 100); // Slight delay to ensure dashboard renders first
         });

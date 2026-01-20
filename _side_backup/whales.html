@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIGMENT OS - WHALE RECAP</title>
+    <link rel="stylesheet" href="styles.css?v=3.20">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            overflow: hidden;
+            /* Prevent page scrolling */
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #000;
+            box-sizing: border-box;
+        }
+
+        .recap-container {
+            width: 100%;
+            max-width: 1000px;
+            height: 100%;
+            /* Fill available height */
+            background: #0a0a0a;
+            border: 1px solid #333;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+
+        .recap-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            /* Reduced margin */
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+            /* Reduced padding */
+            flex-shrink: 0;
+        }
+
+        .close-btn {
+            background: #FF3333;
+            color: #fff;
+            border: 2px solid #990000;
+            padding: 3px 5px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 3px 3px 0px #990000;
+            transition: all 0.1s;
+            flex-shrink: 0;
+            align-self: flex-end;
+            margin-bottom: 5px;
+        }
+
+        .close-btn:hover {
+            transform: translate(1px, 1px);
+            box-shadow: 1px 1px 0px #990000;
+            background: #cc0000;
+        }
+
+        #content-area {
+            flex: 1;
+            /* Fill remaining space */
+            overflow-y: auto;
+            /* Scroll internally */
+            min-height: 0;
+            padding-right: 5px;
+        }
+
+        /* Custom Scrollbar */
+        #content-area::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #content-area::-webkit-scrollbar-track {
+            background: #111;
+        }
+
+        #content-area::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 3px;
+        }
+
+        #content-area::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        .ticker-selector {
+            background: #000;
+            color: #fff;
+            border: 1px solid #bc13fe;
+            padding: 4px 8px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 9px;
+            width: auto;
+            min-width: 80px;
+            cursor: pointer;
+            box-shadow: 2px 2px 0px #4a0063;
+            transition: all 0.1s;
+            outline: none;
+        }
+
+        .ticker-selector:hover,
+        .ticker-selector:focus {
+            transform: translate(1px, 1px);
+            box-shadow: 1px 1px 0px #4a0063;
+            background: #0a0a0a;
+        }
+
+        .header-right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 5px;
+        }
+
+        .status-indicator {
+            font-family: 'VT323', monospace;
+            font-size: 20px;
+            color: #ff9900;
+            /* Aftermarket Orange */
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 100px 0;
+            color: #666;
+            font-family: 'VT323', monospace;
+            font-size: 24px;
+            border: 1px dashed #333;
+            border-radius: 4px;
+        }
+
+        /* Chart Placeholder */
+        #chart-placeholder {
+            width: 100%;
+            height: 350px;
+            border: 1px dashed #333;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-family: 'VT323', monospace;
+            font-size: 20px;
+            background: #050505;
+        }
+
+        /* Reuse Widget Styles for List */
+        .whale-list {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            /* Compact gap */
+        }
+
+        .whale-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #111;
+            padding: 4px 8px;
+            /* Compact padding */
+            font-family: 'VT323', monospace;
+            font-size: 14px;
+            /* Smaller font */
+            transition: background 0.2s;
+            min-height: 32px;
+            /* Ensure minimum height */
+        }
+
+        .whale-item:hover {
+            background: #161616;
+        }
+
+        .strike-date-col {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.1;
+            font-size: 13px;
+            /* Smaller strike */
+        }
+
+        .expiry-date {
+            font-size: 9px;
+            /* Smaller date */
+            color: #666;
+        }
+
+        .text-call {
+            color: #00ff00;
+        }
+
+        .text-put {
+            color: #ff0000;
+        }
+
+        .item-main {
+            display: flex;
+            gap: 10px;
+            /* Tighter gap */
+            align-items: center;
+            flex-grow: 1;
+        }
+
+        .item-ticker {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 9px;
+            /* Smaller ticker */
+            width: 50px;
+            /* Smaller width */
+            color: #fff;
+        }
+
+        .item-details {
+            display: flex;
+            gap: 10px;
+            /* Tighter gap */
+            color: #aaa;
+            align-items: center;
+        }
+
+        .highlight-val {
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .vol-oi-col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            line-height: 1;
+        }
+
+        .vol-oi-label {
+            font-size: 8px;
+            /* Smaller label */
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .vol-oi-value {
+            font-size: 11px;
+            /* Smaller value */
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .premium-val {
+            font-size: 13px;
+            /* Smaller premium */
+            font-weight: bold;
+        }
+
+        .premium-call {
+            color: #00ff00;
+        }
+
+        .premium-put {
+            color: #ff0000;
+        }
+
+        .item-tags {
+            display: flex;
+            gap: 4px;
+            /* Tighter tags */
+        }
+
+        .tag {
+            padding: 1px 3px;
+            /* Compact tag padding */
+            font-size: 9px;
+            /* Smaller tag font */
+            border-radius: 2px;
+            font-weight: bold;
+        }
+
+        .tag-mega {
+            background: #9D4EDD;
+            color: #fff;
+        }
+
+        .tag-sweep {
+            background: #ff9900;
+            color: #000;
+        }
+
+        .tag-lotto {
+            background: #ffff00;
+            color: #000;
+        }
+
+        .tag-itm {
+            border: 1px solid #00ff00;
+            color: #00ff00;
+        }
+
+        .tag-otm {
+            border: 1px solid #ff0000;
+            color: #ff0000;
+        }
+
+        .recap-title {
+            font-family: 'VT323', monospace;
+            font-size: 26px;
+            color: #FFFFFF;
+            letter-spacing: 2px;
+            margin: 0;
+            padding-left: 20px;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+        }
+
+        .header-center {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex-grow: 1;
+        }
+
+        .day-selector {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 4px;
+            padding-left: 20px;
+            /* Match title offset on desktop */
+        }
+
+        .day-btn {
+            background: #000;
+            color: #666;
+            border: 1px solid #333;
+            padding: 3px 6px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 8px;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+
+        .day-btn:hover {
+            border-color: #bc13fe;
+            color: #bc13fe;
+        }
+
+        .day-btn.active {
+            background: #bc13fe;
+            color: #000;
+            border-color: #bc13fe;
+            box-shadow: 0 0 5px #bc13fe;
+        }
+
+        .day-btn.disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            border-color: #333;
+            color: #666;
+        }
+
+        @media (max-width: 600px) {
+            .recap-title {
+                font-size: 20px;
+                padding-left: 0;
+                /* Remove offset on mobile */
+            }
+
+            .day-selector {
+                padding-left: 0;
+                /* Remove offset on mobile */
+            }
+
+            .close-btn {
+                font-size: 8px;
+                padding: 3px 5px;
+            }
+
+            .ticker-selector {
+                font-size: 8px;
+                min-width: 60px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="recap-container">
+        <div class="recap-header">
+            <div class="header-center">
+                <div class="day-selector">
+                    <!-- Populated by JS -->
+                </div>
+                <h2 class="recap-title">UNUSUAL FLOW <span class="whale-emoji">🐳</span></h2>
+            </div>
+
+            <div class="header-right">
+                <a href="/" class="close-btn">X</a>
+                <div class="status-container status-live">
+                    <span class="status-text">LIVE</span>
+                    <span class="status-dot">●</span>
+                </div>
+
+                <select id="ticker-select" class="ticker-selector">
+                    <option value="" disabled selected>SELECT</option>
+                    <!-- Equities Only -->
+                    <option value="NVDA">NVDA</option>
+                    <option value="TSLA">TSLA</option>
+                    <option value="AAPL">AAPL</option>
+                    <option value="MSFT">MSFT</option>
+                    <option value="AMZN">AMZN</option>
+                    <option value="GOOG">GOOG</option>
+                    <option value="META">META</option>
+                    <option value="AMD">AMD</option>
+                    <option value="COIN">COIN</option>
+                    <option value="MSTR">MSTR</option>
+                    <option value="PLTR">PLTR</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="chart-container"
+            style="position: relative; height:300px; width:100%; margin-bottom: 20px; background: #050505; border: 1px solid #333; border-radius: 4px;">
+            <canvas id="convictionChart"></canvas>
+            <div id="chart-loading"
+                style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #666; font-family: 'VT323', monospace; display: none;">
+                LOADING...</div>
+        </div>
+
+        <div id="content-area">
+            <div class="empty-state">
+                SELECT A TICKER TO VIEW TODAY'S FLOW
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+
+    <script>
+        const tickerSelect = document.getElementById('ticker-select');
+        const contentArea = document.getElementById('content-area');
+        let currentDate = null; // null = Today/Live
+        let convictionChart = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            renderDaySelector();
+
+            // Ticker Selector Listener
+            tickerSelect.addEventListener('change', () => {
+                fetchWhales();
+            });
+
+            // Initialize empty chart
+            initChart();
+        });
+
+        function initChart() {
+            const ctx = document.getElementById('convictionChart').getContext('2d');
+
+            // Register plugin if needed (annotation plugin is auto-registered usually)
+
+            convictionChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: []
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    backgroundColor: '#050505',
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#888',
+                                font: { family: "'VT323', monospace", size: 14 }
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(0,0,0,0.9)',
+                            titleColor: '#fff',
+                            bodyColor: '#ccc',
+                            borderColor: '#333',
+                            borderWidth: 1,
+                            titleFont: { family: "'VT323', monospace" },
+                            bodyFont: { family: "'VT323', monospace" }
+                        },
+                        annotation: {
+                            annotations: {}
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: '#222' },
+                            ticks: { color: '#888', font: { family: "'VT323', monospace" } }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            grid: { color: '#222' },
+                            ticks: { color: '#888', font: { family: "'VT323', monospace" } },
+                            title: { display: true, text: 'Volume', color: '#555', font: { size: 10 } }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: '#00FFFF', font: { family: "'VT323', monospace" } },
+                            title: { display: true, text: 'Open Interest', color: '#005555', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderDaySelector() {
+            const container = document.querySelector('.day-selector');
+            if (!container) return;
+
+            container.innerHTML = '';
+
+            const days = ['MON', 'TUE', 'WED', 'THU', 'FRI'];
+            const today = new Date();
+            const currentDay = today.getDay(); // 0=Sun, 1=Mon...
+
+            // Calculate Monday of this week
+            const monday = new Date(today);
+            const dayShift = today.getDay() === 0 ? 6 : today.getDay() - 1;
+            monday.setDate(today.getDate() - dayShift);
+
+            let lastValidBtn = null;
+
+            days.forEach((dayName, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'day-btn';
+                btn.textContent = dayName;
+
+                // Calculate date for this button
+                const btnDate = new Date(monday);
+                btnDate.setDate(monday.getDate() + index);
+                const dateStr = btnDate.toISOString().split('T')[0];
+                const todayStr = today.toISOString().split('T')[0];
+
+                // Check if future OR if today but before 4:30 PM
+                // Reset time to midnight for comparison
+                const compareDate = new Date(btnDate);
+                compareDate.setHours(0, 0, 0, 0);
+                const compareToday = new Date(today);
+                compareToday.setHours(0, 0, 0, 0);
+
+                const isToday = dateStr === todayStr;
+                // 16:30 = 4:30 PM
+                const marketCloseHour = 16;
+                const marketCloseMinute = 30;
+                const now = new Date();
+                const isBeforeClose = (now.getHours() < marketCloseHour) ||
+                    (now.getHours() === marketCloseHour && now.getMinutes() < marketCloseMinute);
+
+                let isDisabled = false;
+                if (compareDate > compareToday) {
+                    isDisabled = true;
+                } else if (isToday && isBeforeClose) {
+                    isDisabled = true; // Disable today if before 4:30 PM
+                }
+
+                if (isDisabled) {
+                    btn.classList.add('disabled');
+                } else {
+                    lastValidBtn = btn; // Track latest valid button
+                    btn.onclick = () => {
+                        document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+
+                        // If today, set to null (live), else set date string
+                        currentDate = (dateStr === todayStr) ? null : dateStr;
+
+                        // Update status text
+                        const statusContainer = document.querySelector('.status-container');
+                        const statusText = document.querySelector('.status-text');
+
+                        if (currentDate) {
+                            statusText.textContent = "HISTORY";
+                            statusContainer.classList.remove('status-live');
+                            statusContainer.style.borderColor = '#bc13fe';
+                            statusText.style.color = '#bc13fe';
+                        } else {
+                            statusText.textContent = "LIVE";
+                            statusContainer.classList.add('status-live');
+                            statusContainer.style.borderColor = '#ff9900';
+                            statusText.style.color = '#ff9900';
+                        }
+
+                        fetchWhales();
+                    };
+                }
+
+                container.appendChild(btn);
+            });
+
+            // Set Default Active (Latest Valid Day)
+            if (lastValidBtn) {
+                // Trigger click to set active state and currentDate
+                lastValidBtn.click();
+            }
+        }
+
+        async function fetchWhales() {
+            const symbol = tickerSelect.value;
+            if (!symbol) return;
+
+            // Show Loading
+            contentArea.innerHTML = '<div class="empty-state">FETCHING DATA...</div>';
+
+            try {
+                let url = `/api/whales/rest?symbol=${symbol}`;
+                if (currentDate) {
+                    url += `&date=${currentDate}`;
+                }
+
+                const response = await fetch(url);
+                const result = await response.json();
+                const trades = result.data || [];
+
+                if (!trades || trades.length === 0) {
+                    contentArea.innerHTML = `<div class="empty-state">NO FLOW FOUND FOR ${symbol}</div>`;
+                    return;
+                }
+
+                renderTrades(trades);
+
+            } catch (err) {
+                console.error(err);
+                contentArea.innerHTML = '<div class="empty-state" style="color: #ff3333;">ERROR FETCHING DATA</div>';
+            }
+        }
+
+        function renderTrades(trades) {
+            contentArea.innerHTML = '';
+            const list = document.createElement('div');
+            list.className = 'whale-list';
+
+            trades.forEach(t => {
+                const isCall = t.putCall === 'C';
+                const sideClass = isCall ? 'call' : 'put';
+                const textClass = isCall ? 'text-call' : 'text-put';
+
+                // Format Date: YYYY-MM-DD -> MM/DD
+                const dateStr = t.expirationDate ? t.expirationDate.slice(5).replace('-', '/') : '';
+
+                let tagsHtml = '';
+                if (t.is_mega_whale) tagsHtml += '<span class="tag tag-mega">MEGA</span>';
+                if (t.is_sweep) tagsHtml += '<span class="tag tag-sweep">SWEEP</span>';
+                if (t.is_lotto) tagsHtml += '<span class="tag tag-lotto">LOTTO 🎰</span>';
+
+                let moneynessHtml = '';
+                if (t.moneyness === 'ITM') moneynessHtml = '<span class="tag tag-itm">ITM</span>';
+                if (t.moneyness === 'OTM') moneynessHtml = '<span class="tag tag-otm">OTM</span>';
+
+                // Delta Bar Logic
+                const delta = t.delta || 0;
+                const deltaPercent = Math.min(Math.abs(delta * 100), 100);
+                const deltaLabel = Math.abs(delta).toFixed(2).replace(/^0+/, '');
+
+                const deltaHtml = `
+                    <div class="delta-wrapper">
+                        <span class="delta-label">${deltaLabel}</span>
+                        <div class="delta-bar-mini">
+                            <div class="delta-bar-fill" style="width: ${deltaPercent}%;"></div>
+                        </div>
+                    </div>
+                `;
+
+                const premiumClass = isCall ? 'premium-call' : 'premium-put';
+
+                const item = document.createElement('div');
+                item.className = `whale-item`;
+
+                // Add click handler for Conviction Chart
+                // We need the full contract symbol (e.g. O:AMD...) but 't' might only have base props
+                // The backend usually returns 'symbol' as the contract ticker
+                const contractSymbol = t.symbol;
+                // Use currentDate if set, otherwise today's date
+                const tradeDate = currentDate || new Date().toISOString().split('T')[0];
+
+                item.onclick = () => {
+                    // Highlight selected
+                    document.querySelectorAll('.whale-item').forEach(i => i.style.background = '');
+                    item.style.background = '#222';
+                    // Pass t.openInterest as initial_oi
+                    fetchConviction(contractSymbol, tradeDate, t.putCall, t.openInterest);
+                };
+
+                item.innerHTML = `
+                    <div class="item-main">
+                        <div class="item-ticker">${t.baseSymbol}</div>
+                        <div class="item-details">
+                            <span class="premium-val ${premiumClass}">${t.premium}</span>
+                            <div class="strike-date-col">
+                                <span class="${textClass}">$${t.strikePrice} ${t.putCall}</span>
+                                <span class="expiry-date">${dateStr}</span>
+                            </div>
+                            <div class="vol-oi-col">
+                                <span class="vol-oi-label">Vol/OI</span>
+                                <span class="vol-oi-value">${t.vol_oi.toFixed(1)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="item-tags">
+                        ${deltaHtml}
+                        ${moneynessHtml}
+                        ${tagsHtml}
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+
+            contentArea.appendChild(list);
+        }
+
+        async function fetchConviction(ticker, date, type, initialOi) {
+            const loading = document.getElementById('chart-loading');
+            loading.style.display = 'block';
+
+            try {
+                // Pass initial_oi to backend
+                const res = await fetch(`/api/whales/conviction?ticker=${ticker}&date=${date}&initial_oi=${initialOi || 0}`);
+                const data = await res.json();
+
+                loading.style.display = 'none';
+
+                if (data.error) {
+                    console.error(data.error);
+                    return;
+                }
+
+                updateChart(data, type);
+
+            } catch (e) {
+                console.error(e);
+                loading.style.display = 'none';
+            }
+        }
+
+        function updateChart(data, type) {
+            if (!convictionChart) return;
+
+            const isCall = type === 'C';
+            const volColor = isCall ? '#00FF00' : '#FF0000'; // Neon Green / Red
+
+            const day1 = data.day1;
+            const day2 = data.day2;
+            const history = data.history || [];
+
+            // Combine Data
+            const labels = [];
+            const volumes = [];
+            const ois = [];
+
+            // 1. History (Baseline)
+            history.forEach(h => {
+                labels.push(formatDate(h.date));
+                volumes.push(h.volume);
+                ois.push(null); // No OI for history
+            });
+
+            // 2. Day 1 (Trade)
+            labels.push(formatDate(day1.date));
+            volumes.push(day1.volume);
+            ois.push(day1.oi);
+
+            // 3. Day 2 (Follow-through)
+            let day2Label = formatDate(day2.date);
+            if (day2.pending) {
+                day2Label += " (PENDING)";
+            }
+            labels.push(day2Label);
+            volumes.push(day2.volume);
+            ois.push(day2.oi);
+
+            // Annotation Label
+            let labelText = data.label || "";
+            let labelColor = '#888';
+            if (labelText.includes("OPENED")) labelColor = '#00FF00';
+            else if (labelText.includes("CLOSED")) labelColor = '#FF3333';
+
+            convictionChart.data = {
+                labels: labels,
+                datasets: [
+                    {
+                        type: 'bar',
+                        label: 'Volume',
+                        data: volumes,
+                        backgroundColor: volColor,
+                        borderColor: volColor,
+                        borderWidth: 1,
+                        maxBarThickness: 40,
+                        yAxisID: 'y',
+                        order: 2
+                    },
+                    {
+                        type: 'line',
+                        label: 'Open Interest',
+                        data: ois,
+                        borderColor: '#00FFFF', // Cyan
+                        borderDash: [5, 5],
+                        borderWidth: 2,
+                        pointBackgroundColor: '#00FFFF',
+                        pointRadius: 4,
+                        yAxisID: 'y1',
+                        order: 1,
+                        tension: 0.1
+                    }
+                ]
+            };
+
+            // Update Annotation
+            convictionChart.options.plugins.annotation.annotations = {
+                label1: {
+                    type: 'label',
+                    xValue: 0.5,
+                    yValue: 'center', // Centered vertically? Or top?
+                    position: 'top',
+                    content: [labelText],
+                    color: labelColor,
+                    font: {
+                        family: "'Press Start 2P', cursive",
+                        size: 12
+                    },
+                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    padding: 6,
+                    borderRadius: 4
+                }
+            };
+
+            convictionChart.update();
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return "N/A";
+            const d = new Date(dateStr);
+            // Adjust for timezone offset to prevent off-by-one
+            const userTimezoneOffset = d.getTimezoneOffset() * 60000;
+            const adjustedDate = new Date(d.getTime() + userTimezoneOffset);
+
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            return `${days[adjustedDate.getDay()]} ${months[adjustedDate.getMonth()]} ${adjustedDate.getDate()}`;
+        }
+    </script>
+
+</body>
+
+</html>
