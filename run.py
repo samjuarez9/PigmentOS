@@ -1911,6 +1911,7 @@ def create_checkout_session():
 @limiter.limit("30 per minute")
 def subscription_status():
     """Check if user has active subscription or valid trial - SERVER-SIDE VERIFIED"""
+    print(f"🔍 Checking subscription status... TRIAL_DAYS={TRIAL_DAYS}")
     try:
         # 1. VERIFY FIREBASE TOKEN (don't trust client-sent email)
         auth_header = request.headers.get('Authorization', '')
@@ -2005,6 +2006,7 @@ def subscription_status():
                         now_ts = datetime.now().timestamp()
                         elapsed_days = int((now_ts - start_ts) / 86400)
                         days_remaining = max(0, TRIAL_DAYS - elapsed_days)
+                        print(f"   Firestore: {user_email} trial_start={trial_start}, elapsed={elapsed_days}, remaining={days_remaining}")
                     else:
                         # Initialize trialStartDate if missing
                         user_ref.update({'trialStartDate': firestore.SERVER_TIMESTAMP})
@@ -2122,6 +2124,8 @@ def subscription_status():
                     'reason': 'trial_expired'
                 })
             
+            print(f"⚠️ GRANTING ACCESS (Auto-Migration): {user_email} days_remaining={days_remaining}")
+            
             return jsonify({
                 'status': 'trialing',
                 'days_remaining': days_remaining,
@@ -2132,21 +2136,19 @@ def subscription_status():
 
         except Exception as stripe_e:
             print(f"Stripe Auto-Migration Error: {stripe_e}")
-            # Fail Open if Stripe is down
+            # Fail CLOSED on error to prevent unauthorized access
             return jsonify({
-                'status': 'trialing',
-                'days_remaining': 1,
-                'has_access': True,
+                'status': 'error',
+                'has_access': False,
                 'error': str(stripe_e)
             })
         
     except Exception as e:
         print(f"Subscription status error: {e}")
-        # Fail OPEN on general error to prevent lockout
+        # Fail CLOSED on error
         return jsonify({
-            'status': 'trialing',
-            'days_remaining': 1,
-            'has_access': True,
+            'status': 'error',
+            'has_access': False,
             'error': str(e)
         })
 

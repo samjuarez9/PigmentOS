@@ -533,8 +533,8 @@
                     console.log('Subscription status response:', status);
 
                     // ONLY redirect if we DEFINITIVELY know they're expired
-                    // (has_access is explicitly false, not undefined or error)
-                    if (status.has_access === false && !status.error) {
+                    // (has_access is explicitly false)
+                    if (status.has_access === false) {
                         logEvent(analytics, 'trial_expired', { user_email_domain: user.email.split('@')[1] });
                         logEvent(analytics, 'paywall_hit', { source: 'dashboard', reason: 'trial_expired' });
                         window.location.href = '/upgrade.html?expired=true';
