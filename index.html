@@ -141,9 +141,9 @@
             <div class="column left-col">
                 <div class="widget" id="unusual-whales">
                     <div class="widget-header">
-                        <a href="/unusual_flow" style="text-decoration: none;">
-                            <h2 id="whale-widget-title">UNUSUAL WHALES <span class="whale-emoji">🐳</span></h2>
-                        </a>
+                        <!-- <a href="/unusual_flow" style="text-decoration: none;"> -->
+                        <h2 id="whale-widget-title">UNUSUAL WHALES <span class="whale-emoji">🐳</span></h2>
+                        <!-- </a> -->
                         <button id="market-status-btn" class="market-status-btn after-market">AFTER MARKET</button>
                         <div class="status-container" id="status-whales">
                             <span class="status-text">LIVE</span>
@@ -356,6 +356,7 @@
             <div class="wifi-bar" data-bar="4"></div>
         </div>
         <div class="inline-metric" id="latency-value">--ms</div>
+        <div id="vip-badge" class="vip-badge" style="display: none;">👑 VIP</div>
     </div>
 
     <!-- X (Twitter) Link Button - Fixed below Diagnostics -->
@@ -481,6 +482,10 @@
                 hideLoadingScreen();
                 document.body.style.visibility = 'visible';
                 setupBillingButton(null); // Show disabled button
+
+                // Show VIP Badge in Dev Mode
+                const vipBadge = document.getElementById('vip-badge');
+                if (vipBadge) vipBadge.style.display = 'flex';
                 return;
             }
 
@@ -531,6 +536,7 @@
                     clearTimeout(timeoutId);
                     const status = await response.json();
                     console.log('Subscription status response:', status);
+                    console.log('Is VIP?', status.is_vip);
 
                     // ONLY redirect if we DEFINITIVELY know they're expired
                     // (has_access is explicitly false)
@@ -559,6 +565,8 @@
                         // Show VIP Animation if applicable
                         if (status.is_vip) {
                             showVipAnimation();
+                            const vipBadge = document.getElementById('vip-badge');
+                            if (vipBadge) vipBadge.style.display = 'flex';
                         }
                     }
 

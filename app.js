@@ -2148,6 +2148,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let triggerStrike = null; // Max absolute negative GEX (volatile)
         let maxNegGex = 0;
 
+        // === UNUSUAL VOL/OI TRACKING ===
+        // 🐋 Whale Strike: Highest Vol/OI ratio indicates aggressive new positioning
+        let unusualStrike = null;
+        let maxVolOi = 0;
+
         data.strikes.forEach(s => {
             if ((s.call_vol || 0) > maxCallVol) maxCallVol = s.call_vol;
             if ((s.put_vol || 0) > maxPutVol) maxPutVol = s.put_vol;
@@ -2163,6 +2168,20 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (netGex < 0 && Math.abs(netGex) > maxNegGex) {
                 maxNegGex = Math.abs(netGex);
                 triggerStrike = s.strike;
+            }
+
+            // Track highest Vol/OI ratio (unusual activity)
+            // Require minimum OI to avoid noise from low-liquidity strikes
+            const totalVol = (s.call_vol || 0) + (s.put_vol || 0);
+            const totalOi = (s.call_oi || 0) + (s.put_oi || 0);
+            if (totalOi >= 500 && totalVol > 0) {
+                const volOiRatio = totalVol / totalOi;
+                if (volOiRatio > maxVolOi) {
+                    maxVolOi = volOiRatio;
+                    unusualStrike = s.strike;
+                    // Track if put or call dominant for emoji selection
+                    window.unusualStrikeIsPutHeavy = (s.put_vol || 0) > (s.call_vol || 0);
+                }
             }
         });
 
@@ -2219,6 +2238,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Is this the Trigger strike (max negative GEX - volatile)?
             const isTrigger = strikeData.strike === triggerStrike && maxNegGex > 0;
 
+            // Is this the Unusual strike (highest Vol/OI - aggressive positioning)?
+            const isUnusual = strikeData.strike === unusualStrike && maxVolOi >= 1.5;
+
             if (row) {
                 // Update Height
                 row.style.height = `${rowHeight}px`;
@@ -2261,10 +2283,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     const hasTrigger = currentText.startsWith(triggerPrefix);
                     const baseStrike = strikeData.strike.toFixed(1);
 
-                    // Determine what prefix should be shown (priority: Magnet > Trigger)
+                    // Determine what prefix should be shown (priority: Unusual > Magnet > Trigger)
+                    // Unusual: 🐻 if PUT volume > CALL volume (bearish), 🐋 otherwise (bullish)
+                    const isPutHeavy = window.unusualStrikeIsPutHeavy || false;
+                    const unusualPrefix = isPutHeavy ? '🐻 ' : '🐋 ';
                     let newPrefix = '';
                     let newClass = '';
-                    if (isMagnet) {
+                    if (isUnusual) {
+                        newPrefix = unusualPrefix;
+                        newClass = isPutHeavy ? 'unusual-strike bearish' : 'unusual-strike';
+                    } else if (isMagnet) {
                         newPrefix = magnetPrefix;
                         newClass = 'magnet-strike';
                     } else if (isTrigger) {
@@ -2273,14 +2301,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     // Update if changed
-                    const hasAnyPrefix = hasMagnet || hasTrigger;
+                    const hasUnusual = currentText.startsWith(unusualPrefix);
+                    const hasAnyPrefix = hasMagnet || hasTrigger || hasUnusual;
                     if (newPrefix && !currentText.startsWith(newPrefix)) {
                         strikeLabel.textContent = newPrefix + baseStrike;
-                        strikeLabel.classList.remove('magnet-strike', 'trigger-strike', 'max-gex-strike');
+                        strikeLabel.classList.remove('magnet-strike', 'trigger-strike', 'unusual-strike', 'max-gex-strike');
                         strikeLabel.classList.add(newClass);
                     } else if (!newPrefix && hasAnyPrefix) {
                         strikeLabel.textContent = baseStrike;
-                        strikeLabel.classList.remove('magnet-strike', 'trigger-strike', 'max-gex-strike');
+                        strikeLabel.classList.remove('magnet-strike', 'trigger-strike', 'unusual-strike', 'max-gex-strike');
                     }
                 }
 
@@ -2322,10 +2351,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const putVolLabel = putWidth >= 5 ? `<span class="gamma-vol-label put-label">${formatVol(strikeData.put_vol)}</span>` : '';
                 const callVolLabel = callWidth >= 5 ? `<span class="gamma-vol-label call-label">${formatVol(strikeData.call_vol)}</span>` : '';
 
-                // Add Magnet (🧲) or Trigger (🚀) emoji based on GEX polarity
+                // Add Unusual (🐻/🐋), Magnet (🧲), or Trigger (🚀) emoji based on activity
+                // Unusual: 🐻 if PUT volume > CALL volume (bearish), 🐋 otherwise (bullish)
                 let strikeDisplay = strikeData.strike.toFixed(1);
                 let strikeClass = 'gamma-strike';
-                if (isMagnet) {
+                if (isUnusual) {
+                    const isPutHeavy = window.unusualStrikeIsPutHeavy || false;
+                    const unusualEmoji = isPutHeavy ? '🐻' : '🐋';
+                    strikeDisplay = `${unusualEmoji} ${strikeData.strike.toFixed(1)}`;
+                    strikeClass = isPutHeavy ? 'gamma-strike unusual-strike bearish' : 'gamma-strike unusual-strike';
+                } else if (isMagnet) {
                     strikeDisplay = `🧲 ${strikeData.strike.toFixed(1)}`;
                     strikeClass = 'gamma-strike magnet-strike';
                 } else if (isTrigger) {
@@ -2457,6 +2492,10 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="tooltip-row">
                 <span class="tooltip-label">💸 EST. FLOW:</span>
                 <span class="tooltip-value">${formatMoney(notional)}</span>
+            </div>
+            <div class="tooltip-row">
+                <span class="tooltip-label">📊 VOLUME:</span>
+                <span class="tooltip-value">${vol ? vol.toLocaleString() : 'N/A'}</span>
             </div>
             <div class="tooltip-row">
                 <span class="tooltip-label">OPEN INT:</span>

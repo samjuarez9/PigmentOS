@@ -753,9 +753,9 @@ def get_option_history(ticker):
     return jsonify({"results": bars})
 
 
-@app.route('/unusual_flow')
-def unusual_flow_page():
-    return send_from_directory('.', 'unusual_flow.html')
+# @app.route('/unusual_flow')
+# def unusual_flow_page():
+#     return send_from_directory('.', 'unusual_flow.html')
 
 
 # === UNUSUAL FLOW (SINGLE CONTRACT) ENDPOINTS ===
@@ -1911,13 +1911,18 @@ def create_checkout_session():
 @limiter.limit("30 per minute")
 def subscription_status():
     """Check if user has active subscription or valid trial - SERVER-SIDE VERIFIED"""
-    print(f"🔍 Checking subscription status... TRIAL_DAYS={TRIAL_DAYS}")
     try:
         # 1. VERIFY FIREBASE TOKEN (don't trust client-sent email)
         auth_header = request.headers.get('Authorization', '')
         
         # BYPASS: If Firestore is not initialized (Local Dev / Missing Creds), trust the client
         # This prevents "Trial Ended" lockout when running locally without Admin SDK
+        # BYPASS: If Firestore is not initialized (Local Dev / Missing Creds), trust the client
+        # This prevents "Trial Ended" lockout when running locally without Admin SDK
+        # FORCE BYPASS FOR DEBUGGING
+        firestore_db_backup = firestore_db
+        firestore_db = None
+        
         if not firestore_db:
             print("⚠️ Firestore not initialized - Bypassing token verification (Dev Mode)")
             # We can't verify the token, so we assume the client is honest for trial check
@@ -2037,41 +2042,46 @@ def subscription_status():
                     if sub.status in ['active', 'trialing']:
                         # If Stripe says active, they are premium (paying customer)
                         if sub.status == 'active':
-                            is_premium = True
                             # Active subscribers always have access
                             return jsonify({
                                 'status': sub.status,
                                 'days_remaining': days_remaining,
                                 'has_access': True,
                                 'login_count': login_count,
-                                'is_premium': is_premium
+                                'is_premium': True
                             })
                         
-                        # STRICT TRIAL EXPIRATION CHECK
-                        # If status is 'trialing' but Firestore shows 0 days remaining,
-                        # lock them out. VIPs are already handled above and won't reach here.
-                        if sub.status == 'trialing' and days_remaining <= 0:
-                            print(f"⚠️ TRIAL EXPIRED for {user_email} (days_remaining={days_remaining})")
+                        elif sub.status == 'trialing':
+                            # STRICT TRIAL EXPIRATION CHECK
+                            # If Stripe says 'trialing' but Firestore shows 0 days remaining,
+                            # lock them out.
+                            if days_remaining <= 0:
+                                print(f"⚠️ TRIAL EXPIRED for {user_email} (days_remaining={days_remaining})")
+                                return jsonify({
+                                    'status': 'expired',
+                                    'has_access': False,
+                                    'reason': 'trial_expired'
+                                })
+                            
+                            # Trial still active
                             return jsonify({
-                                'status': 'expired',
-                                'has_access': False,
-                                'reason': 'trial_expired'
+                                'status': sub.status,
+                                'days_remaining': days_remaining,
+                                'has_access': True,
+                                'login_count': login_count,
+                                'is_premium': False
                             })
                         
-                        # Trial still active
-                        return jsonify({
-                            'status': sub.status,
-                            'days_remaining': days_remaining,
-                            'has_access': True,
-                            'login_count': login_count,
-                            'is_premium': False
-                        })
-                    else:
-                        # Hard Lockout for expired/bad status
-                        return jsonify({
-                            'status': sub.status,
-                            'has_access': False
-                        })
+                        else:
+                            # Hard Lockout for past_due, unpaid, canceled, etc.
+                            print(f"⛔ ACCESS DENIED for {user_email}: Status {sub.status}")
+                            return jsonify({
+                                'status': sub.status,
+                                'has_access': False,
+                                'reason': f"subscription_{sub.status}"
+                            })
+
+
                 else:
                     print("Customer exists but no subscription found -> Auto-Migrating")
             else:

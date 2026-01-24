@@ -16,10 +16,10 @@ STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 FIREBASE_CREDENTIALS_B64 = os.environ.get("FIREBASE_CREDENTIALS_B64", "")
 
 # Product Configuration
-STRIPE_PRICE_ID = "price_1SqHVEGh2zQhHuervW1gZa30"  # $30/month (LIVE)
+STRIPE_PRICE_ID = "price_1SdWyEGh2zQhHuersehF6t0x"  # $15/month (LIVE)
 
 # Trial Configuration
-TRIAL_DAYS = 0
+TRIAL_DAYS = 3
 
 # URLs
 SUCCESS_URL = "https://pigmentos.onrender.com/dashboard?session_id={CHECKOUT_SESSION_ID}"

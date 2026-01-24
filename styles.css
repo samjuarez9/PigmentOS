@@ -2522,6 +2522,21 @@ td {
     }
 }
 
+/* Unusual Strike (Highest Vol/OI - Aggressive Positioning) */
+.unusual-strike {
+    color: #00E5CC !important;
+    /* Aqua/Teal */
+    font-weight: bold;
+    text-shadow: 0 0 8px rgba(0, 229, 204, 0.7);
+}
+
+/* Bearish Unusual Strike (Below Current Price) */
+.unusual-strike.bearish {
+    color: #FF6B9D !important;
+    /* Pink for bearish */
+    text-shadow: 0 0 8px rgba(255, 107, 157, 0.7);
+}
+
 /* Legacy class (for backwards compatibility) */
 .max-gex-strike {
     color: #FFD700 !important;
@@ -5671,9 +5686,10 @@ td {
     opacity: 0.7;
 }
 
-/* Ghost Mode: Magnet/Trigger strikes remain bright */
+/* Ghost Mode: Magnet/Trigger/Unusual strikes remain bright */
 .gamma-ghost-mode .magnet-strike,
-.gamma-ghost-mode .trigger-strike {
+.gamma-ghost-mode .trigger-strike,
+.gamma-ghost-mode .unusual-strike {
     opacity: 1 !important;
 }
 
@@ -7267,4 +7283,51 @@ td {
     font-family: 'Courier New', monospace;
     font-size: 10px;
     color: #444;
+}
+
+/* === VIP BADGE === */
+.vip-badge {
+    background: rgba(255, 215, 0, 0.15);
+    /* Gold tint */
+    border: 1px solid #FFD700;
+    /* Gold border */
+    color: #FFD700;
+    font-family: 'JetBrains Mono', monospace;
+    /* Match other buttons */
+    font-size: 9px;
+    font-weight: bold;
+    padding: 2px 6px;
+    /* Thinner padding */
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: default;
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+    text-shadow: none;
+    animation: pulse-gold-border 2s infinite;
+    margin-left: 10px;
+    letter-spacing: 1px;
+}
+
+.vip-badge:hover {
+    background: #FFD700;
+    color: #000;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
+}
+
+@keyframes pulse-gold-border {
+    0% {
+        box-shadow: 0 0 5px rgba(255, 215, 0, 0.3);
+        border-color: #FFD700;
+    }
+
+    50% {
+        box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+        border-color: #FFA500;
+    }
+
+    100% {
+        box-shadow: 0 0 5px rgba(255, 215, 0, 0.3);
+        border-color: #FFD700;
+    }
 }
