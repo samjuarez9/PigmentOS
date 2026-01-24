@@ -753,9 +753,9 @@ def get_option_history(ticker):
     return jsonify({"results": bars})
 
 
-# @app.route('/unusual_flow')
-# def unusual_flow_page():
-#     return send_from_directory('.', 'unusual_flow.html')
+@app.route('/unusual_flow')
+def unusual_flow_page():
+    return send_from_directory('.', 'unusual_flow.html')
 
 
 # === UNUSUAL FLOW (SINGLE CONTRACT) ENDPOINTS ===

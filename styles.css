@@ -7287,24 +7287,20 @@ td {
 
 /* === VIP BADGE === */
 .vip-badge {
-    background: rgba(255, 215, 0, 0.15);
-    /* Gold tint */
-    border: 1px solid #FFD700;
-    /* Gold border */
+    background: transparent;
+    border: none;
     color: #FFD700;
     font-family: 'JetBrains Mono', monospace;
-    /* Match other buttons */
     font-size: 9px;
     font-weight: bold;
     padding: 2px 6px;
-    /* Thinner padding */
     display: flex;
     align-items: center;
     gap: 4px;
     cursor: default;
-    box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+    box-shadow: none;
     text-shadow: none;
-    animation: pulse-gold-border 2s infinite;
+    animation: none;
     margin-left: 10px;
     letter-spacing: 1px;
 }

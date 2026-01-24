@@ -2046,7 +2046,39 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Show the specific date (e.g., "FRI DEC 20")
                 html += ` <span class="today-badge-orange">${dateLabel}</span>`;
             } else if (data.time_period === 'weekend') {
-                html += ` <span class="monday-badge">MON</span>`;
+                const indices = ['SPY', 'QQQ', 'IWM', 'DIA'];
+                const ticker = data.symbol || currentGammaTicker;
+                const isIndex = indices.includes(ticker);
+
+                if (!isIndex) {
+                    // For stocks, show next Friday (Weekly Expiry)
+                    const today = new Date();
+                    const dayOfWeek = today.getDay(); // 0 (Sun) - 6 (Sat)
+                    // Calculate days until next Friday
+                    // If Sat (6) -> +6 days = Friday
+                    // If Sun (0) -> +5 days = Friday
+                    let daysUntilFriday = 5 - dayOfWeek;
+                    if (daysUntilFriday <= 0) daysUntilFriday += 7;
+
+                    const nextFriday = new Date(today);
+                    nextFriday.setDate(today.getDate() + daysUntilFriday);
+
+                    const day = nextFriday.getDate();
+                    const getSuffix = (d) => {
+                        if (d > 3 && d < 21) return 'th';
+                        switch (d % 10) {
+                            case 1: return "st";
+                            case 2: return "nd";
+                            case 3: return "rd";
+                            default: return "th";
+                        }
+                    };
+
+                    const dateStr = `FRI ${day}${getSuffix(day)}`;
+                    html += ` <span class="today-badge-orange">${dateStr}</span>`;
+                } else {
+                    html += ` <span class="monday-badge">MON</span>`;
+                }
             } else if (data.time_period === 'after_hours') {
                 html += ` <span class="today-badge-green">TODAY</span>`;
             } else if (data.time_period === 'pre_market') {
