@@ -12,6 +12,11 @@ import socket
 # Set global timeout to prevent hanging requests (e.g. blocked yfinance)
 socket.setdefaulttimeout(5)
 
+import warnings
+# Suppress Pandas/yfinance FutureWarnings to clean up logs
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
+
 import yfinance as yf
 # Set cache to /tmp for Render compatibility
 try:
@@ -2088,7 +2093,6 @@ def subscription_status():
                     stripe.Subscription.create(
                         customer=customer.id,
                         items=[{'price': STRIPE_PRICE_ID}],
-                        trial_period_days=TRIAL_DAYS,
                         payment_behavior='default_incomplete',
                         metadata={'firebase_uid': uid, 'source': 'auto_migration'}
                     )

@@ -141,7 +141,9 @@
             <div class="column left-col">
                 <div class="widget" id="unusual-whales">
                     <div class="widget-header">
-                        <h2 id="whale-widget-title">UNUSUAL WHALES <span class="whale-emoji">🐳</span></h2>
+                        <a href="/unusual_flow" style="text-decoration: none;">
+                            <h2 id="whale-widget-title">UNUSUAL WHALES <span class="whale-emoji">🐳</span></h2>
+                        </a>
                         <button id="market-status-btn" class="market-status-btn after-market">AFTER MARKET</button>
                         <div class="status-container" id="status-whales">
                             <span class="status-text">LIVE</span>
@@ -514,7 +516,7 @@
 
                     // Use AbortController for timeout
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+                    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
 
                     const response = await fetch('/api/subscription-status', {
                         method: 'POST',
@@ -542,8 +544,6 @@
                     // Show appropriate UI based on status
                     if (status.status === 'trialing') {
                         const days = status.days_remaining !== undefined ? status.days_remaining : 3;
-                        showTrialBanner(days);
-
                         // Integrate with Critical Events (Economic Calendar)
                         if (window.economicCalendar && window.economicCalendar.addTrialAlert) {
                             window.economicCalendar.addTrialAlert(days);
@@ -565,46 +565,11 @@
                 } catch (error) {
                     // Fail OPEN on any error - user keeps access, we'll check again next time
                     console.warn('Background subscription check failed (user keeps access):', error.name || error.message);
-                    // Show default trial banner as fallback so users know they're in trial
-                    showTrialBanner(3);
                 }
             }, 100); // Slight delay to ensure dashboard renders first
         });
 
-        function showTrialBanner(days) {
-            const banner = document.createElement('div');
-            banner.id = 'trial-banner';
-            banner.innerHTML = `🎁 Free Trial: ${days} days remaining <a href="/upgrade.html" id="upgrade-link" style="color: #00FFFF; text-decoration: underline; margin-left: 20px;">Upgrade Now →</a>`;
-            banner.style.cssText = 'position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; background: linear-gradient(90deg, #9D4EDD, #7B2CBF) !important; color: white !important; text-align: center !important; padding: 10px !important; font-family: VT323, monospace !important; font-size: 18px !important; z-index: 999999 !important; box-shadow: 0 2px 10px rgba(0,0,0,0.3) !important; display: block !important;';
-            document.body.prepend(banner);
 
-            // Push down the main container to avoid overlap
-            const terminal = document.querySelector('.terminal-container');
-            if (terminal) {
-                terminal.style.marginTop = '40px';
-            } else {
-                document.body.style.paddingTop = '40px';
-            }
-
-            // Analytics
-            if (window.pigmentAnalytics) {
-                // Set User Properties
-                if (window.pigmentAnalytics.setUserProperties) {
-                    window.pigmentAnalytics.setUserProperties(window.pigmentAnalytics.analytics, {
-                        trial_days_remaining: days,
-                        trial_status: 'active'
-                    });
-                }
-
-                // Track Click
-                const link = document.getElementById('upgrade-link');
-                if (link) {
-                    link.addEventListener('click', () => {
-                        window.pigmentAnalytics.logEvent(window.pigmentAnalytics.analytics, 'upgrade_click', { location: 'banner' });
-                    });
-                }
-            }
-        }
 
         function showPriceNotification() {
             // Delay slightly so it appears after page loads

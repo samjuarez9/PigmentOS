@@ -19,7 +19,7 @@ FIREBASE_CREDENTIALS_B64 = os.environ.get("FIREBASE_CREDENTIALS_B64", "")
 STRIPE_PRICE_ID = "price_1SqHVEGh2zQhHuervW1gZa30"  # $30/month (LIVE)
 
 # Trial Configuration
-TRIAL_DAYS = 3
+TRIAL_DAYS = 0
 
 # URLs
 SUCCESS_URL = "https://pigmentos.onrender.com/dashboard?session_id={CHECKOUT_SESSION_ID}"

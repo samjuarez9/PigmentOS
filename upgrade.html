@@ -127,9 +127,7 @@
         <h1 id="page-title">🚀 Upgrade to Pro</h1>
         <div class="subtitle" id="page-subtitle">Unlock the full power of PigmentOS</div>
 
-        <div class="trial-message" id="trial-message">
-            Lock in your rate and get unlimited access to real-time market intelligence.
-        </div>
+        Subscribe to PigmentOS Pro for unlimited access to real-time market intelligence.
 
         <div class="price">$15</div>
         <div class="price-label">per month • cancel anytime</div>
@@ -146,7 +144,7 @@
         <button class="subscribe-btn" onclick="subscribe()">Subscribe Now</button>
 
         <div class="logout-link">
-            <a href="/index.html">← Back to Dashboard</a>
+            <a href="/login.html">← Logout</a>
         </div>
     </div>
 
@@ -176,13 +174,10 @@
 
         // Update page content based on whether trial is expired
         if (isExpired) {
-            document.getElementById('page-title').innerHTML = '⚡ Trial Expired';
+            document.getElementById('page-title').innerHTML = '⚡ Subscription Required';
             document.getElementById('page-subtitle').textContent = 'Upgrade to continue trading';
             document.getElementById('trial-message').innerHTML =
-                'Your 3-day free trial has ended.<br>Subscribe to PigmentOS Pro to continue accessing real-time market data.';
-            // Hide back to dashboard link for expired users
-            document.querySelector('.logout-link a').textContent = '← Logout';
-            document.querySelector('.logout-link a').href = '/login.html';
+                'Access to PigmentOS requires an active subscription.<br>Subscribe to PigmentOS Pro to continue accessing real-time market data.';
 
             logEvent(analytics, 'page_view', { page_title: 'Upgrade - Expired' });
         } else {
