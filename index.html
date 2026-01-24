@@ -563,8 +563,10 @@
                     }
 
                 } catch (error) {
-                    // Fail OPEN on any error - user keeps access, we'll check again next time
-                    console.warn('Background subscription check failed (user keeps access):', error.name || error.message);
+                    // Fail CLOSED on error - redirect to upgrade
+                    console.warn('Background subscription check failed:', error.name || error.message);
+                    logEvent(analytics, 'paywall_hit', { source: 'dashboard', reason: 'check_error' });
+                    window.location.href = '/upgrade.html?error=check_failed';
                 }
             }, 100); // Slight delay to ensure dashboard renders first
         });
