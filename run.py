@@ -808,13 +808,23 @@ def get_flow_contracts():
                 oi = contract.get("open_interest", 0) or 0
                 if oi > 0:
                     details = contract.get("details", {})
+                    day_data = contract.get("day", {})
+                    iv = contract.get("implied_volatility", 0) or 0
+                    # Calculate day premium: volume × vwap × 100 (shares per contract)
+                    volume = day_data.get("volume", 0) or 0
+                    vwap = day_data.get("vwap", 0) or 0
+                    day_premium = volume * vwap * 100
+                    
                     all_contracts.append({
                         "ticker": details.get("ticker"),
                         "expiration_date": details.get("expiration_date"),
                         "strike_price": details.get("strike_price"),
                         "contract_type": details.get("contract_type"),
-                        "open_interest": oi
+                        "open_interest": oi,
+                        "implied_volatility": iv,
+                        "day_premium": day_premium
                     })
+
             
             # Check for next page
             next_url = data.get("next_url")
@@ -980,6 +990,13 @@ def get_vol_oi_history(contract_symbol):
         return jsonify({"error": "API Key missing"}), 500
     
     try:
+        # Get requested days (default to 6)
+        days_param = request.args.get('days', 6)
+        try:
+            display_days = int(days_param)
+        except ValueError:
+            display_days = 6
+            
         # Clean contract symbol
         clean_contract = contract_symbol.replace("O:", "")
         formatted_contract = f"O:{clean_contract}" if not contract_symbol.startswith("O:") else contract_symbol
@@ -990,9 +1007,10 @@ def get_vol_oi_history(contract_symbol):
             return jsonify({"error": "Invalid contract format"}), 400
         underlying = match.group(1)
         
-        # Calculate date range (18 days back to get ~10 trading days)
+        # Calculate date range (multiply by 2 to account for weekends/holidays)
+        lookback_days = max(18, display_days * 2)
         today = datetime.now().strftime("%Y-%m-%d")
-        start_date = (datetime.now() - timedelta(days=18)).strftime("%Y-%m-%d")
+        start_date = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
         
         # 1. Fetch historical volume from Polygon Aggs
         aggs_url = f"https://api.polygon.io/v2/aggs/ticker/{formatted_contract}/range/1/day/{start_date}/{today}"
@@ -1018,7 +1036,10 @@ def get_vol_oi_history(contract_symbol):
                         "volume": int(bar.get('v', 0)),
                         "oi": 0,
                         "vol_oi_ratio": 0,
-                        "price": bar.get('c', 0)
+                        "vol_oi_ratio": 0,
+                        "price": bar.get('c', 0),
+                        "vwap": bar.get('vw', 0),
+                        "iv": 0
                     })
         except Exception as e:
             print(f"Aggs fetch error: {e}")
@@ -1034,6 +1055,7 @@ def get_vol_oi_history(contract_symbol):
             if snap_resp.status_code == 200:
                 snap_data = snap_resp.json().get("results", {})
                 current_oi = snap_data.get("open_interest", 0) or 0
+                current_iv = snap_data.get("implied_volatility", 0) or 0
                 day_data = snap_data.get("day", {})
                 current_volume = day_data.get("volume", 0) or 0
                 
@@ -1057,7 +1079,9 @@ def get_vol_oi_history(contract_symbol):
                         "volume": current_volume,
                         "oi": current_oi,
                         "vol_oi_ratio": current_volume / current_oi if current_oi > 0 else 0,
-                        "price": day_data.get("close", 0)
+                        "price": day_data.get("close", 0),
+                        "vwap": day_data.get("vwap", 0),
+                        "iv": current_iv
                     })
         except Exception as e:
             print(f"Snapshot fetch error: {e}")
@@ -1068,8 +1092,8 @@ def get_vol_oi_history(contract_symbol):
                 entry["oi"] = current_oi
                 entry["vol_oi_ratio"] = entry["volume"] / current_oi if current_oi > 0 else 0
         
-        # Keep last 6 days max for display
-        history_data = history_data[-6:]
+        # Keep requested days max for display
+        history_data = history_data[-display_days:]
         
         # 4. Calculate stats
         vol_oi_ratios = [d["vol_oi_ratio"] for d in history_data if d["vol_oi_ratio"] > 0]
@@ -2083,6 +2107,16 @@ def subscription_status():
                 args=(user_email, user_uid, existing_customer),
                 daemon=True
             ).start()
+            
+            # CRITICAL FIX: Check if Firestore trial has expired BEFORE granting access
+            # This catches users who never created a Stripe subscription but whose trial ended
+            if days_remaining <= 0:
+                print(f"⚠️ TRIAL EXPIRED for {user_email} (no Stripe sub, days_remaining={days_remaining})")
+                return jsonify({
+                    'status': 'expired',
+                    'has_access': False,
+                    'reason': 'trial_expired'
+                })
             
             return jsonify({
                 'status': 'trialing',
@@ -3706,7 +3740,10 @@ def refresh_gamma_logic(symbol="SPY"):
             # Dynamic OI threshold based on ticker liquidity
             # Indices = higher bar (extremely liquid), single stocks = lower bar
             INDEX_ETFS = ['SPY', 'QQQ', 'IWM', 'DIA']
-            MIN_OI = 500  # Same threshold for all tickers (indices and single stocks)
+            LOW_LIQUIDITY_TICKERS = ['SNDK', 'LITE']  # Tickers with lower OI threshold
+            
+            # Dynamic OI threshold: 200 for low-liquidity, 500 for normal
+            MIN_OI = 200 if symbol in LOW_LIQUIDITY_TICKERS else 500
             
             final_data = []
             for strike, data in gamma_data.items():
