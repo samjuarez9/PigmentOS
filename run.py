@@ -1417,6 +1417,8 @@ def scan_whales_polygon():
     tz_eastern = pytz.timezone('US/Eastern')
     now_et = datetime.now(tz_eastern)
     
+
+    
     def format_money(val):
         if val >= 1_000_000: return f"${val/1_000_000:.1f}M"
         if val >= 1_000: return f"${val/1_000:.0f}k"
@@ -1425,6 +1427,8 @@ def scan_whales_polygon():
     all_whales = []
     
     for symbol in WHALE_WATCHLIST:
+ 
+        
         try:
             # Fetch raw Polygon data
             data = fetch_unusual_options_polygon(symbol)
@@ -2821,12 +2825,17 @@ def api_whales_30dte_stream():
 
 @app.route('/api/polymarket')
 def api_polymarket():
-    global CACHE, POLY_STATE
+    global CACHE
+    # Serve strictly from cache to prevent blocking
+    if CACHE["polymarket"]["timestamp"] == 0:
+        return jsonify({"loading": True, "data": [], "is_mock": False})
+        
+    return jsonify({"data": CACHE["polymarket"]["data"], "is_mock": CACHE["polymarket"]["is_mock"]})
+
+def refresh_polymarket_logic():
+    global CACHE, SERVICE_STATUS
     current_time = time.time()
     
-    if current_time - CACHE["polymarket"]["timestamp"] < CACHE_DURATION:
-        return jsonify({"data": CACHE["polymarket"]["data"], "is_mock": CACHE["polymarket"]["is_mock"]})
-
     try:
         # FETCH OPTIMIZATION:
         # 1. limit=200: Fetch more to allow for filtering
@@ -2928,6 +2937,10 @@ def api_polymarket():
                 return ' '.join(s.split())
 
             for event in events:
+                # Yield to event loop during heavy processing
+                if len(candidates) % 10 == 0:
+                    time.sleep(0.01)
+
                 title = event.get('title', '')
                 title_lower = title.lower()
                 
@@ -3161,8 +3174,6 @@ def api_polymarket():
             {"event": "Fed rate cut in December?", "outcome_1_label": "Yes", "outcome_1_prob": 75, "outcome_2_label": "No", "outcome_2_prob": 25, "slug": "fed-cut", "delta": -0.02}
         ]
         CACHE["polymarket"]["is_mock"] = True
-
-    return jsonify({"data": CACHE["polymarket"]["data"], "is_mock": CACHE["polymarket"]["is_mock"]})
 
 # VIX endpoint removed - not used (TFI uses CNN+VIX composite instead)
 
@@ -4121,6 +4132,7 @@ def start_background_worker():
         last_gamma_update = 0
         last_heatmap_update = 0
         last_news_update = 0
+        last_polymarket_update = 0
         
         while True:
             # === MARKET HOURS CHECK ===
@@ -4144,6 +4156,24 @@ def start_background_worker():
             # News Slowdown: After 9 PM ET or Weekends
             is_late_night = now.hour >= 21 or now.hour < 4
             is_slow_news_time = (not is_weekday) or is_late_night
+
+            # 0. Polymarket (Runs 24/7, but slower at night)
+            # Normal: 5 mins (300s) | Slow: 15 mins (900s)
+            poly_interval = 900 if is_slow_news_time else 300
+            
+            # Force hydration if cache is empty
+            poly_needs_hydration = not CACHE.get("polymarket", {}).get("data")
+            should_run_poly = poly_needs_hydration or (time.time() - last_polymarket_update > poly_interval)
+            
+            if should_run_poly:
+                try:
+                    # DIRECT CALL - Optimized to yield
+                    refresh_polymarket_logic()
+                    last_polymarket_update = time.time()
+                except Exception as e:
+                    print(f"Worker Error (Polymarket): {e}")
+                    last_polymarket_update = time.time() - (poly_interval - 60)
+                time.sleep(0.2)
 
             # 1. Heatmap (Runs in Extended Hours OR if cache is empty)
             # Core Hours: 30 mins (1800s) | Extended Hours: 30 mins (1800s)
