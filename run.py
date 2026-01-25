@@ -1,5 +1,5 @@
-from gevent import monkey
-monkey.patch_all()
+# from gevent import monkey
+# monkey.patch_all()
 
 import json
 import time
@@ -1939,12 +1939,8 @@ def subscription_status():
         auth_header = request.headers.get('Authorization', '')
         
         if not firestore_db:
-            # Dev Mode / Fallback
-            data = request.get_json() or {}
-            user_email = data.get('email')
-            if not user_email:
-                 return jsonify({'status': 'trialing', 'has_access': True})
-            return jsonify({'status': 'trialing', 'has_access': True, 'is_premium': False})
+            print("⚠️ Firestore not initialized - Cannot verify subscription")
+            return jsonify({'status': 'error', 'has_access': False, 'reason': 'db_error'}), 500
 
         if not auth_header.startswith('Bearer '):
             return jsonify({'error': 'Missing Authorization header'}), 401
@@ -1976,10 +1972,13 @@ def subscription_status():
 
         # 3. CHECK FIRESTORE STATUS (Synced via Webhooks)
         try:
-            user_ref = firestore_db.collection('users').document(user_uid)
-            user_doc = user_ref.get()
+            def get_firestore_user():
+                return firestore_db.collection('users').document(user_uid).get()
             
-            if not user_doc.exists:
+            # Use timeout to prevent hanging
+            user_doc = with_timeout(get_firestore_user, timeout_seconds=3)
+            
+            if not user_doc or not user_doc.exists:
                 # New user who hasn't hit start-trial yet?
                 # Deny access to force them to upgrade/start trial
                 return jsonify({

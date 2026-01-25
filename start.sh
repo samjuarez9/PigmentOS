@@ -28,10 +28,11 @@ if [ -f ".env" ]; then
 fi
 
 # Check if server is already running
-echo -e "${YELLOW}[1/3]${NC} Checking server status..."
-if lsof -Pi :8001 -sTCP:LISTEN -t >/dev/null 2>&1; then
-    PID=$(lsof -Pi :8001 -sTCP:LISTEN -t)
-    echo -e "${YELLOW}⚠${NC} Port 8001 is busy (PID: $PID). Cleaning up..."
+PORT="${PORT:-8001}"
+echo -e "${YELLOW}[1/3]${NC} Checking server status on port $PORT..."
+if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
+    PID=$(lsof -Pi :$PORT -sTCP:LISTEN -t)
+    echo -e "${YELLOW}⚠${NC} Port $PORT is busy (PID: $PID). Cleaning up..."
     kill -9 $PID
     sleep 1
     echo -e "${GREEN}✓${NC} Cleanup complete."
@@ -50,7 +51,7 @@ SERVER_PID=$!
 # Wait for server to start (max 5 seconds)
 echo -n "     Waiting for server startup"
 for i in {1..10}; do
-    if lsof -Pi :8001 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
         echo ""
         echo -e "${GREEN}✓${NC} Server started successfully (PID: $SERVER_PID)"
         break
@@ -60,7 +61,7 @@ for i in {1..10}; do
 done
 
 # Verify server is actually running
-if ! lsof -Pi :8001 -sTCP:LISTEN -t >/dev/null 2>&1; then
+if ! lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
     echo ""
     echo -e "${RED}✗${NC} Server failed to start. Check server.log for details."
     exit 1
@@ -68,7 +69,7 @@ fi
 
 # Open dashboard in browser
 echo -e "${YELLOW}[3/3]${NC} Opening dashboard..."
-DASHBOARD_PATH="http://localhost:8001/index.html"
+DASHBOARD_PATH="http://localhost:$PORT/index.html"
 
 # Detect OS and open browser
 if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -87,7 +88,7 @@ echo -e "${GREEN}     Dashboard Ready!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "Dashboard: ${BLUE}$DASHBOARD_PATH${NC}"
-echo -e "Server:    ${BLUE}http://localhost:8001${NC}"
+echo -e "Server:    ${BLUE}http://localhost:$PORT${NC}"
 echo -e "Logs:      ${BLUE}$(pwd)/server.log${NC}"
 echo ""
 echo -e "To stop the server: ${YELLOW}pkill -f 'python3 run.py'${NC}"
