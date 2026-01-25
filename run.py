@@ -2074,6 +2074,18 @@ def subscription_status():
                         
                         else:
                             # Hard Lockout for past_due, unpaid, canceled, etc.
+                            # UNLESS they have a manual trial extension (days_remaining > 0)
+                            if days_remaining > 0:
+                                print(f"⚠️ ACCESS OVERRIDE for {user_email}: Status {sub.status} but has {days_remaining} days remaining")
+                                return jsonify({
+                                    'status': 'trialing',
+                                    'days_remaining': days_remaining,
+                                    'has_access': True,
+                                    'login_count': login_count,
+                                    'is_premium': False,
+                                    'message': 'Trial Extended'
+                                })
+
                             print(f"⛔ ACCESS DENIED for {user_email}: Status {sub.status}")
                             return jsonify({
                                 'status': sub.status,
