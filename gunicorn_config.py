@@ -11,7 +11,7 @@ bind = f"0.0.0.0:{port}"
 # gthread + gevent monkey patching causes Python 3.13 threading KeyError
 worker_class = "gevent"
 workers = 2  # 2 workers for better concurrency
-timeout = 120  # Increase timeout to 2 minutes for heavy hydration
+timeout = 300  # Increase timeout to 5 minutes for heavy hydration
 
 def post_fork(server, worker):
     """
