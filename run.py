@@ -1417,7 +1417,15 @@ def scan_whales_polygon():
     tz_eastern = pytz.timezone('US/Eastern')
     now_et = datetime.now(tz_eastern)
     
-
+    # STRICT MARKET HOURS CHECK (9:30 AM - 4:15 PM ET)
+    # We allow a small buffer (9:29) for pre-open checks if needed, but generally strict.
+    # ETFs like SPY trade until 4:15 PM.
+    market_open = now_et.replace(hour=9, minute=30, second=0, microsecond=0)
+    market_close = now_et.replace(hour=16, minute=15, second=0, microsecond=0)
+    
+    if now_et < market_open or now_et > market_close:
+        # print("💤 Market closed - skipping whale scan")
+        return []
     
     def format_money(val):
         if val >= 1_000_000: return f"${val/1_000_000:.1f}M"
@@ -1427,7 +1435,8 @@ def scan_whales_polygon():
     all_whales = []
     
     for symbol in WHALE_WATCHLIST:
- 
+        # YIELD TO EVENT LOOP to prevent blocking heartbeats
+        time.sleep(0.2) 
         
         try:
             # Fetch raw Polygon data
