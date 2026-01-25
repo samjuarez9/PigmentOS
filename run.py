@@ -753,9 +753,9 @@ def get_option_history(ticker):
     return jsonify({"results": bars})
 
 
-@app.route('/unusual_flow')
-def unusual_flow_page():
-    return send_from_directory('.', 'unusual_flow.html')
+# @app.route('/unusual_flow')
+# def unusual_flow_page():
+#     return send_from_directory('.', 'unusual_flow.html')
 
 
 # === UNUSUAL FLOW (SINGLE CONTRACT) ENDPOINTS ===
@@ -1967,7 +1967,8 @@ def subscription_status():
             'sam.juarez092678@gmail.com', 
             'jaxnailedit@gmail.com', 
             'gtmichael9218@gmail.com',
-            'Montoyamiguel35@gmail.com'
+            'Montoyamiguel35@gmail.com',
+            'saulr165@gmail.com'
         ]
         
         if user_email.lower().strip() in [e.lower() for e in ADMIN_EMAILS]:
