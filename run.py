@@ -1527,6 +1527,16 @@ def scan_whales_polygon():
                 trade_id = f"{ticker}_{volume}_{last_price}"
                 if trade_id in WHALE_HISTORY:
                     continue
+                
+                # MEMORY SAFEGUARD: Limit history size
+                if len(WHALE_HISTORY) > 10000:
+                    # Clear oldest 2000 entries to prevent OOM
+                    # Sort by timestamp (value)
+                    sorted_history = sorted(WHALE_HISTORY.items(), key=lambda x: x[1])
+                    for k, v in sorted_history[:2000]:
+                        del WHALE_HISTORY[k]
+                    print(f"🧹 Pruned WHALE_HISTORY (Size: {len(WHALE_HISTORY)})")
+                    
                 WHALE_HISTORY[trade_id] = time.time()
                 
                 whale_data = {
@@ -4138,12 +4148,20 @@ def start_background_worker():
         
 
         
+        import gc
+        last_gc_time = 0
+        
         last_gamma_update = 0
         last_heatmap_update = 0
         last_news_update = 0
         last_polymarket_update = 0
         
         while True:
+            # MEMORY SAFEGUARD: Explicit GC every 30 mins
+            if time.time() - last_gc_time > 1800:
+                gc.collect()
+                last_gc_time = time.time()
+                
             # === MARKET HOURS CHECK ===
             tz_eastern = pytz.timezone('US/Eastern')
             now = datetime.now(tz_eastern)
