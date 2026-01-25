@@ -71,8 +71,6 @@ onAuthStateChanged(auth, async (user) => {
 
     } catch (error) {
         console.error('Subscription check error:', error);
-        // Fail CLOSED: If we can't verify, deny access
-        window.location.href = '/upgrade.html';
     }
 });
 

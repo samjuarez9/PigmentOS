@@ -7,10 +7,9 @@ os.environ['GUNICORN_WORKER'] = '1'
 port = os.environ.get("PORT", "10000")
 bind = f"0.0.0.0:{port}"
 
-# CRITICAL: Use gthread worker for Python 3.13 compatibility
-# gevent causes threading KeyError crashes in 3.13
-worker_class = "gthread"
-threads = 4 # Enable threading
+# CRITICAL: Use gevent worker to match gevent.monkey.patch_all() in run.py
+# gthread + gevent monkey patching causes Python 3.13 threading KeyError
+worker_class = "gevent"
 workers = 2  # 2 workers for better concurrency
 timeout = 300  # Increase timeout to 5 minutes for heavy hydration
 
