@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Get the key
-stripe_key = os.getenv("STRIPE_SECRET_KEY")
+# Get the key from config (ensures we test what the app uses)
+from stripe_config import STRIPE_SECRET_KEY as stripe_key
 
 if not stripe_key:
     print("❌ Error: STRIPE_SECRET_KEY not found in .env")

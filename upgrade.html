@@ -171,9 +171,56 @@
         // Check if user came from expired trial (URL contains marker or referrer check)
         const urlParams = new URLSearchParams(window.location.search);
         const isExpired = urlParams.get('expired') === 'true';
+        const reason = urlParams.get('reason');
 
         // Update page content based on whether trial is expired
-        if (isExpired) {
+        if (reason === 'past_due') {
+            document.getElementById('page-title').innerHTML = '⚠️ Payment Failed';
+            document.getElementById('page-subtitle').textContent = 'Please update your payment method';
+            document.getElementById('trial-message').innerHTML =
+                'Your last payment failed. Please update your payment method to restore access to PigmentOS Pro.';
+
+            const btn = document.getElementById('subscribe-btn');
+            if (btn) {
+                btn.innerText = 'Update Payment Method';
+                btn.onclick = async () => {
+                    // Override default click handler
+                    try {
+                        btn.innerText = 'Loading...';
+                        const user = auth.currentUser;
+                        if (!user) return;
+
+                        const idToken = await user.getIdToken();
+                        const response = await fetch('/api/create-portal-session', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${idToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ email: user.email })
+                        });
+                        const data = await response.json();
+                        if (data.url) {
+                            window.location.href = data.url;
+                        } else {
+                            alert('Error: ' + (data.error || 'Could not create portal session'));
+                            btn.innerText = 'Update Payment Method';
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        alert('Error connecting to billing portal');
+                        btn.innerText = 'Update Payment Method';
+                    }
+                };
+                // Remove the default event listener by cloning (hacky but effective for simple pages)
+                const newBtn = btn.cloneNode(true);
+                btn.parentNode.replaceChild(newBtn, btn);
+                newBtn.onclick = btn.onclick; // Re-attach the new handler
+            }
+
+            logEvent(analytics, 'page_view', { page_title: 'Upgrade - Past Due' });
+
+        } else if (isExpired) {
             document.getElementById('page-title').innerHTML = '⚡ Subscription Required';
             document.getElementById('page-subtitle').textContent = 'Upgrade to continue trading';
             document.getElementById('trial-message').innerHTML =
@@ -192,7 +239,7 @@
             try {
                 const response = await fetch('/api/config');
                 stripeConfig = await response.json();
-                
+
                 stripe = Stripe(stripeConfig.stripePublishableKey);
                 console.log("Stripe initialized with key:", stripeConfig.stripePublishableKey.substring(0, 8) + "...");
             } catch (e) {

@@ -1,4 +1,8 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 # Stripe Configuration for PigmentOS
 # Supports 'sandbox' (Test) and 'live' (Production) modes
@@ -12,7 +16,7 @@ STRIPE_CONFIG = {
     "sandbox": {
         "secret_key": os.environ.get("STRIPE_SECRET_KEY_TEST", ""),
         "publishable_key": os.environ.get("STRIPE_PUBLISHABLE_KEY_TEST", ""),
-        "price_id": "price_1ScWX2Gu1xj4bsEyNWsZGq5X", # Found in account: $15/month
+        "price_id": "price_1StaOMGh2zQhHuerRC3JWTl4", # Created 2026-01-25: $15/month
         "webhook_secret": os.environ.get("STRIPE_WEBHOOK_SECRET_TEST", "")
     },
     "live": {
@@ -33,7 +37,7 @@ STRIPE_PRICE_ID = CURRENT_CONFIG["price_id"]
 STRIPE_WEBHOOK_SECRET = CURRENT_CONFIG["webhook_secret"]
 
 # Common Configuration
-TRIAL_DAYS = 3
+TRIAL_DAYS = 5
 FIREBASE_CREDENTIALS_B64 = os.environ.get("FIREBASE_CREDENTIALS_B64", "")
 
 # URLs

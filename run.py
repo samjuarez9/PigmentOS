@@ -105,7 +105,7 @@ limiter = Limiter(
 # Stripe Configuration
 import stripe
 # Import keys from the new dual-mode config
-from stripe_config import STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_PRICE_ID, TRIAL_DAYS, STRIPE_WEBHOOK_SECRET, FIREBASE_CREDENTIALS_B64
+from stripe_config import STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_PRICE_ID, TRIAL_DAYS, STRIPE_WEBHOOK_SECRET, FIREBASE_CREDENTIALS_B64, SUCCESS_URL, CANCEL_URL
 stripe.api_key = STRIPE_SECRET_KEY
 
 # Expose Public Config to Frontend
@@ -1932,8 +1932,8 @@ def create_checkout_session():
                 'quantity': 1,
             }],
             mode='subscription',
-            success_url='https://pigmentos.onrender.com/index.html?session_id={CHECKOUT_SESSION_ID}',
-            cancel_url='https://pigmentos.onrender.com/upgrade.html',
+            success_url=SUCCESS_URL,
+            cancel_url=CANCEL_URL,
         )
         
         return jsonify({'sessionId': checkout_session.id})
@@ -2001,14 +2001,64 @@ def subscription_status():
             user_data = user_doc.to_dict()
             sub_status = user_data.get('subscriptionStatus', 'none')
             
+            # STRICT TRIAL CHECK: Enforce 3-day limit regardless of Stripe status
+            # This handles cases where Stripe webhook is delayed or user is in a "grace period"
+            if sub_status == 'trialing':
+                trial_start = user_data.get('trialStartDate')
+                
+                # SECURITY FIX: If no trial start date, DENY access (assume expired/invalid)
+                if not trial_start:
+                    print(f"🚫 Denied access for {user_email}: Missing trialStartDate")
+                    return jsonify({
+                        'status': 'expired',
+                        'has_access': False,
+                        'reason': 'trial_date_missing'
+                    })
+
+                if trial_start:
+                    # Handle Firestore Timestamp or ISO string
+                    if hasattr(trial_start, 'timestamp'):
+                        start_ts = trial_start.timestamp()
+                    else:
+                        try:
+                            # Try parsing ISO string
+                            dt = datetime.fromisoformat(str(trial_start).replace('Z', '+00:00'))
+                            start_ts = dt.timestamp()
+                        except:
+                            print(f"🚫 Denied access for {user_email}: Invalid trialStartDate format")
+                            return jsonify({
+                                'status': 'expired',
+                                'has_access': False,
+                                'reason': 'trial_date_invalid'
+                            })
+                    
+                    # Calculate days elapsed
+                    now_ts = time.time()
+                    days_elapsed = (now_ts - start_ts) / (86400)
+                    
+                    if days_elapsed > (TRIAL_DAYS + 0.5): # Add 12h buffer for timezone diffs
+                        print(f"🚫 Trial Expired for {user_email}: {days_elapsed:.1f} days")
+                        return jsonify({
+                            'status': 'expired',
+                            'has_access': False,
+                            'reason': 'trial_expired_strict'
+                        })
+
             # Simple Access Logic
-            if sub_status in ['active', 'trialing']:
+            if sub_status == 'active':
                 return jsonify({
-                    'status': sub_status,
+                    'status': 'active',
                     'has_access': True,
-                    'is_premium': (sub_status == 'active')
+                    'is_premium': True
+                })
+            elif sub_status == 'trialing':
+                 return jsonify({
+                    'status': 'trialing',
+                    'has_access': True,
+                    'is_premium': False
                 })
             else:
+                # Explicitly handle other statuses
                 return jsonify({
                     'status': sub_status,
                     'has_access': False,
@@ -2089,7 +2139,7 @@ def start_trial():
             return jsonify({'status': 'success', 'message': 'Subscription already exists'})
 
         # 4. CREATE TRIAL SUBSCRIPTION
-        # 3 Days Free Trial
+        # 5 Days Free Trial (Configured in stripe_config.py)
         try:
             new_sub = stripe.Subscription.create(
                 customer=customer.id,
@@ -2112,8 +2162,26 @@ def start_trial():
                 
             return jsonify({'status': 'success', 'subscription_id': new_sub.id})
             
+        except stripe.error.CardError as e:
+            print(f"❌ Stripe Card Error: {e}")
+            return jsonify({'error': f"Card declined: {e.user_message}"}), 400
+        except stripe.error.RateLimitError as e:
+            print(f"❌ Stripe Rate Limit: {e}")
+            return jsonify({'error': "Too many requests. Please try again later."}), 429
+        except stripe.error.InvalidRequestError as e:
+            print(f"❌ Stripe Invalid Request: {e}")
+            return jsonify({'error': "Invalid request parameters."}), 400
+        except stripe.error.AuthenticationError as e:
+            print(f"❌ Stripe Auth Error: {e}")
+            return jsonify({'error': "Payment system configuration error."}), 401
+        except stripe.error.APIConnectionError as e:
+            print(f"❌ Stripe Connection Error: {e}")
+            return jsonify({'error': "Network error. Please try again."}), 502
+        except stripe.error.StripeError as e:
+            print(f"❌ Stripe Generic Error: {e}")
+            return jsonify({'error': "Payment processing failed. Please try again."}), 500
         except Exception as stripe_error:
-            print(f"Stripe Error: {stripe_error}")
+            print(f"Stripe Unexpected Error: {stripe_error}")
             return jsonify({'error': str(stripe_error)}), 500
 
     except Exception as e:
@@ -2205,6 +2273,7 @@ def create_portal_session():
 def stripe_webhook():
     """Handle Stripe webhook events to update Firestore subscription status"""
     payload = request.get_data(as_text=True)
+    sig_header = request.headers.get('Stripe-Signature')
     
     # Verify webhook signature (skip in development if no secret configured)
     if STRIPE_WEBHOOK_SECRET:
@@ -2295,10 +2364,25 @@ def stripe_webhook():
                 docs = query.stream()
                 
                 for doc in docs:
-                    doc.reference.update({
+                    update_data = {
                         'subscriptionStatus': firestore_status,
                         'subscriptionUpdatedAt': firestore.SERVER_TIMESTAMP
-                    })
+                    }
+                    
+                    # BACKFILL TRIAL START DATE IF MISSING & TRIALING
+                    # This ensures the strict check doesn't lock out valid new trials
+                    if firestore_status == 'trialing':
+                        user_data = doc.to_dict()
+                        if not user_data.get('trialStartDate'):
+                            # Use Stripe's start date or current time
+                            trial_start_ts = subscription.get('trial_start') or subscription.get('start_date')
+                            if trial_start_ts:
+                                update_data['trialStartDate'] = datetime.fromtimestamp(trial_start_ts)
+                            else:
+                                update_data['trialStartDate'] = firestore.SERVER_TIMESTAMP
+                            print(f"⚠️ Backfilled trialStartDate for {customer_email}")
+
+                    doc.reference.update(update_data)
                     print(f"✅ Updated Firestore for {customer_email}: subscriptionStatus = {firestore_status}")
                     break
         except Exception as e:
