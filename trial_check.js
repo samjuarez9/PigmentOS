@@ -60,7 +60,13 @@ onAuthStateChanged(auth, async (user) => {
 
         // Show trial banner if trialing
         if (status.status === 'trialing') {
-            showTrialBanner(status.days_remaining);
+            let daysRemaining = 3;
+            if (trialStartDate) {
+                const now = new Date();
+                const elapsedDays = Math.floor((now - trialStartDate) / (1000 * 60 * 60 * 24));
+                daysRemaining = Math.max(0, 3 - elapsedDays);
+            }
+            showTrialBanner(daysRemaining);
         }
 
     } catch (error) {

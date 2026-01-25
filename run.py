@@ -1933,59 +1933,32 @@ def create_checkout_session():
 @app.route('/api/subscription-status', methods=['POST'])
 @limiter.limit("30 per minute")
 def subscription_status():
-    """Check if user has active subscription or valid trial - SERVER-SIDE VERIFIED"""
+    """Check if user has active subscription - SIMPLIFIED (Stripe is Source of Truth)"""
     try:
-        # 1. VERIFY FIREBASE TOKEN (don't trust client-sent email)
+        # 1. VERIFY FIREBASE TOKEN
         auth_header = request.headers.get('Authorization', '')
         
         if not firestore_db:
-            print("⚠️ Firestore not initialized - Bypassing token verification (Dev Mode)")
-            # We can't verify the token, so we assume the client is honest for trial check
-            # In a real paid scenario, we'd check Stripe, which doesn't need Firebase Admin
-            pass
-        elif not auth_header.startswith('Bearer '):
-            return jsonify({'error': 'Missing or invalid Authorization header'}), 401
-        else:
-            id_token = auth_header.split('Bearer ')[1]
-            try:
-                decoded_token = firebase_auth.verify_id_token(id_token)
-                user_email = decoded_token.get('email')
-                user_uid = decoded_token.get('uid')
-            except Exception as auth_error:
-                print(f"Firebase token verification failed: {auth_error}")
-                return jsonify({'error': 'Invalid authentication token'}), 401
-            
-            if not user_email:
-                return jsonify({'error': 'No email in token'}), 401
-        
-        # Track login count in Firestore
-        login_count = 1
-        if firestore_db and user_uid:
-            try:
-                user_ref = firestore_db.collection('users').document(user_uid)
-                user_ref.set({'login_count': firestore.Increment(1)}, merge=True)
-                user_doc = user_ref.get()
-                if user_doc.exists:
-                    login_count = user_doc.to_dict().get('login_count', 1)
-            except Exception as e:
-                print(f"Login count update failed: {e}")
-        
-        # If we bypassed, we need to get email/uid from request body as fallback
-        if not firestore_db:
+            # Dev Mode / Fallback
             data = request.get_json() or {}
             user_email = data.get('email')
-            if user_email:
-                user_uid = "dev_user_" + user_email
-            
-            # If no email provided in body, we can't check Stripe, so we default to Trialing
             if not user_email:
-                 return jsonify({
-                    'status': 'trialing',
-                    'days_remaining': TRIAL_DAYS,
-                    'has_access': True
-                })
+                 return jsonify({'status': 'trialing', 'has_access': True})
+            return jsonify({'status': 'trialing', 'has_access': True, 'is_premium': False})
+
+        if not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Missing Authorization header'}), 401
             
-        # 3. CHECK VIP/ADMIN LIST (Bypass all checks)
+        id_token = auth_header.split('Bearer ')[1]
+        try:
+            decoded_token = firebase_auth.verify_id_token(id_token)
+            user_email = decoded_token.get('email')
+            user_uid = decoded_token.get('uid')
+        except Exception as auth_error:
+            print(f"Token verification failed: {auth_error}")
+            return jsonify({'error': 'Invalid token'}), 401
+
+        # 2. CHECK VIP/ADMIN LIST
         ADMIN_EMAILS = [
             'sam.juarez092678@gmail.com', 
             'jaxnailedit@gmail.com', 
@@ -2000,204 +1973,45 @@ def subscription_status():
                 'has_access': True,
                 'is_vip': True
             })
-        
-        # 2. FIRESTORE IS SOURCE OF TRUTH FOR TRIAL COUNTDOWN
-        # We use Firestore for the countdown to avoid Stripe latency/sync issues
-        
-        # Ensure TRIAL_DAYS is available
+
+        # 3. CHECK FIRESTORE STATUS (Synced via Webhooks)
         try:
-            from stripe_config import TRIAL_DAYS
-        except ImportError:
-            TRIAL_DAYS = 3 # Fallback
+            user_ref = firestore_db.collection('users').document(user_uid)
+            user_doc = user_ref.get()
             
-        days_remaining = TRIAL_DAYS
-        is_premium = False
-        
-        if firestore_db and user_uid:
-            try:
-                user_ref = firestore_db.collection('users').document(user_uid)
-                user_doc = user_ref.get()
-                
-                if user_doc.exists:
-                    user_data = user_doc.to_dict()
-                    trial_start = user_data.get('trialStartDate')
-                    
-                    if trial_start:
-                        # Calculate days remaining
-                        # trial_start is a Firestore timestamp (datetime object)
-                        if isinstance(trial_start, datetime):
-                            start_ts = trial_start.timestamp()
-                        else:
-                            # Fallback if it's already a timestamp or other format
-                            start_ts = trial_start
-                            
-                        now_ts = datetime.now().timestamp()
-                        elapsed_days = int((now_ts - start_ts) / 86400)
-                        days_remaining = max(0, TRIAL_DAYS - elapsed_days)
-                        print(f"   Firestore: {user_email} trial_start={trial_start}, elapsed={elapsed_days}, remaining={days_remaining}")
-                    else:
-                        # Initialize trialStartDate if missing
-                        user_ref.update({'trialStartDate': firestore.SERVER_TIMESTAMP})
-                        print(f"Initialized missing trialStartDate for {user_email}")
-                else:
-                    # Create document if it doesn't exist (should be handled by login.html but safe fallback)
-                    user_ref.set({
-                        'email': user_email,
-                        'trialStartDate': firestore.SERVER_TIMESTAMP,
-                        'subscriptionStatus': 'trialing',
-                        'login_count': 1
-                    })
-                    print(f"Created missing user document for {user_email}")
-            except Exception as e:
-                print(f"⚠️ Firestore trial check failed: {e}")
-                # FAIL OPEN: If Firestore fails, assume trial is valid
-                days_remaining = TRIAL_DAYS
-
-        # 3. STRIPE IS SOURCE OF TRUTH FOR PAYMENTS
-        try:
-            customers = stripe.Customer.list(email=user_email, limit=1)
-            if customers.data:
-                customer = customers.data[0]
-                subscriptions = stripe.Subscription.list(customer=customer.id, limit=1, status='all')
-                
-                if subscriptions.data:
-                    sub = subscriptions.data[0]
-                    print(f"Stripe Status for {user_email}: {sub.status}")
-                    
-                    if sub.status in ['active', 'trialing']:
-                        # If Stripe says active, they are premium (paying customer)
-                        if sub.status == 'active':
-                            # Active subscribers always have access
-                            return jsonify({
-                                'status': sub.status,
-                                'days_remaining': days_remaining,
-                                'has_access': True,
-                                'login_count': login_count,
-                                'is_premium': True
-                            })
-                        
-                        elif sub.status == 'trialing':
-                            # STRICT TRIAL EXPIRATION CHECK
-                            # If Stripe says 'trialing' but Firestore shows 0 days remaining,
-                            # lock them out.
-                            if days_remaining <= 0:
-                                print(f"⚠️ TRIAL EXPIRED for {user_email} (days_remaining={days_remaining})")
-                                return jsonify({
-                                    'status': 'expired',
-                                    'has_access': False,
-                                    'reason': 'trial_expired'
-                                })
-                            
-                            # Trial still active
-                            return jsonify({
-                                'status': sub.status,
-                                'days_remaining': days_remaining,
-                                'has_access': True,
-                                'login_count': login_count,
-                                'is_premium': False
-                            })
-                        
-                        else:
-                            # Hard Lockout for past_due, unpaid, canceled, etc.
-                            # UNLESS they have a manual trial extension (days_remaining > 0)
-                            if days_remaining > 0:
-                                print(f"⚠️ ACCESS OVERRIDE for {user_email}: Status {sub.status} but has {days_remaining} days remaining")
-                                return jsonify({
-                                    'status': 'trialing',
-                                    'days_remaining': days_remaining,
-                                    'has_access': True,
-                                    'login_count': login_count,
-                                    'is_premium': False,
-                                    'message': 'Trial Extended'
-                                })
-
-                            print(f"⛔ ACCESS DENIED for {user_email}: Status {sub.status}")
-                            return jsonify({
-                                'status': sub.status,
-                                'has_access': False,
-                                'reason': f"subscription_{sub.status}"
-                            })
-
-
-                else:
-                    print("Customer exists but no subscription found -> Auto-Migrating")
-            else:
-                print("No Stripe customer found -> Auto-Migrating")
-                
-            # AUTO-MIGRATION LOGIC (Background)
-            # If we are here, the user has NO active subscription in Stripe.
-            # We return the Firestore-calculated trial status immediately.
-            
-            def create_stripe_subscription_async(email, uid, cust_data):
-                """Background task to create Stripe customer and subscription"""
-                try:
-                    if cust_data:
-                        customer = cust_data
-                    else:
-                        customer = stripe.Customer.create(
-                            email=email,
-                            metadata={'firebase_uid': uid}
-                        )
-                    
-                    stripe.Subscription.create(
-                        customer=customer.id,
-                        items=[{'price': STRIPE_PRICE_ID}],
-                        payment_behavior='default_incomplete',
-                        metadata={'firebase_uid': uid, 'source': 'auto_migration'}
-                    )
-                    
-                    if firestore_db:
-                        firestore_db.collection('users').document(uid).update({
-                            'stripeCustomerId': customer.id,
-                            'subscriptionStatus': 'trialing'
-                        })
-                except Exception as e:
-                    print(f"Background Stripe migration error: {e}")
-            
-            existing_customer = customers.data[0] if customers.data else None
-            threading.Thread(
-                target=create_stripe_subscription_async,
-                args=(user_email, user_uid, existing_customer),
-                daemon=True
-            ).start()
-            
-            # CRITICAL FIX: Check if Firestore trial has expired BEFORE granting access
-            # This catches users who never created a Stripe subscription but whose trial ended
-            if days_remaining <= 0:
-                print(f"⚠️ TRIAL EXPIRED for {user_email} (no Stripe sub, days_remaining={days_remaining})")
+            if not user_doc.exists:
+                # New user who hasn't hit start-trial yet?
+                # Deny access to force them to upgrade/start trial
                 return jsonify({
-                    'status': 'expired',
+                    'status': 'none',
                     'has_access': False,
-                    'reason': 'trial_expired'
+                    'reason': 'no_account'
                 })
             
-            print(f"⚠️ GRANTING ACCESS (Auto-Migration): {user_email} days_remaining={days_remaining}")
+            user_data = user_doc.to_dict()
+            sub_status = user_data.get('subscriptionStatus', 'none')
             
-            return jsonify({
-                'status': 'trialing',
-                'days_remaining': days_remaining,
-                'has_access': True,
-                'login_count': login_count,
-                'is_premium': False
-            })
+            # Simple Access Logic
+            if sub_status in ['active', 'trialing']:
+                return jsonify({
+                    'status': sub_status,
+                    'has_access': True,
+                    'is_premium': (sub_status == 'active')
+                })
+            else:
+                return jsonify({
+                    'status': sub_status,
+                    'has_access': False,
+                    'reason': f"subscription_{sub_status}"
+                })
+                
+        except Exception as e:
+            print(f"Firestore check failed: {e}")
+            return jsonify({'error': 'Database error'}), 500
 
-        except Exception as stripe_e:
-            print(f"Stripe Auto-Migration Error: {stripe_e}")
-            # Fail CLOSED on error to prevent unauthorized access
-            return jsonify({
-                'status': 'error',
-                'has_access': False,
-                'error': str(stripe_e)
-            })
-        
     except Exception as e:
         print(f"Subscription status error: {e}")
-        # Fail CLOSED on error
-        return jsonify({
-            'status': 'error',
-            'has_access': False,
-            'error': str(e)
-        })
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/start-trial', methods=['POST'])
 @limiter.limit("5 per minute")
@@ -2464,7 +2278,7 @@ def stripe_webhook():
             
             if customer_email and firestore_db:
                 # Map Stripe status to our status
-                firestore_status = 'active' if status == 'active' else 'expired'
+                firestore_status = status if status in ['active', 'trialing'] else 'expired'
                 
                 users_ref = firestore_db.collection('users')
                 query = users_ref.where('email', '==', customer_email).limit(1)
