@@ -186,32 +186,57 @@
 
         const stripe = Stripe('pk_live_51ScWFSGh2zQhHuerwyHWNhJC1WSoHenIky5sYcd8rPmntuLsnmypY6ob6Pj4J9oRXnQ9EhxPmyNGczqKMJFs4MUA00HBHGHhmm');
 
+        let currentUser = null;
+        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            console.log("Auth state changed:", user ? "Logged in" : "Logged out");
+        });
+
         window.subscribe = async function () {
-            const user = auth.currentUser;
-            if (!user) {
-                alert('Please log in first');
-                window.location.href = '/login.html';
-                return;
+            const btn = document.querySelector('.subscribe-btn');
+
+            if (!currentUser) {
+                // Try to get current user one last time
+                currentUser = auth.currentUser;
+                if (!currentUser) {
+                    alert('Please log in first to subscribe.');
+                    window.location.href = '/login.html';
+                    return;
+                }
             }
 
             try {
+                // Show loading state
+                const originalText = btn.innerText;
+                btn.innerText = 'Processing...';
+                btn.disabled = true;
+                btn.style.opacity = '0.7';
+
                 // Track checkout started
                 logEvent(analytics, 'subscription_checkout_started', {
-                    user_email_domain: user.email.split('@')[1],
+                    user_email_domain: currentUser.email.split('@')[1],
                     price: '$15/month'
                 });
+
+                console.log("Requesting checkout session for:", currentUser.email);
 
                 const response = await fetch('/api/create-checkout-session', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: user.email })
+                    body: JSON.stringify({ email: currentUser.email })
                 });
 
                 const data = await response.json();
+                console.log("Checkout session response:", data);
 
                 if (data.error) {
-                    alert('Error: ' + data.error);
-                    return;
+                    throw new Error(data.error);
+                }
+
+                if (!data.sessionId) {
+                    throw new Error("No session ID returned from server");
                 }
 
                 // Redirect to Stripe Checkout
@@ -220,11 +245,16 @@
                 });
 
                 if (result.error) {
-                    alert(result.error.message);
+                    throw new Error(result.error.message);
                 }
             } catch (error) {
                 console.error('Subscription error:', error);
-                alert('Failed to start subscription process');
+                alert('Error: ' + error.message);
+
+                // Reset button
+                btn.innerText = 'Subscribe Now';
+                btn.disabled = false;
+                btn.style.opacity = '1';
             }
         };
     </script>
