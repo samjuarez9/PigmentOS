@@ -141,9 +141,9 @@
             <div class="column left-col">
                 <div class="widget" id="unusual-whales">
                     <div class="widget-header">
-                        <!-- <a href="/unusual_flow" style="text-decoration: none;"> -->
-                        <h2 id="whale-widget-title">UNUSUAL WHALES <span class="whale-emoji">🐳</span></h2>
-                        <!-- </a> -->
+                        <a href="/unusual_flow" style="text-decoration: none;" id="unusual-whales-link">
+                            <h2 id="whale-widget-title">UNUSUAL WHALES <span class="whale-emoji">🐳</span></h2>
+                        </a>
                         <button id="market-status-btn" class="market-status-btn after-market">AFTER MARKET</button>
                         <div class="status-container" id="status-whales">
                             <span class="status-text">LIVE</span>
@@ -514,6 +514,7 @@
             // setupBillingButton(user); // REMOVED: Only show for Admins or Active Subscribers (after check)
 
             // Background subscription check (non-blocking)
+            // BUFFERED: Wait 3 seconds to let the dashboard settle before checking
             setTimeout(async () => {
                 try {
                     // Get Firebase ID token for server-side verification
@@ -534,6 +535,11 @@
                     });
 
                     clearTimeout(timeoutId);
+
+                    if (!response.ok) {
+                        throw new Error(`Server returned ${response.status}`);
+                    }
+
                     const status = await response.json();
                     console.log('Subscription status response:', status);
                     console.log('Is VIP?', status.is_vip);
@@ -571,12 +577,15 @@
                     }
 
                 } catch (error) {
-                    // Fail CLOSED on error - redirect to upgrade
-                    console.warn('Background subscription check failed:', error.name || error.message);
-                    logEvent(analytics, 'paywall_hit', { source: 'dashboard', reason: 'check_error' });
-                    window.location.href = '/upgrade.html?error=check_failed';
+                    // FAIL OPEN: If check fails (network, 500, etc), ALLOW ACCESS
+                    console.warn('⚠️ Background subscription check failed - Allowing Optimistic Access:', error.name || error.message);
+
+                    // Optional: Show a subtle toast or log to analytics
+                    logEvent(analytics, 'subscription_check_error', { error: error.message });
+
+                    // DO NOT REDIRECT
                 }
-            }, 100); // Slight delay to ensure dashboard renders first
+            }, 3000); // 3-second buffer for smooth loading
         });
 
 
@@ -621,6 +630,23 @@
                 console.log('VIP Overlay removed');
             }, 4000);
         }
+
+        // Environment-Specific Link Control
+        document.addEventListener('DOMContentLoaded', () => {
+            const link = document.getElementById('unusual-whales-link');
+            if (link) {
+                const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                if (!isLocal) {
+                    // Disable link in production (Render)
+                    link.removeAttribute('href');
+                    link.style.pointerEvents = 'none';
+                    link.style.cursor = 'default';
+                    console.log('🔒 Production Mode: Unusual Whales link disabled');
+                } else {
+                    console.log('🔓 Dev Mode: Unusual Whales link active');
+                }
+            }
+        });
     </script>
 
 </html>

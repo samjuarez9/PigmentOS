@@ -1979,6 +1979,13 @@ def subscription_status():
         
         # 2. FIRESTORE IS SOURCE OF TRUTH FOR TRIAL COUNTDOWN
         # We use Firestore for the countdown to avoid Stripe latency/sync issues
+        
+        # Ensure TRIAL_DAYS is available
+        try:
+            from stripe_config import TRIAL_DAYS
+        except ImportError:
+            TRIAL_DAYS = 3 # Fallback
+            
         days_remaining = TRIAL_DAYS
         is_premium = False
         
@@ -2018,7 +2025,9 @@ def subscription_status():
                     })
                     print(f"Created missing user document for {user_email}")
             except Exception as e:
-                print(f"Firestore trial check failed: {e}")
+                print(f"⚠️ Firestore trial check failed: {e}")
+                # FAIL OPEN: If Firestore fails, assume trial is valid
+                days_remaining = TRIAL_DAYS
 
         # 3. STRIPE IS SOURCE OF TRUTH FOR PAYMENTS
         try:
