@@ -184,7 +184,24 @@
             logEvent(analytics, 'page_view', { page_title: 'Upgrade - Early' });
         }
 
-        const stripe = Stripe('pk_live_51ScWFSGh2zQhHuerwyHWNhJC1WSoHenIky5sYcd8rPmntuLsnmypY6ob6Pj4J9oRXnQ9EhxPmyNGczqKMJFs4MUA00HBHGHhmm');
+        let stripe;
+        let stripeConfig;
+
+        // Fetch Stripe Configuration dynamically
+        async function initializeStripe() {
+            try {
+                const response = await fetch('/api/config');
+                stripeConfig = await response.json();
+                
+                stripe = Stripe(stripeConfig.stripePublishableKey);
+                console.log("Stripe initialized with key:", stripeConfig.stripePublishableKey.substring(0, 8) + "...");
+            } catch (e) {
+                console.error("Failed to load Stripe config:", e);
+            }
+        }
+
+        // Initialize on load
+        initializeStripe();
 
         let currentUser = null;
 
@@ -197,6 +214,11 @@
 
         if (subscribeBtn) {
             subscribeBtn.addEventListener('click', async () => {
+                if (!stripe) {
+                    alert("Stripe is still initializing. Please try again in a moment.");
+                    return;
+                }
+
                 if (!currentUser) {
                     // Try to get current user one last time
                     currentUser = auth.currentUser;

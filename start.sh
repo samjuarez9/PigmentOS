@@ -44,7 +44,7 @@ PYTHON_CMD="python3"
 if [ -f ".venv/bin/python" ]; then
     PYTHON_CMD=".venv/bin/python"
 fi
-nohup $PYTHON_CMD run.py > server.log 2>&1 &
+PORT=8001 nohup $PYTHON_CMD run.py > server.log 2>&1 &
 SERVER_PID=$!
 
 # Wait for server to start (max 5 seconds)

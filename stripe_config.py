@@ -1,25 +1,40 @@
-
-import base64
 import os
 
 # Stripe Configuration for PigmentOS
+# Supports 'sandbox' (Test) and 'live' (Production) modes
 
-# Live API Keys (Production)
-STRIPE_PUBLISHABLE_KEY = "pk_live_51ScWFSGh2zQhHuerwyHWNhJC1WSoHenIky5sYcd8rPmntuLsnmypY6ob6Pj4J9oRXnQ9EhxPmyNGczqKMJFs4MUA00HBHGHhmm"
-# Secret key from environment variable (set in Render)
-STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+# Determine environment: 'sandbox' or 'live'
+# Default to 'sandbox' for safety
+STRIPE_ENV = os.environ.get("STRIPE_ENV", "sandbox")
 
-# Webhook Secret (Set in Render env vars after configuring Stripe Dashboard)
-STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+# Configuration Dictionary
+STRIPE_CONFIG = {
+    "sandbox": {
+        "secret_key": os.environ.get("STRIPE_SECRET_KEY_TEST", ""),
+        "publishable_key": os.environ.get("STRIPE_PUBLISHABLE_KEY_TEST", ""),
+        "price_id": "price_1ScWX2Gu1xj4bsEyNWsZGq5X", # Found in account: $15/month
+        "webhook_secret": os.environ.get("STRIPE_WEBHOOK_SECRET_TEST", "")
+    },
+    "live": {
+        "secret_key": os.environ.get("STRIPE_SECRET_KEY", ""),
+        "publishable_key": "pk_live_51ScWFSGh2zQhHuerwyHWNhJC1WSoHenIky5sYcd8rPmntuLsnmypY6ob6Pj4J9oRXnQ9EhxPmyNGczqKMJFs4MUA00HBHGHhmm",
+        "price_id": "price_1SdWyEGh2zQhHuersehF6t0x",
+        "webhook_secret": os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+    }
+}
 
-# Firebase Admin SDK Credentials (Base64 encoded JSON)
-FIREBASE_CREDENTIALS_B64 = os.environ.get("FIREBASE_CREDENTIALS_B64", "")
+# Get current config based on environment
+CURRENT_CONFIG = STRIPE_CONFIG.get(STRIPE_ENV, STRIPE_CONFIG["sandbox"])
 
-# Product Configuration
-STRIPE_PRICE_ID = "price_1SdWyEGh2zQhHuersehF6t0x"  # $15/month (LIVE)
+# Export variables for easy import
+STRIPE_SECRET_KEY = CURRENT_CONFIG["secret_key"]
+STRIPE_PUBLISHABLE_KEY = CURRENT_CONFIG["publishable_key"]
+STRIPE_PRICE_ID = CURRENT_CONFIG["price_id"]
+STRIPE_WEBHOOK_SECRET = CURRENT_CONFIG["webhook_secret"]
 
-# Trial Configuration
+# Common Configuration
 TRIAL_DAYS = 3
+FIREBASE_CREDENTIALS_B64 = os.environ.get("FIREBASE_CREDENTIALS_B64", "")
 
 # URLs
 SUCCESS_URL = "https://pigmentos.onrender.com/dashboard?session_id={CHECKOUT_SESSION_ID}"

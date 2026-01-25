@@ -422,6 +422,8 @@
         if (signOutBtn) {
             signOutBtn.addEventListener('click', () => {
                 logEvent(analytics, 'sign_out', { location: 'dashboard' });
+                // Clear Dev Mode flag to ensure proper sign out
+                localStorage.removeItem('devMode');
                 signOut(auth).then(() => {
                     window.location.href = '/login.html';
                 }).catch((error) => {
@@ -476,9 +478,9 @@
             clearTimeout(safetyTimeout);
 
             // DEV MODE BYPASS
-            const isDevMode = localStorage.getItem('devMode') === 'true' ||
-                window.location.hostname === 'localhost' ||
-                window.location.hostname === '127.0.0.1';
+            // Only enable if explicitly set in localStorage
+            const isDevMode = localStorage.getItem('devMode') === 'true';
+
             if (isDevMode && !user) {
                 console.log('🔧 DEV MODE: Bypassing auth check');
                 hideLoadingScreen();

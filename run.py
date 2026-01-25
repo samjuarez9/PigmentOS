@@ -104,8 +104,18 @@ limiter = Limiter(
 
 # Stripe Configuration
 import stripe
-from stripe_config import STRIPE_SECRET_KEY, STRIPE_PRICE_ID, TRIAL_DAYS, STRIPE_WEBHOOK_SECRET, FIREBASE_CREDENTIALS_B64
+# Import keys from the new dual-mode config
+from stripe_config import STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_PRICE_ID, TRIAL_DAYS, STRIPE_WEBHOOK_SECRET, FIREBASE_CREDENTIALS_B64
 stripe.api_key = STRIPE_SECRET_KEY
+
+# Expose Public Config to Frontend
+@app.route('/api/config', methods=['GET'])
+def get_public_config():
+    """Return public configuration (Stripe Key) to frontend"""
+    return jsonify({
+        "stripePublishableKey": STRIPE_PUBLISHABLE_KEY,
+        "stripePriceId": STRIPE_PRICE_ID
+    })
 
 # Firebase Admin SDK Initialization
 import firebase_admin
