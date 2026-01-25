@@ -1915,14 +1915,6 @@ def subscription_status():
         # 1. VERIFY FIREBASE TOKEN (don't trust client-sent email)
         auth_header = request.headers.get('Authorization', '')
         
-        # BYPASS: If Firestore is not initialized (Local Dev / Missing Creds), trust the client
-        # This prevents "Trial Ended" lockout when running locally without Admin SDK
-        # BYPASS: If Firestore is not initialized (Local Dev / Missing Creds), trust the client
-        # This prevents "Trial Ended" lockout when running locally without Admin SDK
-        # FORCE BYPASS FOR DEBUGGING
-        firestore_db_backup = firestore_db
-        firestore_db = None
-        
         if not firestore_db:
             print("⚠️ Firestore not initialized - Bypassing token verification (Dev Mode)")
             # We can't verify the token, so we assume the client is honest for trial check
