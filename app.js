@@ -254,7 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'SPY', 'QQQ', 'IWM',
 
         // Semiconductors & AI Hardware
-        'AMD', 'INTC', 'MU', 'AVGO', 'TSM', 'ARM', 'SMCI',
+        'AMD', 'INTC', 'MU', 'AVGO', 'TSM', 'ARM', 'SMCI', 'SNDK',
 
         // AI & Cloud
         'PLTR', 'ORCL', 'CRWD',

@@ -190,7 +190,7 @@ def api_status():
 # === CONFIGURATION ===
 WHALE_WATCHLIST = [
     'NVDA', 'TSLA', 'AAPL', 'AMD', 'MSFT', 'AMZN', 
-    'META', 'GOOG', 'GOOGL', 'PLTR', 'MU', 'ORCL', 'TSM'
+    'META', 'GOOG', 'GOOGL', 'PLTR', 'MU', 'ORCL', 'TSM', 'WDC', 'STX', 'SNDK'
 ]
 
 # MarketData.app API Token (for enhanced options data)
@@ -1433,7 +1433,11 @@ def scan_whales_polygon():
     market_open = now_et.replace(hour=9, minute=30, second=0, microsecond=0)
     market_close = now_et.replace(hour=16, minute=15, second=0, microsecond=0)
     
-    if now_et < market_open or now_et > market_close:
+    # Allow weekend scanning if cache is empty (for development/testing)
+    is_weekend = now_et.weekday() >= 5
+    is_cache_empty = len(WHALE_HISTORY) == 0
+    
+    if (now_et < market_open or now_et > market_close) and not (is_weekend and is_cache_empty):
         # print("💤 Market closed - skipping whale scan")
         return []
     
@@ -1486,24 +1490,37 @@ def scan_whales_polygon():
                 # Calculate premium
                 notional = volume * last_price * 100
                 
-                # THRESHOLDS
-                if symbol.upper() in ['SPY', 'QQQ']:
-                    min_whale_val = 8_000_000
-                elif symbol.upper() == 'TSLA':
-                    min_whale_val = 6_000_000
+                # TIERED THRESHOLDS
+                symbol_upper = symbol.upper()
+                
+                # Tier 1: Indices/ETFs (Massive Liquidity)
+                if symbol_upper in ['SPY', 'QQQ', 'IWM', 'DIA']:
+                    min_whale_val = 1_000_000  # $1M
+                    min_vol = 1000
+                # Tier 2: Mag 7 / Mega Cap (High Liquidity)
+                elif symbol_upper in ['TSLA', 'NVDA', 'AAPL', 'MSFT', 'AMZN', 'GOOG', 'GOOGL', 'META', 'AMD']:
+                    min_whale_val = 500_000    # $500k
+                    min_vol = 500
+                # Tier 3: Mid Cap / Others (STX, PLTR, SOFI, etc.)
                 else:
-                    min_whale_val = 500_000
+                    min_whale_val = 100_000    # $100k
+                    min_vol = 100
+
+                # 1. PURE WHALE FILTER (Big Money)
+                is_pure_whale = (notional >= min_whale_val) and (volume >= min_vol)
                 
-                is_significant_premium = notional >= min_whale_val
-                is_meaningful_volume = volume >= 500
-                
-                if not (is_significant_premium and is_meaningful_volume):
-                    continue
-                
-                # GLOBAL FILTER: Volume > 1.2x Open Interest (Unusual Activity)
-                # Must be strictly unusual to enter the feed
-                open_interest = contract.get("open_interest", 0)
-                if volume <= (open_interest * 1.2):
+                # 2. UNUSUAL ACTIVITY FILTER (High Relative Volume)
+                # Must be > 1.2x OI and have at least some premium ($20k+)
+                open_interest = int(contract.get("open_interest", 0) or 0)
+                is_unusual = False
+                if open_interest > 0:
+                    is_unusual = (volume > open_interest * 1.2) and (notional >= 20_000)
+                elif open_interest == 0 and volume >= 100:
+                     # If OI is 0, treat as unusual if volume is decent
+                     is_unusual = True
+
+                # COMBINED CHECK: Must be either a Whale OR Unusual
+                if not (is_pure_whale or is_unusual):
                     continue
                 
                 # Extract contract details
@@ -1567,9 +1584,8 @@ def scan_whales_polygon():
                     "moneyness": moneyness,
                     "bid": 0, # Polygon snapshot doesn't give bid/ask easily in this endpoint
                     "ask": 0,
-                    "is_mega_whale": is_significant_premium and notional >= MEGA_WHALE_THRESHOLD,
-                    "is_mega_whale": is_significant_premium and notional >= MEGA_WHALE_THRESHOLD,
-                    "is_sweep": (delta > 0) and is_significant_premium, # Vol > OI guaranteed by global filter
+                    "is_mega_whale": notional >= MEGA_WHALE_THRESHOLD,
+                    "is_sweep": (delta > 0) and (notional >= min_whale_val), # Sweep if buying and meets tier threshold
                     "source": "polygon"
                 }
                 
@@ -1617,15 +1633,21 @@ def scan_single_whale_polygon(symbol):
         
         current_price = polygon_data.get("_current_price", 0)
         
-        # Thresholds - tiered by ticker liquidity
-        vol_oi_multiplier = 4 if symbol.upper() in ['SPY', 'QQQ', 'IWM'] else 3
-        # SPY/QQQ = $8M (index ETFs), TSLA = $4M (mega cap single stock), others = $500k
-        if symbol.upper() in ['SPY', 'QQQ']:
-            min_whale_val = 8_000_000
-        elif symbol.upper() == 'TSLA':
-            min_whale_val = 6_000_000
-        else:
+        # TIERED THRESHOLDS
+        symbol_upper = symbol.upper()
+        
+        # Tier 1: Indices/ETFs
+        if symbol_upper in ['SPY', 'QQQ', 'IWM', 'DIA']:
+            min_whale_val = 1_000_000
+            min_vol = 1000
+        # Tier 2: Mag 7 / Mega Cap
+        elif symbol_upper in ['TSLA', 'NVDA', 'AAPL', 'MSFT', 'AMZN', 'GOOG', 'GOOGL', 'META', 'AMD']:
             min_whale_val = 500_000
+            min_vol = 500
+        # Tier 3: Mid Cap / Others
+        else:
+            min_whale_val = 100_000
+            min_vol = 100
         
         for contract in polygon_data.get("results", []):
             details = contract.get("details", {})
@@ -1647,13 +1669,15 @@ def scan_single_whale_polygon(symbol):
             # Calculate premium (notional value)
             notional = volume * last_price * 100
             
-            # Vol/OI ratio - KEY indicator of unusual activity
-            vol_oi_ratio = volume / open_interest if open_interest > 0 else 999
+            # 1. PURE WHALE FILTER
+            is_pure_whale = (notional >= min_whale_val) and (volume >= min_vol)
             
-            # INDUSTRY-STANDARD FILTERS (aligned with Unusual Whales, Cheddar Flow)
-            is_unusual = vol_oi_ratio > 1.05
-            is_significant_premium = notional >= min_whale_val  # Use ticker-specific threshold
-            is_meaningful_volume = volume >= 500
+            # 2. UNUSUAL ACTIVITY FILTER
+            is_unusual = False
+            if open_interest > 0:
+                is_unusual = (volume > open_interest * 1.2) and (notional >= 20_000)
+            elif open_interest == 0 and volume >= 100:
+                is_unusual = True
             
             # Calculate DTE (Days to Expiration)
             try:
@@ -1663,8 +1687,9 @@ def scan_single_whale_polygon(symbol):
             except:
                 is_short_term = False
             
-            # Must pass ALL criteria to be "unusual"
-            if not (is_unusual and is_significant_premium and is_meaningful_volume and is_short_term):
+            # Must be (Whale OR Unusual) AND Short Term (if that's the desired scope)
+            # Assuming this function is for the "Whale Feed" which usually focuses on near-term
+            if not ((is_pure_whale or is_unusual) and is_short_term):
                 continue
             
             # Moneyness calculation with 0.5% ATM buffer
@@ -4008,8 +4033,12 @@ def start_background_worker():
         is_market_hours = 4 <= now_et.hour < 20  # Extended hours: 4am-8pm
         
         if is_weekend:
-            print("📅 Weekend - skipping whale fetch (using cached data)")
-            print(f"   Cached whale trades available: {len(CACHE.get('whales', {}).get('data', []))}")
+            # If cache is empty, allow one fetch even on weekend to populate data
+            if len(CACHE.get('whales', {}).get('data', [])) == 0:
+                 print("📅 Weekend but cache empty - triggering initial whale scan...")
+            else:
+                 print("📅 Weekend - skipping whale fetch (using cached data)")
+                 print(f"   Cached whale trades available: {len(CACHE.get('whales', {}).get('data', []))}")
         elif not is_market_hours:
             print("🌙 Market closed - minimal startup (using cached data)")
         else:
