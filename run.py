@@ -763,9 +763,9 @@ def get_option_history(ticker):
     return jsonify({"results": bars})
 
 
-# @app.route('/unusual_flow')
-# def unusual_flow_page():
-#     return send_from_directory('.', 'unusual_flow.html')
+@app.route('/unusual_flow')
+def unusual_flow_page():
+    return send_from_directory('.', 'unusual_flow.html')
 
 
 # === UNUSUAL FLOW (SINGLE CONTRACT) ENDPOINTS ===
@@ -2820,9 +2820,7 @@ def refresh_polymarket_logic():
                     "nvidia", "apple", "microsoft", "google", "tesla", "openai", "gemini", 
                     "grok", "deepseek", "claude", "spacex", "starship", "robotaxi"
                 ],
-                "CULTURE": [
-                    "spotify", "youtube", "mrbeast", "swift", "beyonce", "grammy"
-                ]
+
             }
 
             BLACKLIST_WORDS = [
@@ -2964,7 +2962,8 @@ def refresh_polymarket_logic():
                 try:
                     vol = float(m.get('volume', 0))
                     liq = float(m.get('liquidity', 0))
-                    delta = float(m.get('oneDayPriceChange', 0))
+                    delta = float(m.get('oneDayPriceChange', 0) or 0)
+                    one_hour_change = float(m.get('oneHourPriceChange', 0) or 0)
                 except: continue
 
                 # Thresholds
@@ -2986,7 +2985,8 @@ def refresh_polymarket_logic():
                     seen_stems[stem] = len(candidates)
 
                 # 5. Weighted Score
-                score = math.log(vol + 1) * (abs(delta) * 100)
+                # Weight 1H change 5x more than 24H change to surface breaking news
+                score = math.log(vol + 1) * ((abs(one_hour_change) * 500) + (abs(delta) * 100))
                 
                 # 6. Process Outcomes (for Display)
                 # This part is from the original code, adapted for the new loop
@@ -3048,7 +3048,7 @@ def refresh_polymarket_logic():
                     candidates.append({
                         "event": title,
                         "category": category,
-                        "is_volatile": abs(delta) >= 0.05,
+                        "is_volatile": abs(one_hour_change) >= 0.02 or abs(delta) >= 0.05,
                         "volume": vol, # Keep raw for sorting
                         "volume_fmt": format_money(vol),
                         "liquidity": format_money(liq),

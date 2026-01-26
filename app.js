@@ -426,6 +426,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Add multi-choice indicator to event text
             let eventText = market.event;
+
+            // Add Volatility Icon
+            if (market.is_volatile) {
+                eventText = '🔥 ' + eventText;
+            }
+
             if (isMultiChoice) {
                 eventText += ' ⋯';
             }
