@@ -1,0 +1,2139 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PigmentOS - Unusual Flow (Single Contract)</title>
+    <style>
+        :root {
+            --bg-color: #000000;
+            --text-color: #e0e0e0;
+            --accent-cyan: #00ffff;
+            --accent-purple: #bd00ff;
+            --alert-red: #ff3333;
+            --font-pixel: 'Press Start 2P', cursive;
+            --font-mono: 'JetBrains Mono', monospace;
+            --border-color: #333;
+            --widget-bg: #111;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-mono);
+            margin: 0;
+            padding: 20px;
+            overflow-x: hidden;
+            min-height: 100vh;
+            /* Ensure full height for overlay */
+            position: relative;
+            /* For absolute positioning of overlay */
+        }
+
+        /* CRT Scanline Overlay */
+        body::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 9999;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .title {
+            font-family: var(--font-pixel);
+            font-size: 16px;
+            color: #fff;
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        .close-btn {
+            background: #FF3333;
+            color: #fff;
+            border: 2px solid #990000;
+            padding: 4px 8px;
+            font-family: var(--font-pixel);
+            font-size: 10px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 3px 3px 0px #990000;
+            transition: all 0.1s;
+        }
+
+        .close-btn:hover {
+            transform: translate(1px, 1px);
+            box-shadow: 1px 1px 0px #990000;
+            background: #cc0000;
+        }
+
+        /* Main Layout */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* Selection Panel */
+        .selection-panel {
+            background: var(--widget-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .panel-title {
+            font-family: var(--font-pixel);
+            font-size: 12px;
+            color: #fff;
+            margin-bottom: 10px;
+        }
+
+        .drill-down-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .select-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .select-label {
+            font-size: 10px;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        .styled-select {
+            background: #000;
+            color: #fff;
+            border: 1px solid #333;
+            padding: 8px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            border-radius: 4px;
+            width: 100%;
+        }
+
+        .styled-select:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .spot-price {
+            font-size: 10px;
+            color: #888;
+            font-family: var(--font-mono);
+            margin-top: 4px;
+        }
+
+        .strike-nav-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .strike-nav-wrapper .styled-select {
+            flex: 1;
+        }
+
+        .strike-nav-btn {
+            background: #1a1a1a;
+            color: #fff;
+            border: 1px solid #444;
+            width: 28px;
+            height: 34px;
+            font-family: var(--font-mono);
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .strike-nav-btn:hover:not(:disabled) {
+            background: var(--accent-purple);
+            border-color: var(--accent-purple);
+            transform: scale(1.05);
+        }
+
+        .strike-nav-btn:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+
+        .strike-nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .type-toggle-wrapper {
+            display: flex;
+            gap: 0;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid #333;
+        }
+
+        .type-toggle-btn {
+            flex: 1;
+            padding: 8px 12px;
+            font-family: var(--font-pixel);
+            font-size: 9px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.15s;
+            background: #1a1a1a;
+            color: #666;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .type-toggle-btn::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(0deg,
+                    transparent,
+                    transparent 1px,
+                    rgba(0, 0, 0, 0.15) 1px,
+                    rgba(0, 0, 0, 0.15) 2px);
+            pointer-events: none;
+        }
+
+        .type-toggle-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .type-toggle-btn.call {
+            border-right: 1px solid #333;
+        }
+
+        .type-toggle-btn.call.active {
+            background: linear-gradient(180deg, #00cc00 0%, #009900 100%);
+            color: #000;
+            text-shadow: 0 0 8px rgba(0, 255, 0, 0.5);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 10px rgba(0, 255, 0, 0.3);
+        }
+
+        .type-toggle-btn.put.active {
+            background: linear-gradient(180deg, #cc0000 0%, #990000 100%);
+            color: #fff;
+            text-shadow: 0 0 8px rgba(255, 0, 0, 0.5);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 10px rgba(255, 0, 0, 0.3);
+        }
+
+        .type-toggle-btn:hover:not(:disabled):not(.active) {
+            background: #2a2a2a;
+            color: #aaa;
+        }
+
+        .go-btn {
+            background: var(--accent-purple);
+            color: #fff;
+            border: none;
+            padding: 0 20px;
+            font-family: var(--font-pixel);
+            font-size: 10px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+            height: 34px;
+            align-self: flex-end;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .go-btn::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(0deg,
+                    transparent,
+                    transparent 1px,
+                    rgba(0, 0, 0, 0.15) 1px,
+                    rgba(0, 0, 0, 0.15) 2px);
+            pointer-events: none;
+        }
+
+        .go-btn:hover {
+            background: #d54dff;
+            transform: translateY(-1px);
+        }
+
+        .go-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Snapshot Card */
+        .snapshot-card {
+            background: var(--widget-bg);
+            border: 2px solid #0063B2;
+            border-radius: 12px;
+            padding: 20px;
+            display: none;
+            /* Hidden until loaded */
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .contract-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 15px;
+        }
+
+        .contract-name {
+            font-family: 'Space Mono', monospace;
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 5px;
+        }
+
+        .contract-id {
+            font-size: 10px;
+            color: #666;
+            font-family: var(--font-mono);
+        }
+
+        .price-large {
+            font-family: var(--font-pixel);
+            font-size: 18px;
+            color: #fff;
+        }
+
+        .price-label {
+            font-size: 8px;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-box::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(0, 0, 0, 0.08) 2px,
+                    rgba(0, 0, 0, 0.08) 4px);
+            pointer-events: none;
+            border-radius: 6px;
+        }
+
+        .stat-label {
+            font-size: 9px;
+            color: #888;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-size: 14px;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        /* Moneyness Badge Styles */
+        .moneyness-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+            font-family: var(--font-pixel);
+            margin-right: 6px;
+        }
+
+        .moneyness-badge.itm {
+            background: linear-gradient(180deg, #00cc00 0%, #009900 100%);
+            color: #000;
+            box-shadow: 0 0 6px rgba(0, 255, 0, 0.3);
+        }
+
+        .moneyness-badge.atm {
+            background: linear-gradient(180deg, #ffcc00 0%, #cc9900 100%);
+            color: #000;
+            box-shadow: 0 0 6px rgba(255, 204, 0, 0.3);
+        }
+
+        .moneyness-badge.otm {
+            background: linear-gradient(180deg, #cc0000 0%, #990000 100%);
+            color: #fff;
+            box-shadow: 0 0 6px rgba(255, 0, 0, 0.3);
+        }
+
+        .moneyness-pct {
+            font-size: 12px;
+            font-family: var(--font-mono);
+        }
+
+        .moneyness-pct.positive {
+            color: #00ff00;
+        }
+
+        .moneyness-pct.negative {
+            color: #ff3333;
+        }
+
+        /* DTE Countdown Styles */
+        .dte-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+            font-family: var(--font-pixel);
+            transition: all 0.3s;
+        }
+
+        .dte-badge.safe {
+            background: linear-gradient(180deg, #00cc00 0%, #009900 100%);
+            color: #000;
+            box-shadow: 0 0 8px rgba(0, 255, 0, 0.3);
+        }
+
+        .dte-badge.warning {
+            background: linear-gradient(180deg, #ffcc00 0%, #cc9900 100%);
+            color: #000;
+            box-shadow: 0 0 8px rgba(255, 204, 0, 0.3);
+        }
+
+        .dte-badge.danger {
+            background: linear-gradient(180deg, #ff6600 0%, #cc3300 100%);
+            color: #fff;
+            box-shadow: 0 0 8px rgba(255, 102, 0, 0.3);
+        }
+
+        .dte-badge.critical {
+            background: linear-gradient(180deg, #ff0000 0%, #990000 100%);
+            color: #fff;
+            box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+            animation: dte-flash 0.8s ease-in-out infinite;
+        }
+
+        @keyframes dte-flash {
+
+            0%,
+            100% {
+                box-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
+                transform: scale(1);
+            }
+
+            50% {
+                box-shadow: 0 0 20px rgba(255, 0, 0, 0.4);
+                transform: scale(1.05);
+            }
+        }
+
+        .dte-label {
+            font-size: 9px;
+            color: #666;
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .greeks-section {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .greek-item {
+            flex: 1;
+            text-align: center;
+        }
+
+        .greek-val {
+            color: #aaa;
+            font-size: 12px;
+        }
+
+        .greek-bar-track {
+            width: 100%;
+            height: 12px;
+            /* Thicker for health bar look */
+            background: #000;
+            border: 1px solid #fff;
+            /* White pixel border */
+            border-radius: 0;
+            /* Sharp corners */
+            margin-top: 6px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5);
+            /* Drop shadow depth */
+        }
+
+        .greek-bar-fill {
+            height: 100%;
+            border-radius: 0;
+            transition: width 0.5s steps(10);
+            /* Stepped animation */
+            position: relative;
+            /* Segmented Gradient: Red -> Yellow -> Green */
+            background: linear-gradient(90deg,
+                    #ff0000 0%, #ff0000 33%,
+                    #ffcc00 33%, #ffcc00 66%,
+                    #00cc00 66%, #00cc00 100%);
+
+            /* Mask to create "segments" (black lines) */
+            mask-image: repeating-linear-gradient(90deg,
+                    #000, #000 8px,
+                    transparent 8px, transparent 10px);
+            -webkit-mask-image: repeating-linear-gradient(90deg,
+                    #000, #000 8px,
+                    transparent 8px, transparent 10px);
+        }
+
+        /* Remove old specific color classes since we use a unified health bar gradient */
+        .greek-bar-fill.delta,
+        .greek-bar-fill.gamma,
+        .greek-bar-fill.theta,
+        .greek-bar-fill.vega {
+            box-shadow: none;
+        }
+
+        /* Tooltip Icon Update */
+        .tooltip-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 9px;
+            height: 9px;
+            background: transparent;
+            border: 1px solid #555;
+            border-radius: 50%;
+            font-size: 6px;
+            color: #555;
+            margin-left: 3px;
+            cursor: help;
+            transition: all 0.2s;
+            vertical-align: middle;
+        }
+
+        .greek-item:hover .tooltip-icon {
+            background: var(--accent-purple);
+            color: #fff;
+            border-color: var(--accent-purple);
+        }
+
+        .greek-item {
+            position: relative;
+        }
+
+        .greek-item::before {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.95);
+            color: #e0e0e0;
+            padding: 8px 10px;
+            border-radius: 4px;
+            border: 1px solid var(--accent-purple);
+            font-size: 10px;
+            font-family: var(--font-mono);
+            line-height: 1.4;
+            width: 180px;
+            text-align: left;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+            z-index: 100;
+            pointer-events: none;
+            box-shadow: 0 0 15px rgba(189, 0, 255, 0.2);
+        }
+
+        .greek-item::after {
+            content: '';
+            position: absolute;
+            bottom: calc(100% + 2px);
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: var(--accent-purple);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+            z-index: 101;
+        }
+
+        .greek-item:hover::before,
+        .greek-item:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid #0063B2;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 40px auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Volume Chart Container */
+        .chart-container {
+            position: relative;
+            height: 280px;
+            width: 100%;
+            background: #050505;
+            border: 2px solid #333;
+            border-radius: 8px;
+            margin-top: 20px;
+            transition: border-color 0.3s;
+            padding: 10px;
+        }
+
+        .chart-container.spike-alert {
+            animation: spike-flash 0.8s ease-in-out infinite;
+        }
+
+        @keyframes spike-flash {
+
+            0%,
+            100% {
+                border-color: #FF3333;
+                box-shadow: 0 0 10px rgba(255, 51, 51, 0.5);
+            }
+
+            50% {
+                border-color: #990000;
+                box-shadow: 0 0 5px rgba(255, 51, 51, 0.2);
+            }
+        }
+
+        .chart-title {
+            font-family: var(--font-pixel);
+            font-size: 10px;
+            color: #888;
+            padding: 10px 15px 0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #chart-loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #666;
+            font-family: 'VT323', monospace;
+            font-size: 16px;
+        }
+
+        /* Premium vs ADV Badge (Orange, styled like sign-out button) */
+        .premium-adv-badge {
+            display: inline-block;
+            background: rgba(255, 165, 0, 0.2);
+            border: 1px solid #FFA500;
+            color: #FFA500;
+            padding: 4px 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 0 10px rgba(255, 165, 0, 0.2);
+            margin-top: 6px;
+            cursor: default;
+            transition: all 0.2s;
+        }
+
+        .premium-adv-badge.unusual {
+            background: rgba(255, 165, 0, 0.4);
+            box-shadow: 0 0 15px rgba(255, 165, 0, 0.6);
+            color: #FFF;
+            animation: badge-pulse 1.5s infinite;
+        }
+
+        @keyframes badge-pulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 10px rgba(255, 165, 0, 0.4);
+            }
+
+            50% {
+                box-shadow: 0 0 20px rgba(255, 165, 0, 0.8);
+            }
+        }
+
+        /* Chart Timeframe Toggle */
+        .chart-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 15px 5px;
+        }
+
+        .timeframe-toggle {
+            display: flex;
+            gap: 0;
+            border-radius: 3px;
+            overflow: hidden;
+            border: 1px solid #333;
+        }
+
+        .timeframe-btn {
+            padding: 3px 8px;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            background: #1a1a1a;
+            color: #666;
+            border: none;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .timeframe-btn:first-child {
+            border-right: 1px solid #333;
+        }
+
+        .timeframe-btn.active {
+            background: #333;
+            color: #fff;
+        }
+
+        .timeframe-btn:hover:not(.active) {
+            background: #2a2a2a;
+            color: #aaa;
+        }
+    </style>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;700&family=VT323&family=Space+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+</head>
+
+<style>
+    /* Retro 3D Title Styles */
+    .retro-title-3d {
+        font-family: var(--font-pixel);
+        font-weight: 700;
+        font-size: 32px;
+        /* Larger size */
+        letter-spacing: 2px;
+        color: #FFFF00;
+        /* Bright Yellow Face */
+        background: none;
+        -webkit-text-fill-color: #FFFF00;
+
+        /* Deep Layered 3D Extrusion (Pink then Blue) */
+        text-shadow:
+            1px 1px 0 #FF00FF, 2px 2px 0 #FF00FF, 3px 3px 0 #FF00FF, 4px 4px 0 #FF00FF,
+            5px 5px 0 #0000FF, 6px 6px 0 #0000FF, 7px 7px 0 #0000FF, 8px 8px 0 #0000FF,
+            9px 9px 20px rgba(0, 0, 0, 0.5);
+
+        /* Subtle White Highlight */
+        filter: drop-shadow(-1px -1px 0px #FFFFFF);
+
+        animation:
+            slam-enter 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards,
+            retroShine 4s linear infinite 0.6s;
+
+        display: inline-block;
+        /* Required for transform animations */
+    }
+
+    .whale-icon-anim {
+        display: inline-block;
+        font-size: 32px;
+        /* Reset colors to show original emoji */
+        color: initial;
+        -webkit-text-fill-color: initial;
+        text-shadow: none;
+        filter: none;
+
+        /* filter: contrast(150%) saturate(150%) drop-shadow(2px 2px 0px #000); */
+        /* animation: idle-float 3s ease-in-out infinite; */
+        vertical-align: middle;
+        margin-left: 10px;
+    }
+
+    /* Animations */
+    @keyframes slam-enter {
+        0% {
+            opacity: 0;
+            transform: scale(3);
+            filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0));
+        }
+
+        70% {
+            opacity: 1;
+            transform: scale(0.9);
+            filter: drop-shadow(0 0 50px white) drop-shadow(0 0 20px #FF00FF);
+        }
+
+        100% {
+            transform: scale(1);
+            filter: drop-shadow(-1px -1px 0px #FFFFFF);
+        }
+    }
+
+    @keyframes retroShine {
+
+        0%,
+        100% {
+            filter: drop-shadow(-1px -1px 0px #FFFFFF) brightness(1);
+        }
+
+        50% {
+            filter: drop-shadow(-1px -1px 0px #FFFFFF) brightness(1.4);
+        }
+    }
+
+    @keyframes idle-float {
+
+        0%,
+        100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-5px);
+        }
+    }
+
+    /* Glitch/Scramble Effect Classes */
+    .glitch-text {
+        position: relative;
+        display: inline-block;
+    }
+
+    .glitch-active {
+        color: #fff;
+        animation: glitch-skew 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both infinite;
+    }
+
+    .glitch-active::before,
+    .glitch-active::after {
+        content: attr(data-text);
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: var(--widget-bg);
+    }
+
+    .glitch-active::before {
+        left: 2px;
+        text-shadow: -1px 0 #ff00c1;
+        clip: rect(44px, 450px, 56px, 0);
+        animation: glitch-anim-1 2s infinite linear alternate-reverse;
+    }
+
+    .glitch-active::after {
+        left: -2px;
+        text-shadow: -1px 0 #00fff9;
+        clip: rect(44px, 450px, 56px, 0);
+        animation: glitch-anim-2 2s infinite linear alternate-reverse;
+    }
+
+    @keyframes glitch-anim-1 {
+        0% {
+            clip: rect(20px, 9999px, 15px, 0);
+        }
+
+        20% {
+            clip: rect(55px, 9999px, 80px, 0);
+        }
+
+        40% {
+            clip: rect(10px, 9999px, 65px, 0);
+        }
+
+        60% {
+            clip: rect(80px, 9999px, 5px, 0);
+        }
+
+        80% {
+            clip: rect(35px, 9999px, 95px, 0);
+        }
+
+        100% {
+            clip: rect(60px, 9999px, 40px, 0);
+        }
+    }
+
+    @keyframes glitch-anim-2 {
+        0% {
+            clip: rect(65px, 9999px, 100px, 0);
+        }
+
+        20% {
+            clip: rect(10px, 9999px, 5px, 0);
+        }
+
+        40% {
+            clip: rect(90px, 9999px, 25px, 0);
+        }
+
+        60% {
+            clip: rect(15px, 9999px, 70px, 0);
+        }
+
+        80% {
+            clip: rect(50px, 9999px, 30px, 0);
+        }
+
+        100% {
+            clip: rect(5px, 9999px, 85px, 0);
+        }
+    }
+
+    @keyframes glitch-skew {
+        0% {
+            transform: skew(0deg);
+        }
+
+        20% {
+            transform: skew(-2deg);
+        }
+
+        40% {
+            transform: skew(2deg);
+        }
+
+        60% {
+            transform: skew(-1deg);
+        }
+
+        80% {
+            transform: skew(1deg);
+        }
+
+        100% {
+            transform: skew(0deg);
+        }
+    }
+</style>
+</head>
+
+<body>
+    <div class="header">
+        <div class="retro-title-3d">UNUSUAL FLOW</div>
+        <a href="/" class="close-btn">X</a>
+    </div>
+
+    <div class="main-content">
+        <!-- Selection Panel -->
+        <div class="selection-panel">
+            <div class="panel-title">CONTRACT VIEW <span style="font-size: 14px;">🕹️</span></div>
+            <div class="drill-down-row">
+                <!-- 1. Ticker -->
+                <div class="select-group">
+                    <span class="select-label">Ticker</span>
+                    <select id="ticker-select" class="styled-select">
+                        <option value="" selected disabled>SELECT</option>
+                        <option value="NVDA">NVDA</option>
+                        <option value="TSLA">TSLA</option>
+                        <option value="AAPL">AAPL</option>
+                        <option value="AMD">AMD</option>
+                        <option value="AMZN">AMZN</option>
+                        <option value="MSFT">MSFT</option>
+                        <option value="META">META</option>
+                        <option value="GOOGL">GOOGL</option>
+                        <option value="PLTR">PLTR</option>
+                        <option value="MU">MU</option>
+                        <option value="SNDK">SNDK</option>
+                        <option value="LITE">LITE</option>
+                        <option value="ORCL">ORCL</option>
+                        <option value="TSM">TSM</option>
+                        <option value="IREN">IREN</option>
+                        <option value="STX">STX</option>
+                    </select>
+                    <div id="spot-price" class="spot-price"></div>
+                </div>
+
+                <!-- 2. Expiration -->
+                <div class="select-group">
+                    <span class="select-label">Expiration</span>
+                    <select id="expiry-select" class="styled-select" disabled>
+                        <option value="" selected disabled>SELECT TICKER FIRST</option>
+                    </select>
+                </div>
+
+                <!-- 3. Strike -->
+                <div class="select-group">
+                    <span class="select-label">Strike</span>
+                    <div class="strike-nav-wrapper">
+                        <button id="strike-down" class="strike-nav-btn" disabled title="Previous Strike (↓)">−</button>
+                        <select id="strike-select" class="styled-select" disabled>
+                            <option value="" selected disabled>WAITING...</option>
+                        </select>
+                        <button id="strike-up" class="strike-nav-btn" disabled title="Next Strike (↑)">+</button>
+                    </div>
+                </div>
+
+                <!-- 4. Type -->
+                <div class="select-group">
+                    <span class="select-label">Type</span>
+                    <div class="type-toggle-wrapper">
+                        <button id="type-call" class="type-toggle-btn call active" disabled>CALL</button>
+                        <button id="type-put" class="type-toggle-btn put" disabled>PUT</button>
+                    </div>
+                    <input type="hidden" id="type-select" value="C">
+                </div>
+
+                <button id="go-btn" class="go-btn" disabled>LOAD</button>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading-indicator" style="display: none;">
+            <div class="spinner"></div>
+            <div style="text-align: center; font-size: 10px; color: #666;">FETCHING SNAPSHOT...</div>
+        </div>
+
+        <!-- Snapshot Result -->
+        <div id="snapshot-card" class="snapshot-card">
+            <div class="contract-header">
+                <div>
+                    <div class="contract-name" id="display-name">NVDA $150 Call</div>
+                    <div class="contract-id" id="display-id">O:NVDA250117C00150000</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="display: flex; align-items: baseline; justify-content: flex-end; gap: 8px;">
+                        <div class="price-large" id="display-price">$4.20</div>
+                        <div id="display-change" style="font-size: 12px; font-weight: bold;">+5.2%</div>
+                    </div>
+                    <div class="price-label">CURRENT PRICE</div>
+                    <div class="premium-adv-badge" id="premium-adv-badge" style="display: none;">LOADING...</div>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Volume</div>
+                    <div class="stat-value" id="display-vol">12,450</div>
+                    <div class="stat-notional" id="display-notional"
+                        style="font-size: 10px; color: #bd00ff; margin-top: 4px; font-family: var(--font-mono);">$0
+                    </div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Open Interest</div>
+                    <div class="stat-value" id="display-oi">5,000</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Implied Vol</div>
+                    <div class="stat-value" id="display-iv">45.2%</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Break Even</div>
+                    <div class="stat-value" id="display-be">$154.20</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Moneyness</div>
+                    <div class="stat-value" id="display-moneyness">
+                        <span class="moneyness-badge otm">OTM</span>
+                        <span class="moneyness-pct" id="moneyness-pct">-8.3%</span>
+                    </div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Days to Expiry</div>
+                    <div class="stat-value" id="display-dte">
+                        <span class="dte-badge safe" id="dte-badge">--</span>
+                        <div class="dte-label" id="dte-expiry-date"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="greeks-section">
+                <div class="greek-item"
+                    data-tooltip="How much the option price moves per $1 change in stock price. 0.50 = 50¢ move per $1.">
+                    <div class="stat-label">🏎️ DELTA <span class="tooltip-icon">?</span></div>
+                    <div class="greek-val" id="display-delta">0.45</div>
+                    <div class="greek-bar-track">
+                        <div class="greek-bar-fill delta" id="delta-bar"></div>
+                    </div>
+                </div>
+                <div class="greek-item"
+                    data-tooltip="Rate of delta change. High gamma = explosive moves near the money. Think of it as acceleration.">
+                    <div class="stat-label">💣 GAMMA <span class="tooltip-icon">?</span></div>
+                    <div class="greek-val" id="display-gamma">0.02</div>
+                    <div class="greek-bar-track">
+                        <div class="greek-bar-fill gamma" id="gamma-bar"></div>
+                    </div>
+                </div>
+                <div class="greek-item"
+                    data-tooltip="Daily time decay. Shows how much value you lose each day. -0.15 = lose 15¢/day just from time passing.">
+                    <div class="stat-label">⏳ THETA <span class="tooltip-icon">?</span></div>
+                    <div class="greek-val" id="display-theta">-0.15</div>
+                    <div class="greek-bar-track">
+                        <div class="greek-bar-fill theta" id="theta-bar"></div>
+                    </div>
+                </div>
+                <div class="greek-item"
+                    data-tooltip="Sensitivity to implied volatility. High vega = big moves when IV spikes or crushes.">
+                    <div class="stat-label">🌊 VEGA <span class="tooltip-icon">?</span></div>
+                    <div class="greek-val" id="display-vega">0.08</div>
+                    <div class="greek-bar-track">
+                        <div class="greek-bar-fill vega" id="vega-bar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vol/OI Ratio Chart -->
+            <div class="chart-container">
+                <div class="chart-header">
+                    <div class="chart-title">VOL/OI RATIO <span id="unusual-badge"
+                            style="display:none; background:#ff9900; color:#000; padding:2px 6px; border-radius:3px; font-size:8px; margin-left:10px;">⚡
+                            UNUSUAL</span></div>
+                    <div class="timeframe-toggle">
+                        <button id="tf-6d" class="timeframe-btn active">6D</button>
+                        <button id="tf-20d" class="timeframe-btn">20D</button>
+                    </div>
+                </div>
+                <canvas id="volumeChart"></canvas>
+                <div id="chart-loading" style="display: none;">LOADING CHART...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const IS_FILE_PROTOCOL = window.location.protocol === 'file:';
+        // If opening file directly, use localhost:8001. Otherwise (served by Flask), use relative path.
+        const API_BASE_URL = IS_FILE_PROTOCOL ? 'http://localhost:8001' : '';
+        console.log('Configured API URL:', API_BASE_URL || 'Relative Path');
+
+        // Elements
+        const tickerSelect = document.getElementById('ticker-select');
+        const expirySelect = document.getElementById('expiry-select');
+        const strikeSelect = document.getElementById('strike-select');
+        const typeSelect = document.getElementById('type-select');
+        const goBtn = document.getElementById('go-btn');
+        const loadingEl = document.getElementById('loading-indicator');
+        const snapshotCard = document.getElementById('snapshot-card');
+
+        // State
+        let availableContracts = []; // Store raw contract list to filter locally
+
+        // 1. Ticker Selected -> Fetch Contracts (Expiries)
+        tickerSelect.addEventListener('change', async (e) => {
+            const ticker = e.target.value;
+            if (!ticker) return;
+
+            // Reset downstream
+            expirySelect.innerHTML = '<option>LOADING...</option>';
+            expirySelect.disabled = true;
+            strikeSelect.innerHTML = '<option>WAITING...</option>';
+            strikeSelect.disabled = true;
+            goBtn.disabled = true;
+
+            try {
+                // Fetch ALL contracts for this ticker (Reference API)
+                const res = await fetch(`${API_BASE_URL}/api/flow/contracts?ticker=${ticker}`);
+                const data = await res.json();
+
+                if (data.results) {
+                    availableContracts = data.results;
+                    populateExpiries(availableContracts);
+                }
+
+                // Fetch and display spot price
+                const spotPriceEl = document.getElementById('spot-price');
+                try {
+                    const priceRes = await fetch(`${API_BASE_URL}/api/price/${ticker}`);
+                    const priceData = await priceRes.json();
+                    if (priceData.price) {
+                        spotPriceEl.textContent = `SPOT: $${priceData.price.toFixed(2)}`;
+                    }
+                } catch (e) {
+                    spotPriceEl.textContent = '';
+                }
+            } catch (err) {
+                console.error("Failed to fetch contracts:", err);
+                expirySelect.innerHTML = '<option>ERROR</option>';
+            }
+        });
+
+        function populateExpiries(contracts) {
+            const expiries = new Set();
+            contracts.forEach(c => expiries.add(c.expiration_date));
+
+            // Get today's date in YYYY-MM-DD format (local timezone) to filter out 0DTE
+            const now = new Date();
+            const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+            // Filter out today's date and sort
+            const sortedExpiries = Array.from(expiries)
+                .filter(date => date !== today)
+                .sort();
+
+            expirySelect.innerHTML = '<option value="" selected disabled>SELECT DATE</option>';
+            sortedExpiries.forEach(date => {
+                const opt = document.createElement('option');
+                opt.value = date;
+                opt.textContent = date;
+                expirySelect.appendChild(opt);
+            });
+            expirySelect.disabled = false;
+        }
+
+        // 2. Expiry Selected -> Populate Strikes (filtered by $100K minimum premium if available)
+        expirySelect.addEventListener('change', (e) => {
+            const date = e.target.value;
+            const ticker = tickerSelect.value;
+            const PREMIUM_THRESHOLD = 100000; // $100K minimum
+
+            // Filter contracts for this date
+            const relevant = availableContracts.filter(c => c.expiration_date === date);
+
+            // Aggregate premium, OI, and IV by strike (sum calls + puts)
+            const strikePremiums = {};
+            const strikeOI = {};
+            const strikeIV = {};  // Track IV per strike { sum, count }
+            let hasPremiumData = false;
+
+            relevant.forEach(c => {
+                const strike = c.strike_price;
+                if (!strikePremiums[strike]) {
+                    strikePremiums[strike] = 0;
+                    strikeOI[strike] = 0;
+                    strikeIV[strike] = { sum: 0, count: 0 };
+                }
+                strikePremiums[strike] += (c.day_premium || 0);
+                strikeOI[strike] += (c.open_interest || 0);
+                // Track IV (average across call/put at same strike)
+                if (c.implied_volatility > 0) {
+                    strikeIV[strike].sum += c.implied_volatility;
+                    strikeIV[strike].count++;
+                }
+                if (c.day_premium > 0) hasPremiumData = true;
+            });
+
+            let qualifyingStrikes;
+
+            if (hasPremiumData) {
+                // Filter strikes that meet $100K threshold
+                qualifyingStrikes = Object.entries(strikePremiums)
+                    .filter(([strike, premium]) => premium >= PREMIUM_THRESHOLD)
+                    .map(([strike, premium]) => ({
+                        strike: parseFloat(strike),
+                        premium,
+                        oi: strikeOI[strike],
+                        iv: strikeIV[strike]
+                    }))
+                    .sort((a, b) => a.strike - b.strike);
+            } else {
+                // No premium data - show all strikes with OI, sorted by strike
+                qualifyingStrikes = Object.entries(strikeOI)
+                    .filter(([strike, oi]) => oi > 0)
+                    .map(([strike, oi]) => ({
+                        strike: parseFloat(strike),
+                        premium: null,
+                        oi,
+                        iv: strikeIV[strike]
+                    }))
+                    .sort((a, b) => a.strike - b.strike);
+            }
+
+            strikeSelect.innerHTML = '<option value="" selected disabled>SELECT STRIKE</option>';
+
+            if (qualifyingStrikes.length === 0) {
+                // No strikes meet threshold - show message
+                const opt = document.createElement('option');
+                opt.value = "";
+                opt.textContent = "No strikes available";
+                opt.disabled = true;
+                strikeSelect.appendChild(opt);
+            } else {
+                qualifyingStrikes.forEach(({ strike, premium, oi, iv }) => {
+                    const opt = document.createElement('option');
+                    opt.value = strike;
+                    // Show premium if available, otherwise show OI
+                    let infoStr;
+                    if (premium !== null && premium > 0) {
+                        infoStr = premium >= 1e6
+                            ? `$${(premium / 1e6).toFixed(1)}M`
+                            : `$${(premium / 1e3).toFixed(0)}K`;
+                    } else {
+                        infoStr = `OI: ${oi.toLocaleString()}`;
+                    }
+                    opt.textContent = `$${strike} (${infoStr})`;
+                    strikeSelect.appendChild(opt);
+                });
+            }
+            strikeSelect.disabled = false;
+        });
+
+
+        // 3. Strike Selected -> Enable Type & Go
+        strikeSelect.addEventListener('change', () => {
+            // Enable type toggle buttons
+            typeCallBtn.disabled = false;
+            typePutBtn.disabled = false;
+            goBtn.disabled = false;
+            updateStrikeNavButtons();
+        });
+
+        // Type Toggle Buttons
+        const typeCallBtn = document.getElementById('type-call');
+        const typePutBtn = document.getElementById('type-put');
+
+        typeCallBtn.addEventListener('click', () => {
+            if (typeCallBtn.disabled) return;
+            typeSelect.value = 'C';
+            typeCallBtn.classList.add('active');
+            typePutBtn.classList.remove('active');
+        });
+
+        typePutBtn.addEventListener('click', () => {
+            if (typePutBtn.disabled) return;
+            typeSelect.value = 'P';
+            typePutBtn.classList.add('active');
+            typeCallBtn.classList.remove('active');
+        });
+
+        // Strike Navigation Buttons
+        const strikeUpBtn = document.getElementById('strike-up');
+        const strikeDownBtn = document.getElementById('strike-down');
+
+        function updateStrikeNavButtons() {
+            const currentIndex = strikeSelect.selectedIndex;
+            const optionsCount = strikeSelect.options.length;
+
+            // Disable if strike selector is disabled or no valid selection
+            if (strikeSelect.disabled || currentIndex <= 0) {
+                strikeDownBtn.disabled = true;
+                strikeUpBtn.disabled = true;
+                return;
+            }
+
+            // Down navigates to lower strikes (earlier in the sorted list)
+            strikeDownBtn.disabled = currentIndex <= 1; // 0 is placeholder
+            // Up navigates to higher strikes (later in the sorted list)
+            strikeUpBtn.disabled = currentIndex >= optionsCount - 1;
+        }
+
+        function navigateStrike(direction) {
+            const currentIndex = strikeSelect.selectedIndex;
+            const optionsCount = strikeSelect.options.length;
+
+            if (direction === 'up' && currentIndex < optionsCount - 1) {
+                strikeSelect.selectedIndex = currentIndex + 1;
+            } else if (direction === 'down' && currentIndex > 1) {
+                strikeSelect.selectedIndex = currentIndex - 1;
+            }
+
+            // Trigger change event to update UI
+            strikeSelect.dispatchEvent(new Event('change'));
+            updateStrikeNavButtons();
+        }
+
+        strikeUpBtn.addEventListener('click', () => navigateStrike('up'));
+        strikeDownBtn.addEventListener('click', () => navigateStrike('down'));
+
+        // Keyboard shortcut: Arrow keys when focused on strike area
+        document.addEventListener('keydown', (e) => {
+            // Only work when strike select has options and is enabled
+            if (strikeSelect.disabled || strikeSelect.selectedIndex <= 0) return;
+
+            // Check if user is focused on strike-related elements
+            const activeEl = document.activeElement;
+            const isStrikeArea = activeEl === strikeSelect ||
+                activeEl === strikeUpBtn ||
+                activeEl === strikeDownBtn;
+
+            if (!isStrikeArea) return;
+
+            if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                navigateStrike('up');
+            } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+                e.preventDefault();
+                navigateStrike('down');
+            }
+        });
+
+        // 4. GO -> Fetch Snapshot
+        goBtn.addEventListener('click', async () => {
+            const ticker = tickerSelect.value;
+            const expiry = expirySelect.value;
+            const strike = strikeSelect.value;
+            const type = typeSelect.value; // C or P
+
+            // Construct Contract ID (Polygon Format)
+            // Format: O:NVDA230616C00400000
+            // We need to match the exact ID from our availableContracts list to be safe
+            const match = availableContracts.find(c =>
+                c.expiration_date === expiry &&
+                c.strike_price == strike &&
+                c.contract_type === (type === 'C' ? 'call' : 'put')
+            );
+
+            if (!match) {
+                alert("Contract not found!");
+                return;
+            }
+
+            const contractId = match.ticker; // e.g. O:NVDA...
+
+            // UI Loading
+            snapshotCard.style.display = 'none';
+            loadingEl.style.display = 'block';
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/flow/snapshot/${contractId}`);
+                const data = await res.json();
+
+                if (data.results) {
+                    renderSnapshot(data.results);
+                } else {
+                    alert("No data for this contract.");
+                }
+            } catch (err) {
+                console.error("Snapshot error:", err);
+                alert("Failed to fetch snapshot.");
+            } finally {
+                loadingEl.style.display = 'none';
+            }
+        });
+
+        function renderSnapshot(data) {
+            snapshotCard.style.display = 'block';
+
+            // Parse Details
+            const details = data.details || {};
+            const greeks = data.greeks || {};
+            const day = data.day || {};
+
+            const typeWord = typeSelect.value === 'C' ? '<span style="color:#00FF00;">CALL</span>' : '<span style="color:#FF3333;">PUT</span>';
+            document.getElementById('display-name').innerHTML = `${tickerSelect.value} $${strikeSelect.value} ${typeWord}`;
+            document.getElementById('display-id').textContent = details.ticker;
+            document.getElementById('display-price').textContent = `$${day.close || data.last_quote?.ask || '-'}`;
+
+            // Display percent change
+            const changeEl = document.getElementById('display-change');
+            const pctChange = day.change_percent;
+            let changeText = '-';
+            let changeColor = '#888';
+
+            if (pctChange !== undefined && pctChange !== null) {
+                const isPositive = pctChange >= 0;
+                changeText = `${isPositive ? '+' : ''}${pctChange.toFixed(2)}%`;
+                changeColor = isPositive ? '#00FF00' : '#FF3333';
+            }
+
+            scrambleText(changeEl, changeText, 600, () => {
+                changeEl.style.color = changeColor;
+            });
+
+            scrambleText(document.getElementById('display-vol'), (day.volume || 0).toLocaleString());
+
+            // Calculate and display notional value (Volume × Price × 100 shares per contract)
+            const volume = day.volume || 0;
+            const price = day.close || day.vwap || data.last_quote?.ask || data.last_quote?.midpoint || 0;
+            const notionalValue = volume * price * 100;
+            scrambleText(document.getElementById('display-notional'), formatNotional(notionalValue));
+
+            scrambleText(document.getElementById('display-oi'), (data.open_interest || 0).toLocaleString());
+            scrambleText(document.getElementById('display-iv'), (data.implied_volatility * 100).toFixed(2) + '%');
+            scrambleText(document.getElementById('display-be'), `$${data.break_even_price || '-'}`);
+
+            // Calculate and display moneyness
+            updateMoneyness(data.underlying_asset?.price, parseFloat(strikeSelect.value), typeSelect.value);
+
+            // Update DTE countdown
+            updateDTE(details.expiration_date);
+
+            scrambleText(document.getElementById('display-delta'), greeks.delta?.toFixed(2) || '-');
+            scrambleText(document.getElementById('display-gamma'), greeks.gamma?.toFixed(4) || '-');
+            scrambleText(document.getElementById('display-theta'), greeks.theta?.toFixed(2) || '-');
+            scrambleText(document.getElementById('display-vega'), greeks.vega?.toFixed(2) || '-');
+
+            // Update Greek sparkline bars
+            updateGreekBars(greeks);
+
+            // Fetch and render volume chart
+            const contractId = document.getElementById('display-id').textContent;
+            const contractType = typeSelect.value;
+            fetchVolumeHistory(contractId, contractType, data.open_interest || 0);
+        }
+
+        // Glitch/Scramble Utility
+        function scrambleText(element, finalText, duration = 800, onComplete = null) {
+            const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$%^&*()';
+            const startTime = Date.now();
+            const originalText = element.textContent;
+
+            // Add glitch class
+            element.classList.add('glitch-active');
+            element.setAttribute('data-text', finalText); // For CSS pseudo-elements
+
+            const interval = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // Determine how many characters to "lock in"
+                const length = finalText.length;
+                const lockCount = Math.floor(progress * length);
+
+                let scrambled = '';
+                for (let i = 0; i < length; i++) {
+                    if (i < lockCount) {
+                        scrambled += finalText[i];
+                    } else {
+                        // Random char
+                        scrambled += chars[Math.floor(Math.random() * chars.length)];
+                    }
+                }
+
+                element.textContent = scrambled;
+                element.setAttribute('data-text', scrambled); // Update glitch text
+
+                if (progress >= 1) {
+                    clearInterval(interval);
+                    element.textContent = finalText;
+                    element.classList.remove('glitch-active');
+                    element.removeAttribute('data-text');
+                    if (onComplete) onComplete();
+                }
+            }, 50); // Update every 50ms
+        }
+
+        // Volume Chart
+        let volumeChart = null;
+
+        // Format notional value with K/M/B suffixes
+        function formatNotional(value) {
+            if (value >= 1e9) {
+                return '$' + (value / 1e9).toFixed(2) + 'B';
+            } else if (value >= 1e6) {
+                return '$' + (value / 1e6).toFixed(2) + 'M';
+            } else if (value >= 1e3) {
+                return '$' + (value / 1e3).toFixed(1) + 'K';
+            } else {
+                return '$' + value.toFixed(0);
+            }
+        }
+
+        function updateMoneyness(spotPrice, strike, optionType) {
+            const badge = document.querySelector('.moneyness-badge');
+            const pctEl = document.getElementById('moneyness-pct');
+
+            if (!spotPrice || !strike) {
+                badge.textContent = '-';
+                badge.className = 'moneyness-badge';
+                pctEl.textContent = '';
+                return;
+            }
+
+            // Calculate % distance from strike
+            // For calls: ITM when spot > strike, OTM when spot < strike
+            // For puts: ITM when spot < strike, OTM when spot > strike
+            const pctFromStrike = ((spotPrice - strike) / strike) * 100;
+            const isCall = optionType === 'C';
+
+            let status, isITM;
+            if (Math.abs(pctFromStrike) <= 1) {
+                status = 'ATM';
+                isITM = false;
+            } else if (isCall) {
+                isITM = pctFromStrike > 0;
+                status = isITM ? 'ITM' : 'OTM';
+            } else {
+                isITM = pctFromStrike < 0;
+                status = isITM ? 'ITM' : 'OTM';
+            }
+
+            // Update badge
+            badge.textContent = status;
+            badge.className = `moneyness-badge ${status.toLowerCase()}`;
+
+            // Update percentage
+            const displayPct = isCall ? pctFromStrike : -pctFromStrike;
+            const sign = displayPct >= 0 ? '+' : '';
+            pctEl.textContent = `${sign}${displayPct.toFixed(1)}%`;
+            pctEl.className = `moneyness-pct ${displayPct >= 0 ? 'positive' : 'negative'}`;
+        }
+
+        function updateDTE(expirationDate) {
+            const dteBadge = document.getElementById('dte-badge');
+            const dteLabel = document.getElementById('dte-expiry-date');
+
+            if (!expirationDate) {
+                dteBadge.textContent = '--';
+                dteBadge.className = 'dte-badge';
+                dteLabel.textContent = '';
+                return;
+            }
+
+            // Parse expiration date (YYYY-MM-DD format)
+            const expiry = new Date(expirationDate + 'T16:00:00'); // 4 PM ET expiration
+            const now = new Date();
+
+            // Calculate days to expiration
+            const diffTime = expiry - now;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            // Determine color class based on DTE
+            let colorClass;
+            if (diffDays <= 0) {
+                colorClass = 'critical';
+                dteBadge.textContent = 'EXPIRED';
+            } else if (diffDays <= 3) {
+                colorClass = 'critical'; // Flashing red animation
+                dteBadge.textContent = `${diffDays} DTE`;
+            } else if (diffDays <= 7) {
+                colorClass = 'danger'; // Orange
+                dteBadge.textContent = `${diffDays} DTE`;
+            } else if (diffDays <= 14) {
+                colorClass = 'warning'; // Yellow
+                dteBadge.textContent = `${diffDays} DTE`;
+            } else {
+                colorClass = 'safe'; // Green
+                dteBadge.textContent = `${diffDays} DTE`;
+            }
+
+            dteBadge.className = `dte-badge ${colorClass}`;
+
+            // Format expiry date for label (e.g., "Exp: Jan 24")
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            dteLabel.textContent = `EXP: ${months[expiry.getMonth()]} ${expiry.getDate()}`;
+        }
+
+        function updateGreekBars(greeks) {
+            // Unified Scale: 0.0 to 1.0 maps to 0% to 100% width
+            // This ensures bars are congruent with the numerical value (e.g. 0.50 is half width)
+
+            // Delta: ranges from -1 to 1, display absolute value
+            const deltaBar = document.getElementById('delta-bar');
+            const deltaVal = Math.abs(greeks.delta || 0);
+            deltaBar.style.width = `${Math.min(deltaVal * 100, 100)}%`;
+
+            // Gamma: typically small (e.g. 0.02), will show as small bar
+            const gammaBar = document.getElementById('gamma-bar');
+            const gammaVal = Math.abs(greeks.gamma || 0);
+            gammaBar.style.width = `${Math.min(gammaVal * 100, 100)}%`;
+
+            // Theta: typically small negative, show absolute value
+            const thetaBar = document.getElementById('theta-bar');
+            const thetaVal = Math.abs(greeks.theta || 0);
+            thetaBar.style.width = `${Math.min(thetaVal * 100, 100)}%`;
+
+            // Vega: typically small positive
+            const vegaBar = document.getElementById('vega-bar');
+            const vegaVal = Math.abs(greeks.vega || 0);
+            vegaBar.style.width = `${Math.min(vegaVal * 100, 100)}%`;
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('volumeChart').getContext('2d');
+
+            volumeChart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: [], datasets: [] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    backgroundColor: '#050505',
+                    barPercentage: 0.5,
+                    categoryPercentage: 0.7,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(0,0,0,0.95)',
+                            titleColor: '#fff',
+                            titleFont: { family: "'VT323', monospace", size: 14 },
+                            bodyColor: '#ccc',
+                            bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+                            borderColor: '#0063B2',
+                            borderWidth: 1,
+                            padding: 10,
+                            callbacks: {
+                                label: function (context) {
+                                    const idx = context.dataIndex;
+                                    const historyItem = window.chartHistoryData?.[idx];
+                                    const label = context.dataset.label;
+
+                                    if (label === 'Avg Fill') {
+                                        return `Avg Fill: $${context.raw?.toFixed(2) || '-'}`;
+                                    } else if (label === 'VWAP') {
+                                        return `VWAP: $${context.raw?.toFixed(2) || '-'}`;
+                                    } else if (label === 'Avg Trade Size') {
+                                        return [
+                                            `Avg Size: ${historyItem.transactions ? (historyItem.volume / historyItem.transactions).toFixed(0) : 'Loading...'}`,
+                                            `Tx Count: ${historyItem.transactions || 'Loading...'}`
+                                        ];
+                                    } else if (label === 'Vol/OI Ratio') {
+                                        if (!historyItem) return `Vol/OI: ${context.raw?.toFixed(2)}x`;
+                                        const isToday = idx === (window.chartHistoryData.length - 1);
+                                        const volLabel = isToday ? "Today's Volume" : "Volume";
+                                        return [
+                                            `Vol/OI: ${context.raw?.toFixed(2) || '0'}x`,
+                                            `${volLabel}: ${historyItem.volume?.toLocaleString() || '-'}`,
+                                            `OI: ${historyItem.oi?.toLocaleString() || '-'}`
+                                        ];
+                                    }
+                                    return '';
+                                }
+                            }
+                        }
+                    },
+                    layout: {
+                        padding: {
+                            right: 30 // Add padding for custom axis title
+                        }
+                    },
+                    scales: {
+                                x: {
+                                    grid: { display: false, drawBorder: false },
+                                    ticks: { color: '#888', font: { family: "'VT323', monospace", size: 10 } }
+                                },
+                                y: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'left',
+                                    beginAtZero: true,
+                                    grid: { color: '#222', drawBorder: false },
+                                    ticks: { color: '#888', font: { family: "'VT323', monospace" } },
+                                    title: { display: true, text: 'Vol/OI', color: '#555', font: { size: 10 } }
+                                },
+                                y1: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'right',
+                                    beginAtZero: false,
+                                    grid: { drawOnChartArea: false, drawBorder: false },
+                                    ticks: {
+                                        color: '#555',
+                                        font: { family: "'VT323', monospace", size: 10 },
+                                        callback: function (value) { return '$' + value.toFixed(0); }
+                                    },
+                                    title: { display: false } // Handled by custom plugin
+                                },
+                                y2: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'right',
+                                    beginAtZero: true,
+                                    grid: { drawOnChartArea: false, drawBorder: false },
+                                    ticks: {
+                                        color: '#0085FF',
+                                        font: { family: "'VT323', monospace", size: 8 },
+                                        callback: function (value) { return value.toFixed(0); }
+                                    },
+                                    title: { display: false }
+                                }
+                            }
+                        },
+                        plugins: [{
+                            id: 'customAxisTitle',
+                            afterDraw: (chart) => {
+                                const { ctx, chartArea, scales } = chart;
+                                const yAxis = scales.y1;
+                                if (!yAxis) return;
+
+                                const x = chart.width - 10; // Right margin
+                                const y = (yAxis.top + yAxis.bottom) / 2;
+
+                                ctx.save();
+                                ctx.font = "10px 'VT323', monospace";
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+
+                                // Rotate for vertical axis label
+                                ctx.translate(x, y);
+                                ctx.rotate(-Math.PI / 2);
+
+                                // Draw segments
+                                // Total text: "Avg Fill / VWAP / Avg Size"
+                                // Colors: Purple / Gray / Red / Gray / Cyan
+
+                                const textSegments = [
+                                    { text: 'Avg Fill', color: '#D15CFF' },
+                                    { text: ' / ', color: '#555' },
+                                    { text: 'VWAP', color: '#FF3333' },
+                                    { text: ' / ', color: '#555' },
+                                    { text: 'Avg Size', color: '#0085FF' }
+                                ];
+
+                                let totalWidth = 0;
+                                textSegments.forEach(seg => {
+                                    seg.width = ctx.measureText(seg.text).width;
+                                    totalWidth += seg.width;
+                                });
+
+                                let currentX = -totalWidth / 2; // Start centered
+
+                                textSegments.forEach(seg => {
+                                    ctx.fillStyle = seg.color;
+                                    ctx.fillText(seg.text, currentX + (seg.width / 2), 0); // fillText uses center alignment, so offset by half width
+                                    currentX += seg.width;
+                                });
+
+                                ctx.restore();
+                            }
+                        }]
+                    });
+        }
+
+        // Chart timeframe state
+        let chartDays = 6;
+        let lastContractId = null;
+        let lastContractType = null;
+        let lastOI = 0;
+
+        // Timeframe toggle handlers
+        document.getElementById('tf-6d').addEventListener('click', () => {
+            if (chartDays === 6) return;
+            chartDays = 6;
+            document.getElementById('tf-6d').classList.add('active');
+            document.getElementById('tf-20d').classList.remove('active');
+            if (lastContractId) fetchVolumeHistory(lastContractId, lastContractType, lastOI);
+        });
+
+        document.getElementById('tf-20d').addEventListener('click', () => {
+            if (chartDays === 20) return;
+            chartDays = 20;
+            document.getElementById('tf-20d').classList.add('active');
+            document.getElementById('tf-6d').classList.remove('active');
+            if (lastContractId) fetchVolumeHistory(lastContractId, lastContractType, lastOI);
+        });
+
+        async function fetchVolumeHistory(contractId, type, currentOI) {
+            const chartLoading = document.getElementById('chart-loading');
+            chartLoading.style.display = 'block';
+
+            // Store for toggle refetch
+            lastContractId = contractId;
+            lastContractType = type;
+            lastOI = currentOI;
+
+            try {
+                // Use Vol/OI History endpoint with days param
+                const res = await fetch(`${API_BASE_URL}/api/flow/vol_oi_history/${encodeURIComponent(contractId)}?days=${chartDays}`);
+                const data = await res.json();
+
+                chartLoading.style.display = 'none';
+
+                if (data.error) {
+                    console.error('Chart error:', data.error);
+                    return;
+                }
+
+                updateVolOIChart(data, type);
+            } catch (e) {
+                console.error('Chart fetch error:', e);
+                chartLoading.style.display = 'none';
+            }
+        }
+
+        function updateVolOIChart(data, type) {
+            if (!volumeChart) return;
+
+            const isCall = type === 'C';
+            const history = data.history || [];
+            const avgVolOI = data.avg_vol_oi || 0;
+            const unusualThreshold = data.unusual_threshold || 0;
+            const isUnusual = data.is_unusual || false;
+
+            // Store for tooltips
+            window.chartHistoryData = history;
+
+            // Show/hide unusual badge
+            const badge = document.getElementById('unusual-badge');
+            if (badge) badge.style.display = isUnusual ? 'inline' : 'none';
+
+            // Calculate Premium vs ADV (Average Daily Premium)
+            // Premium = Volume × Price × 100
+            const premiumAdvBadge = document.getElementById('premium-adv-badge');
+            if (premiumAdvBadge && history.length > 1) {
+                // Calculate historical average premium (excluding today)
+                const historicalDays = history.slice(0, -1); // All but last (today)
+                const todayData = history[history.length - 1];
+
+                if (historicalDays.length > 0 && todayData) {
+                    // Calculate daily premiums
+                    const historicalPremiums = historicalDays.map(h =>
+                        (h.volume || 0) * (h.price || 0) * 100
+                    );
+                    const avgPremium = historicalPremiums.reduce((a, b) => a + b, 0) / historicalPremiums.length;
+                    const todayPremium = (todayData.volume || 0) * (todayData.price || 0) * 100;
+
+                    if (avgPremium > 0) {
+                        const ratio = todayPremium / avgPremium;
+                        if (ratio >= 2.0) {
+                            premiumAdvBadge.textContent = `${ratio.toFixed(1)}x ADV PREMIUM`;
+                            premiumAdvBadge.style.display = 'inline-block';
+                            premiumAdvBadge.className = 'premium-adv-badge unusual';
+                        } else {
+                            premiumAdvBadge.textContent = `${ratio.toFixed(1)}x ADV PREMIUM`;
+                            premiumAdvBadge.style.display = 'inline-block';
+                            premiumAdvBadge.className = 'premium-adv-badge';
+                        }
+                    }
+                }
+            }
+
+            // Prepare Chart Data
+            const labels = history.map(h => {
+                const date = new Date(h.date + 'T12:00:00');
+                return `${date.getMonth() + 1}/${date.getDate()}`;
+            });
+
+            const volData = history.map(h => h.volume);
+            const oiData = history.map(h => h.oi);
+            const ratioData = history.map(h => h.vol_oi_ratio);
+            const priceData = history.map(h => h.price);
+
+
+
+            const vwapData = history.map(h => h.vwap || null);
+
+            // Calculate Avg Trade Size (Volume / Transactions)
+            const avgSizeData = history.map(h => {
+                if (!h.transactions || h.transactions === 0) return null;
+                return h.volume / h.transactions;
+            });
+
+            // Update Chart
+            volumeChart.data.labels = labels;
+            volumeChart.data.datasets = [
+                {
+                    type: 'line',
+                    label: 'VWAP',
+                    data: vwapData,
+                    borderColor: '#FF3333', // Red
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    yAxisID: 'y1',
+                    order: 0
+                },
+                {
+                    type: 'line',
+                    label: 'Avg Fill',
+                    data: priceData,
+                    borderColor: '#D15CFF', // Lighter Purple
+                    borderWidth: 1, // Minimalistic
+                    borderDash: [4, 4], // Dotted
+                    pointRadius: 0,
+                    yAxisID: 'y1',
+                    order: 1
+                },
+
+                {
+                    type: 'bar',
+                    label: 'Vol/OI Ratio',
+                    data: ratioData,
+                    backgroundColor: function (context) {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+                        // Color logic: Green for Calls, Red for Puts
+                        const color = isCall ? '#00ff88' : '#cc0000';
+
+                        if (!chartArea) {
+                            return color;
+                        }
+                        return createScanlinePattern(ctx, color);
+                    },
+                    yAxisID: 'y',
+                    order: 2
+                },
+                {
+                    type: 'line',
+                    label: 'Avg Trade Size',
+                    data: avgSizeData,
+                    borderColor: '#0085FF', // Pepsi Blue (Brighter for dark mode)
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    pointHoverRadius: 5,
+                    yAxisID: 'y2', // New Right Axis
+                    order: 0
+                }
+            ];
+
+            // Add annotation for average line
+            volumeChart.options.plugins.annotation = {
+                annotations: {
+                    avgLine: {
+                        type: 'line',
+                        yMin: avgVolOI,
+                        yMax: avgVolOI,
+                        borderColor: 'rgba(255, 255, 255, 0.3)',
+                        borderWidth: 1,
+                        borderDash: [4, 4],
+                        label: {
+                            display: true,
+                            content: `Avg: ${avgVolOI.toFixed(2)}x`,
+                            color: '#888',
+                            font: { size: 7 },
+                            position: 'end'
+                        }
+                    },
+                    unusualLine: {
+                        type: 'line',
+                        yMin: 5, // Fixed 5x threshold for visual reference
+                        yMax: 5,
+                        borderColor: 'rgba(255, 51, 51, 0.5)',
+                        borderWidth: 1,
+                        label: {
+                            display: true,
+                            content: 'BASELINE',
+                            color: '#ff3333',
+                            font: { size: 7 },
+                            position: 'start'
+                        }
+                    }
+                }
+            };
+
+            // Flash alert if any bar > 5x
+            const maxRatio = Math.max(...ratioData);
+            const container = document.querySelector('.chart-container');
+            if (maxRatio >= 5) {
+                container.classList.add('spike-alert');
+            } else {
+                container.classList.remove('spike-alert');
+            }
+
+
+
+            volumeChart.update();
+        }
+
+        function createScanlinePattern(ctx, color) {
+            const patternCanvas = document.createElement('canvas');
+            const patternCtx = patternCanvas.getContext('2d');
+            const size = 2; // Match the 2px pattern from CSS
+            patternCanvas.width = 1;
+            patternCanvas.height = size;
+
+            // 1. Fill background with base color
+            patternCtx.fillStyle = color;
+            patternCtx.fillRect(0, 0, 1, size);
+
+            // 2. Add subtle scanline overlay (every other pixel)
+            // Matches rgba(0, 0, 0, 0.15) from CSS
+            patternCtx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+            patternCtx.fillRect(0, 1, 1, 1);
+
+            return ctx.createPattern(patternCanvas, 'repeat');
+        }
+
+
+        function formatDate(dateStr) {
+            if (!dateStr) return 'N/A';
+            const d = new Date(dateStr);
+            const userTimezoneOffset = d.getTimezoneOffset() * 60000;
+            const adjustedDate = new Date(d.getTime() + userTimezoneOffset);
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            return `${days[adjustedDate.getDay()]} ${months[adjustedDate.getMonth()]} ${adjustedDate.getDate()}`;
+        }
+
+        // Initialize chart on page load
+        document.addEventListener('DOMContentLoaded', initChart);
+
+    </script>
+</body>
+
+</html>

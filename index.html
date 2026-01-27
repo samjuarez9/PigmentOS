@@ -644,16 +644,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             const link = document.getElementById('unusual-whales-link');
             if (link) {
-                const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-                if (!isLocal) {
-                    // Disable link in production (Render)
-                    link.removeAttribute('href');
-                    link.style.pointerEvents = 'none';
-                    link.style.cursor = 'default';
-                    console.log('🔒 Production Mode: Unusual Whales link disabled');
-                } else {
-                    console.log('🔓 Dev Mode: Unusual Whales link active');
-                }
+                console.log('🔓 Unusual Whales link active');
             }
         });
     </script>

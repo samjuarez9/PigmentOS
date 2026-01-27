@@ -202,7 +202,7 @@ MARKETDATA_MIN_INTERVAL = 0.25  # 250ms between requests
 # Polygon.io API Key (primary options data source - unlimited calls)
 POLYGON_API_KEY = os.environ.get("POLYGON_API_KEY")
 FMP_API_KEY = os.environ.get("FMP_API_KEY")  # No longer used
-FRED_API_KEY = os.environ.get("FRED_API_KEY", "9832f887b004951ec7d53cb78f1063a0")
+
 FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY", "d56539pr01qu3qo8fk40d56539pr01qu3qo8fk4g")
 
 # Price cache to reduce redundant API calls (TTL: 15 minutes)
@@ -1051,10 +1051,10 @@ def get_vol_oi_history(contract_symbol):
                         "volume": int(bar.get('v', 0)),
                         "oi": 0,
                         "vol_oi_ratio": 0,
-                        "vol_oi_ratio": 0,
                         "price": bar.get('c', 0),
                         "vwap": bar.get('vw', 0),
-                        "iv": 0
+                        "iv": None,
+                        "transactions": int(bar.get('n', 0))
                     })
         except Exception as e:
             print(f"Aggs fetch error: {e}")
@@ -1084,7 +1084,11 @@ def get_vol_oi_history(contract_symbol):
                     if entry["date"] == today_str:
                         entry["volume"] = current_volume
                         entry["oi"] = current_oi
+                        entry["iv"] = current_iv
                         entry["vol_oi_ratio"] = current_volume / current_oi if current_oi > 0 else 0
+                        # Snapshot doesn't have 'n', so keep existing or 0
+                        if "transactions" not in entry:
+                            entry["transactions"] = None
                         today_found = True
                         break
                 
@@ -1096,7 +1100,8 @@ def get_vol_oi_history(contract_symbol):
                         "vol_oi_ratio": current_volume / current_oi if current_oi > 0 else 0,
                         "price": day_data.get("close", 0),
                         "vwap": day_data.get("vwap", 0),
-                        "iv": current_iv
+                        "iv": current_iv,
+                        "transactions": None # Snapshot doesn't provide 'n', will be None until next agg update
                     })
         except Exception as e:
             print(f"Snapshot fetch error: {e}")
@@ -3244,86 +3249,7 @@ def api_movers():
         return jsonify({"error": str(e)})
 
 
-@app.route('/api/economic-calendar')
-def api_economic_calendar():
-    global CACHE
-    current_time = time.time()
-    
-    # Cache for 1 hour for economic calendar
-    if current_time - CACHE["economic_calendar"]["timestamp"] < 3600:
-        return jsonify(CACHE["economic_calendar"]["data"])
-        
-    try:
-        # Fetch releases for the next 3 weeks using FRED API
-        start_date = datetime.now().strftime('%Y-%m-%d')
-        end_date = (datetime.now() + timedelta(days=21)).strftime('%Y-%m-%d')
-        
-        url = f"https://api.stlouisfed.org/fred/releases/dates?api_key={FRED_API_KEY}&file_type=json&realtime_start={start_date}&realtime_end={end_date}&include_release_dates_with_no_data=true&limit=50&sort_order=asc"
-        response = requests.get(url, timeout=10)
-        
-        if response.status_code != 200:
-            print(f"⚠️ FRED API Error: {response.status_code}")
-            return jsonify(CACHE["economic_calendar"]["data"])
-            
-        data = response.json()
-        release_dates = data.get('release_dates', [])
-        
-        # High-impact releases (FOMC, CPI, Jobs, GDP)
-        HIGH_IMPACT_KEYWORDS = ['FOMC', 'CPI', 'Employment', 'GDP', 'Nonfarm', 'Jobless', 'Retail Sales', 'Consumer Price', 'Federal Reserve']
-        MEDIUM_IMPACT_KEYWORDS = ['ADP', 'PMI', 'Housing', 'Durable', 'Industrial', 'Trade Balance', 'Treasury']
-        
-        formatted_events = []
-        for item in release_dates:
-            release_name = item.get('release_name', 'Unknown')
-            release_date = item.get('date', '')
-            
-            # Determine impact level based on keywords
-            stars = 1
-            critical = False
-            event_type = "STANDARD"
-            
-            if any(kw.lower() in release_name.lower() for kw in HIGH_IMPACT_KEYWORDS):
-                stars = 3
-                critical = True
-                event_type = "BOSS ENCOUNTER"
-            elif any(kw.lower() in release_name.lower() for kw in MEDIUM_IMPACT_KEYWORDS):
-                stars = 2
-                event_type = "CRITICAL DATA"
-            
-            # Format time for display (e.g. "TUE JAN 07")
-            try:
-                dt = datetime.strptime(release_date, '%Y-%m-%d')
-                display_time = dt.strftime('%a %b %d').upper()
-            except:
-                display_time = release_date
-                dt = datetime.now()
-                
-            formatted_events.append({
-                "title": release_name.upper(),
-                "time": display_time,
-                "type": event_type,
-                "status": "UPCOMING",
-                "critical": critical,
-                "stars": stars,
-                "rawDate": release_date,
-                "country": "US"
-            })
-        
-        # Filter to only high-impact (3-star BOSS ENCOUNTER) events
-        formatted_events = [e for e in formatted_events if e['stars'] >= 3]
-        
-        # Sort by date and limit to top 6
-        formatted_events.sort(key=lambda x: x['rawDate'])
-        formatted_events = formatted_events[:6]
-        
-        CACHE["economic_calendar"]["data"] = formatted_events
-        CACHE["economic_calendar"]["timestamp"] = current_time
-        
-        return jsonify(formatted_events)
-        
-    except Exception as e:
-        print(f"⚠️ Economic Calendar Error: {e}")
-        return jsonify(CACHE["economic_calendar"]["data"])
+
 
 
 @app.route('/api/news')

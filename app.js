@@ -592,44 +592,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Render Alert Stream
-    function renderAlerts(alerts) {
-        clear(alertsList);
-        alerts.forEach(alert => {
-            const div = document.createElement('div');
 
-            // Base classes for the alert item
-            let classes = ['alert-item'];
-            if (alert.isNew) {
-                classes.push('new');
-            }
-
-            // Mega Whale styling (>$3M) - Assuming 'alert' object has these properties
-            if (alert.is_mega_whale) {
-                classes.push('mega-whale-alert');
-                if (alert.type === 'CALL') {
-                    classes.push('mega-whale-bull');
-                } else {
-                    classes.push('mega-whale-bear');
-                }
-            }
-            // Regular whale styling (>$2M)
-            else if (alert.notionalValue > 2000000) { // Assuming 'alert' object has notionalValue
-                classes.push('whale-alert');
-                if (alert.type === 'CALL') {
-                    classes.push('whale-alert-bull');
-                } else {
-                    classes.push('whale-alert-bear'); // Corrected class name for consistency
-                }
-            }
-
-            div.className = classes.join(' ');
-            div.innerHTML = `
-    <span style="color: #00FFFF; font-size: 10px; margin-right: 5px;">[${alert.time}]</span>
-        ${alert.message}
-`;
-            alertsList.appendChild(div);
-        });
-    }
 
     // Market Movers Tape Data (20 Items: 10 Gainers + 10 Losers)
     function generateMoversData() {
@@ -2840,17 +2803,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 30000); // Check every 30 seconds
 
     // Dynamic Alert Stream Logic
-    const MOCK_ALERTS = [
-        { source: "@OSINT_CYBER", time: "JUST NOW", text: "⚡ NVDA large block of calls detected. $2.5M premium.", isCritical: true },
-        { source: "@WHALE_WATCH", time: "1m ago", text: "🕵️ TSLA insider selling reported. 50k shares.", isCritical: false },
-        { source: "@MARKET_FLOW", time: "3m ago", text: "🐳 SPY dark pool print: $450M at 445.20.", isCritical: true },
-        { source: "@FED_WIRE", time: "5m ago", text: "🏛️ Powell speech scheduled for Friday 2PM EST.", isCritical: false },
-        { source: "@CRYPTO_ALERT", time: "8m ago", text: "⚡ BTC breaks resistance at 65k. Volume spiking.", isCritical: true },
-        { source: "@OPTIONS_FLOW", time: "10m ago", text: "⚡ AMD put sweep. Bearish sentiment increasing.", isCritical: false },
-        { source: "@INSIDER_INTEL", time: "12m ago", text: "🕵️ META CFO files form 4. Sold 10k shares.", isCritical: false },
-        { source: "@GOV_WATCH", time: "15m ago", text: "🏛️ SEC announces new oversight rules for crypto.", isCritical: true },
-        { source: "@MOMENTUM", time: "18m ago", text: "⚡ AAPL breaking multi-year highs.", isCritical: true },
-    ];
+
 
     // PCR Chart Logic Removed (Replaced by Gamma Wall)
     let isNewsHovered = false;

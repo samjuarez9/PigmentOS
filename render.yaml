@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: pigmentos
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -c gunicorn_config.py run:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: PORT
+        value: 10000
+      - key: STRIPE_ENV
+        value: live
