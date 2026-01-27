@@ -2731,7 +2731,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // LOTTO: High risk, short term (Delta < 0.20, DTE <= 7)
         // Must be meaningful size (already filtered by feed > $500k usually, but good to check)
         const delta = flow.delta || 0;
-        const isLotto = Math.abs(delta) < 0.20 && daysToExpiry <= 7;
+        const isLotto = Math.abs(delta) < 0.20;
 
         // Priority 1: MEGA SWEEP (Very high premium + aggressive buy)
         if (isMega && isSweep) {
@@ -2797,58 +2797,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Store trade data on element for saving
         row._tradeData = flow;
 
-        // === LONG-PRESS TO SAVE ===
-        let pressTimer = null;
-        let pressStart = 0;
 
-        const startPress = (e) => {
-            pressStart = Date.now();
-            row.classList.add('pressing');
-
-            pressTimer = setTimeout(async () => {
-                // Long-press triggered (500ms)
-                row.classList.remove('pressing');
-                row.classList.add('saving');
-
-                try {
-                    const response = await fetch(`${API_BASE_URL}/api/whales/save`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(flow)
-                    });
-
-                    if (response.ok) {
-                        row.classList.add('saved');
-                        // Show saved toast
-                        showToast(`💾 Saved ${flow.ticker} to watchlist`);
-                    } else {
-                        row.classList.remove('saving');
-                        showToast(`❌ Failed to save trade`);
-                    }
-                } catch (err) {
-                    row.classList.remove('saving');
-                    console.error('Save failed:', err);
-                }
-            }, 500);
-        };
-
-        const endPress = () => {
-            if (pressTimer) {
-                clearTimeout(pressTimer);
-                pressTimer = null;
-            }
-            row.classList.remove('pressing');
-        };
-
-        // Mouse events
-        row.addEventListener('mousedown', startPress);
-        row.addEventListener('mouseup', endPress);
-        row.addEventListener('mouseleave', endPress);
-
-        // Touch events (mobile)
-        row.addEventListener('touchstart', startPress, { passive: true });
-        row.addEventListener('touchend', endPress);
-        row.addEventListener('touchcancel', endPress);
 
         return row;
     }
