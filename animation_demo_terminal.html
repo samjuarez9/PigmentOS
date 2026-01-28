@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terminal INSERT COIN Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Unusual Flow title colors */
+            --arcade-yellow: #FFFF00;
+            --arcade-magenta: #FF00FF;
+            --arcade-blue: #0000FF;
+            --arcade-cyan: #00FFFF;
+            --terminal-green: #00FF41;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: #0a0a0a;
+            color: #e0e0e0;
+            font-family: 'VT323', monospace;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 12px;
+            color: var(--arcade-yellow);
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 0 var(--arcade-magenta), 4px 4px 0 var(--arcade-blue);
+        }
+
+        .description {
+            color: #888;
+            font-size: 16px;
+            margin-bottom: 40px;
+            text-align: center;
+            max-width: 500px;
+        }
+
+        /* Demo trigger area */
+        .demo-panel {
+            background: #111;
+            border: 2px solid #333;
+            border-radius: 8px;
+            padding: 30px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .panel-title {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .ticker-select {
+            width: 100%;
+            padding: 12px 16px;
+            background: #1a1a1a;
+            border: 2px solid #333;
+            color: #e0e0e0;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            cursor: pointer;
+            appearance: none;
+            border-radius: 4px;
+        }
+
+        .ticker-select:focus {
+            outline: none;
+            border-color: var(--arcade-magenta);
+        }
+
+        /* === TERMINAL OVERLAY === */
+        .terminal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.97);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .terminal-overlay.active {
+            display: flex;
+        }
+
+        .terminal-window {
+            width: 90%;
+            max-width: 600px;
+            background: #0a0a0a;
+            border: 3px solid var(--arcade-magenta);
+            box-shadow:
+                0 0 0 1px #000,
+                0 0 30px rgba(255, 0, 255, 0.3),
+                inset 0 0 60px rgba(0, 0, 0, 0.8);
+            position: relative;
+        }
+
+        /* Terminal title bar */
+        .terminal-titlebar {
+            background: linear-gradient(90deg, var(--arcade-magenta), var(--arcade-blue));
+            padding: 6px 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .terminal-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--arcade-yellow);
+            box-shadow: 0 0 5px var(--arcade-yellow);
+        }
+
+        .terminal-dot:nth-child(2) {
+            background: var(--arcade-cyan);
+            box-shadow: 0 0 5px var(--arcade-cyan);
+        }
+
+        .terminal-dot:nth-child(3) {
+            background: var(--arcade-magenta);
+            box-shadow: 0 0 5px var(--arcade-magenta);
+        }
+
+        .terminal-title {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 8px;
+            color: #000;
+            margin-left: auto;
+            letter-spacing: 1px;
+        }
+
+        /* Terminal content */
+        .terminal-content {
+            padding: 20px;
+            min-height: 200px;
+            font-family: 'VT323', monospace;
+            font-size: 20px;
+            line-height: 1.6;
+        }
+
+        .terminal-line {
+            opacity: 0;
+            color: var(--arcade-cyan);
+        }
+
+        .terminal-line.visible {
+            opacity: 1;
+        }
+
+        .terminal-line .prompt {
+            color: var(--arcade-magenta);
+        }
+
+        .terminal-line .command {
+            color: var(--arcade-yellow);
+        }
+
+        .terminal-line .ticker {
+            color: var(--arcade-yellow);
+            font-family: 'Press Start 2P', cursive;
+            font-size: 24px;
+            text-shadow:
+                2px 2px 0 var(--arcade-magenta),
+                4px 4px 0 var(--arcade-blue);
+            letter-spacing: 4px;
+        }
+
+        .terminal-line .success {
+            color: var(--terminal-green);
+        }
+
+        .terminal-line .ready {
+            color: var(--arcade-yellow);
+            font-family: 'Press Start 2P', cursive;
+            font-size: 16px;
+            text-shadow: 0 0 10px var(--arcade-yellow);
+        }
+
+        /* Blinking cursor */
+        .cursor {
+            display: inline-block;
+            width: 12px;
+            height: 20px;
+            background: var(--arcade-cyan);
+            margin-left: 2px;
+            animation: blink 0.5s steps(2) infinite;
+            vertical-align: middle;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0;
+            }
+        }
+
+        /* Typing effect */
+        .typing-text {
+            overflow: hidden;
+            white-space: nowrap;
+            border-right: none;
+        }
+
+        /* Progress bar */
+        .progress-container {
+            margin-top: 10px;
+            opacity: 0;
+        }
+
+        .progress-container.visible {
+            opacity: 1;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #222;
+            border: 1px solid var(--arcade-magenta);
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--arcade-magenta), var(--arcade-yellow));
+            transition: width 0.1s steps(10);
+        }
+
+        .progress-text {
+            font-size: 14px;
+            color: var(--arcade-cyan);
+            margin-top: 4px;
+        }
+
+        /* CRT Scanlines */
+        .terminal-overlay::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(0deg,
+                    rgba(0, 0, 0, 0.15),
+                    rgba(0, 0, 0, 0.15) 1px,
+                    transparent 1px,
+                    transparent 2px);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .terminal-window {
+            z-index: 2;
+        }
+
+        /* Screen flicker on ready */
+        @keyframes screen-flicker {
+            0% {
+                opacity: 1;
+            }
+
+            5% {
+                opacity: 0.8;
+            }
+
+            10% {
+                opacity: 1;
+            }
+
+            15% {
+                opacity: 0.9;
+            }
+
+            20% {
+                opacity: 1;
+            }
+        }
+
+        .terminal-overlay.flicker {
+            animation: screen-flicker 0.2s steps(3);
+        }
+
+        .reset-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: transparent;
+            border: 1px solid #444;
+            color: #666;
+            font-family: 'VT323', monospace;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .reset-btn:hover {
+            border-color: #888;
+            color: #aaa;
+        }
+
+        .status-msg {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .status-msg.ready {
+            color: var(--terminal-green);
+        }
+    </style>
+</head>
+
+<body>
+    <h1>TERMINAL INSERT COIN</h1>
+    <p class="description">
+        Boot sequence style animation with arcade colors.
+        Feels like initializing an old-school trading terminal.
+    </p>
+
+    <div class="demo-panel">
+        <div class="panel-title">CONTRACT VIEW 🕹️</div>
+
+        <select id="ticker-select" class="ticker-select">
+            <option value="" selected disabled>SELECT TICKER</option>
+            <option value="NVDA">NVDA</option>
+            <option value="TSLA">TSLA</option>
+            <option value="AAPL">AAPL</option>
+            <option value="AMD">AMD</option>
+            <option value="META">META</option>
+        </select>
+
+        <div id="status-msg" class="status-msg">Select a ticker to see the animation</div>
+
+        <button id="reset-btn" class="reset-btn">↺ Reset Demo</button>
+    </div>
+
+    <!-- Terminal Overlay -->
+    <div id="terminal-overlay" class="terminal-overlay">
+        <div class="terminal-window">
+            <div class="terminal-titlebar">
+                <div class="terminal-dot"></div>
+                <div class="terminal-dot"></div>
+                <div class="terminal-dot"></div>
+                <span class="terminal-title">PIGMENT_OS v2.0</span>
+            </div>
+            <div class="terminal-content" id="terminal-content">
+                <div class="terminal-line" id="line1">
+                    <span class="prompt">&gt;</span> <span class="command">INIT_CHAIN</span> <span id="ticker-display"
+                        class="ticker"></span>
+                </div>
+                <div class="terminal-line" id="line2">
+                    <span class="prompt">&gt;</span> SCANNING OPTIONS DATA...
+                </div>
+                <div class="terminal-line" id="line3">
+                    <span class="prompt">&gt;</span> CONNECTING TO FEED...
+                </div>
+                <div class="progress-container" id="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <div class="progress-text" id="progress-text">0%</div>
+                </div>
+                <div class="terminal-line" id="line4">
+                    <span class="success">✓ CHAIN LOADED</span>
+                </div>
+                <div class="terminal-line" id="line5">
+                    <span class="ready">[ READY ]</span><span class="cursor"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tickerSelect = document.getElementById('ticker-select');
+        const overlay = document.getElementById('terminal-overlay');
+        const statusMsg = document.getElementById('status-msg');
+        const resetBtn = document.getElementById('reset-btn');
+
+        // Terminal elements
+        const tickerDisplay = document.getElementById('ticker-display');
+        const line1 = document.getElementById('line1');
+        const line2 = document.getElementById('line2');
+        const line3 = document.getElementById('line3');
+        const line4 = document.getElementById('line4');
+        const line5 = document.getElementById('line5');
+        const progressContainer = document.getElementById('progress-container');
+        const progressFill = document.getElementById('progress-fill');
+        const progressText = document.getElementById('progress-text');
+
+        function resetTerminal() {
+            [line1, line2, line3, line4, line5].forEach(l => l.classList.remove('visible'));
+            progressContainer.classList.remove('visible');
+            progressFill.style.width = '0%';
+            progressText.textContent = '0%';
+            overlay.classList.remove('flicker');
+        }
+
+        async function playTerminalAnimation(ticker) {
+            return new Promise((resolve) => {
+                resetTerminal();
+                tickerDisplay.textContent = ticker;
+
+                // Show overlay
+                overlay.classList.add('active');
+
+                // Line 1: Command with ticker
+                setTimeout(() => {
+                    line1.classList.add('visible');
+                }, 100);
+
+                // Line 2: Scanning
+                setTimeout(() => {
+                    line2.classList.add('visible');
+                }, 400);
+
+                // Line 3: Connecting
+                setTimeout(() => {
+                    line3.classList.add('visible');
+                }, 700);
+
+                // Progress bar
+                setTimeout(() => {
+                    progressContainer.classList.add('visible');
+
+                    // Animate progress in steps
+                    let progress = 0;
+                    const progressInterval = setInterval(() => {
+                        progress += 20;
+                        progressFill.style.width = progress + '%';
+                        progressText.textContent = progress + '%';
+
+                        if (progress >= 100) {
+                            clearInterval(progressInterval);
+                        }
+                    }, 80);
+                }, 900);
+
+                // Line 4: Success
+                setTimeout(() => {
+                    line4.classList.add('visible');
+                }, 1500);
+
+                // Line 5: Ready + screen flicker
+                setTimeout(() => {
+                    overlay.classList.add('flicker');
+                    line5.classList.add('visible');
+                }, 1700);
+
+                // Close overlay
+                setTimeout(() => {
+                    overlay.classList.remove('active');
+                    resetTerminal();
+                    resolve();
+                }, 2200);
+            });
+        }
+
+        tickerSelect.addEventListener('change', async (e) => {
+            const ticker = e.target.value;
+            if (!ticker) return;
+
+            statusMsg.textContent = 'Loading...';
+            statusMsg.classList.remove('ready');
+
+            await playTerminalAnimation(ticker);
+
+            statusMsg.textContent = `${ticker} READY`;
+            statusMsg.classList.add('ready');
+        });
+
+        resetBtn.addEventListener('click', () => {
+            tickerSelect.value = '';
+            statusMsg.textContent = 'Select a ticker to see the animation';
+            statusMsg.classList.remove('ready');
+            overlay.classList.remove('active');
+            resetTerminal();
+        });
+    </script>
+</body>
+
+</html>

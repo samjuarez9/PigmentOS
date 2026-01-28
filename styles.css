@@ -1501,6 +1501,41 @@ h1 {
     vertical-align: middle;
 }
 
+/* INSERT COIN Easter Egg Hint - stacks above UNUSUAL WHALES title */
+.insert-coin-hint {
+    display: block;
+    font-family: 'Press Start 2P', cursive;
+    font-size: 5px;
+    color: #FFFF00;
+    text-shadow: 1px 1px 0 #FF00FF, 2px 2px 0 #0000FF;
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+    animation: coin-bounce 1.2s ease-in-out infinite;
+    opacity: 0.85;
+    transition: color 0.2s ease, text-shadow 0.2s ease;
+}
+
+/* Red glow on hover - matches title behavior */
+#unusual-whales-link:hover .insert-coin-hint {
+    color: #FF3366;
+    text-shadow: 0 0 10px rgba(255, 51, 102, 0.5);
+    opacity: 1;
+}
+
+@keyframes coin-bounce {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-3px);
+    }
+}
+
+
+
 .decoration-line {
     height: 2px;
     width: 20px;

@@ -1015,7 +1015,7 @@
         }
     }
 
-    /* Coin Insert Overlay Styles */
+    /* Coin Insert Overlay Styles - Arcade Edition */
     .coin-overlay {
         display: none;
         position: fixed;
@@ -1037,34 +1037,42 @@
 
     .coin-content {
         text-align: center;
+        z-index: 2;
     }
 
+    /* Main text - solid 3D block style, no glow */
     .coin-text {
         font-family: 'Press Start 2P', cursive;
-        font-size: 28px;
-        color: #FFD700;
+        font-size: 24px;
+        color: #FFFF00;
+        /* Solid 3D extrusion - no blur/glow */
         text-shadow:
-            0 0 10px #FFD700,
-            0 0 20px #FFA500,
-            3px 3px 0 #000;
-        animation: coin-blink 0.5s ease-in-out infinite;
-        letter-spacing: 4px;
+            2px 2px 0 #FF00FF,
+            4px 4px 0 #FF00FF,
+            6px 6px 0 #0000FF,
+            8px 8px 0 #0000FF,
+            10px 10px 0 #000;
+        letter-spacing: 3px;
+        /* Stepped blink, not smooth */
+        animation: arcade-blink 0.6s steps(2) infinite;
     }
 
+    /* Ticker display - big and bold */
     .coin-ticker {
         font-family: 'Press Start 2P', cursive;
         font-size: 48px;
-        color: #00FF00;
+        color: #00FFFF;
         text-shadow:
-            0 0 15px #00FF00,
-            0 0 30px #00FF00,
-            4px 4px 0 #000;
-        margin-top: 20px;
-        animation: ticker-pulse 0.3s ease-in-out infinite;
+            3px 3px 0 #FF00FF,
+            6px 6px 0 #0000FF,
+            9px 9px 0 #000;
+        margin-top: 25px;
         letter-spacing: 6px;
+        /* Stepped pulse */
+        animation: ticker-step-pulse 0.4s steps(2) infinite;
     }
 
-    @keyframes coin-blink {
+    @keyframes arcade-blink {
 
         0%,
         100% {
@@ -1072,11 +1080,11 @@
         }
 
         50% {
-            opacity: 0.7;
+            opacity: 0.6;
         }
     }
 
-    @keyframes ticker-pulse {
+    @keyframes ticker-step-pulse {
 
         0%,
         100% {
@@ -1084,7 +1092,7 @@
         }
 
         50% {
-            transform: scale(1.05);
+            transform: scale(1.03);
         }
     }
 
@@ -1098,30 +1106,43 @@
         }
     }
 
-    .coin-text.ready {
-        color: #00FFFF;
+    /* Player 1 state */
+    .coin-text.player1 {
+        color: #FF00FF;
         text-shadow:
-            0 0 10px #00FFFF,
-            0 0 20px #00FFFF,
-            3px 3px 0 #000;
-        animation: ready-flash 0.2s ease-in-out 3;
+            2px 2px 0 #FFFF00,
+            4px 4px 0 #FFFF00,
+            6px 6px 0 #0000FF,
+            8px 8px 0 #000;
+        animation: none;
     }
 
-    @keyframes ready-flash {
+    /* Ready state - flash between colors */
+    .coin-text.ready {
+        animation: ready-color-flash 0.15s steps(2) 4;
+    }
+
+    @keyframes ready-color-flash {
 
         0%,
         100% {
-            opacity: 1;
-            color: #00FFFF;
+            color: #FFFF00;
+            text-shadow:
+                2px 2px 0 #FF00FF,
+                4px 4px 0 #0000FF,
+                6px 6px 0 #000;
         }
 
         50% {
-            opacity: 0.5;
-            color: #FFFFFF;
+            color: #00FFFF;
+            text-shadow:
+                2px 2px 0 #FF00FF,
+                4px 4px 0 #0000FF,
+                6px 6px 0 #000;
         }
     }
 
-    /* CRT scanline effect on overlay */
+    /* CRT scanline effect on overlay - matching load button style */
     .coin-overlay::before {
         content: '';
         position: absolute;
@@ -1130,11 +1151,49 @@
         width: 100%;
         height: 100%;
         background: repeating-linear-gradient(0deg,
-                rgba(0, 0, 0, 0.15),
-                rgba(0, 0, 0, 0.15) 1px,
+                rgba(0, 0, 0, 0.25),
+                rgba(0, 0, 0, 0.25) 1px,
                 transparent 1px,
                 transparent 2px);
         pointer-events: none;
+        z-index: 1;
+    }
+
+    /* White corner brackets */
+    .corner-decor {
+        position: absolute;
+        width: 50px;
+        height: 50px;
+        border: 3px solid #fff;
+        z-index: 2;
+    }
+
+    .corner-decor.tl {
+        top: 25px;
+        left: 25px;
+        border-right: none;
+        border-bottom: none;
+    }
+
+    .corner-decor.tr {
+        top: 25px;
+        right: 25px;
+        border-left: none;
+        border-bottom: none;
+    }
+
+    .corner-decor.bl {
+        bottom: 25px;
+        left: 25px;
+        border-right: none;
+        border-top: none;
+    }
+
+    .corner-decor.br {
+        bottom: 25px;
+        right: 25px;
+        border-left: none;
+        border-top: none;
     }
 </style>
 </head>
@@ -1142,6 +1201,10 @@
 <body>
     <!-- Coin Insert Overlay -->
     <div id="coin-overlay" class="coin-overlay">
+        <div class="corner-decor tl"></div>
+        <div class="corner-decor tr"></div>
+        <div class="corner-decor bl"></div>
+        <div class="corner-decor br"></div>
         <div class="coin-content">
             <div id="coin-text" class="coin-text">INSERT COIN</div>
             <div id="coin-ticker" class="coin-ticker"></div>
@@ -1350,7 +1413,7 @@
         let availableContracts = []; // Store raw contract list to filter locally
 
         // ==============================================
-        // COIN INSERT ANIMATION
+        // COIN INSERT ANIMATION - Arcade Edition
         // ==============================================
         function playCoinAnimation(ticker) {
             return new Promise((resolve) => {
@@ -1359,30 +1422,36 @@
                 const coinTicker = document.getElementById('coin-ticker');
 
                 // Reset state
-                coinText.classList.remove('ready');
+                coinText.textContent = 'INSERT COIN';
+                coinText.className = 'coin-text';
                 coinTicker.textContent = '';
 
                 // Show overlay
                 overlay.classList.add('active');
 
-                // Animation sequence
+                // Step 1: "PLAYER 1" (400ms)
                 setTimeout(() => {
                     coinText.textContent = 'PLAYER 1';
+                    coinText.classList.add('player1');
                 }, 400);
 
+                // Step 2: Show ticker (700ms)
                 setTimeout(() => {
                     coinTicker.textContent = ticker;
                 }, 700);
 
+                // Step 3: "READY!" with flash (1100ms)
                 setTimeout(() => {
                     coinText.textContent = 'READY!';
+                    coinText.classList.remove('player1');
                     coinText.classList.add('ready');
                 }, 1100);
 
+                // Step 4: Hide (1500ms)
                 setTimeout(() => {
                     overlay.classList.remove('active');
                     coinText.textContent = 'INSERT COIN';
-                    coinText.classList.remove('ready');
+                    coinText.className = 'coin-text';
                     coinTicker.textContent = '';
                     resolve();
                 }, 1500);

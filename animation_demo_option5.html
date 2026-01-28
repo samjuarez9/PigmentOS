@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Option 5: Minimalist Pixel Flash Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-main: #0a0a0a;
+            --widget-bg: #111;
+            --border-color: #333;
+            --accent-purple: #bd00ff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: var(--bg-main);
+            color: #e0e0e0;
+            font-family: 'VT323', monospace;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            color: #FFD700;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .description {
+            color: #888;
+            font-size: 16px;
+            margin-bottom: 40px;
+            text-align: center;
+            max-width: 500px;
+        }
+
+        /* Mock Selection Panel */
+        .demo-panel {
+            background: var(--widget-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 30px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .panel-title {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            color: #666;
+            margin-bottom: 20px;
+            letter-spacing: 1px;
+        }
+
+        .select-label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        /* The Ticker Selector - Star of the Show */
+        .ticker-select {
+            width: 100%;
+            padding: 12px 16px;
+            background: #1a1a1a;
+            border: 2px solid #333;
+            color: #e0e0e0;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            cursor: pointer;
+            appearance: none;
+            border-radius: 4px;
+            transition: border-color 0.1s;
+        }
+
+        .ticker-select:hover {
+            border-color: #555;
+        }
+
+        .ticker-select:focus {
+            outline: none;
+            border-color: var(--accent-purple);
+        }
+
+        /* === THE PIXEL FLASH ANIMATION === */
+
+        /* Frame 1: White flash */
+        @keyframes pixel-select-flash {
+            0% {
+                background: #1a1a1a;
+                border-color: #333;
+                color: #e0e0e0;
+            }
+
+            /* Frame 1: Bright white flash */
+            10% {
+                background: #fff;
+                border-color: #fff;
+                color: #000;
+            }
+
+            /* Frame 2: Yellow/Gold */
+            30% {
+                background: #FFD700;
+                border-color: #FFD700;
+                color: #000;
+            }
+
+            /* Frame 3: Green confirm */
+            50% {
+                background: #00FF41;
+                border-color: #00FF41;
+                color: #000;
+            }
+
+            /* Settle back with glow */
+            70% {
+                background: #1a1a1a;
+                border-color: #00FF41;
+                color: #00FF41;
+                box-shadow: 0 0 20px rgba(0, 255, 65, 0.5), inset 0 0 10px rgba(0, 255, 65, 0.1);
+            }
+
+            /* Final state */
+            100% {
+                background: #1a1a1a;
+                border-color: #00FF41;
+                color: #00FF41;
+                box-shadow: 0 0 8px rgba(0, 255, 65, 0.3);
+            }
+        }
+
+        .ticker-select.flash-active {
+            animation: pixel-select-flash 0.35s steps(5) forwards;
+        }
+
+        /* Confirmed state after flash */
+        .ticker-select.confirmed {
+            border-color: #00FF41;
+            color: #00FF41;
+            box-shadow: 0 0 8px rgba(0, 255, 65, 0.3);
+        }
+
+        /* Status indicator */
+        .status {
+            margin-top: 20px;
+            padding: 10px 15px;
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #666;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status.ready {
+            border-color: #00FF41;
+            color: #00FF41;
+        }
+
+        .status::before {
+            content: '>';
+            color: #555;
+        }
+
+        .status.ready::before {
+            content: '✓';
+            color: #00FF41;
+        }
+
+        /* Compare section */
+        .compare-section {
+            margin-top: 60px;
+            text-align: center;
+        }
+
+        .compare-title {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            color: #555;
+            margin-bottom: 20px;
+        }
+
+        .variant-row {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .variant-btn {
+            padding: 12px 24px;
+            background: #1a1a1a;
+            border: 2px solid #333;
+            color: #888;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 9px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.1s;
+        }
+
+        .variant-btn:hover {
+            border-color: #666;
+            color: #fff;
+        }
+
+        .variant-btn.active {
+            border-color: var(--accent-purple);
+            color: var(--accent-purple);
+        }
+
+        /* Speed variants */
+        .speed-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 30px;
+            margin-bottom: 10px;
+        }
+
+        /* Scanline overlay for extra retro feel */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(0deg,
+                    rgba(0, 0, 0, 0.1),
+                    rgba(0, 0, 0, 0.1) 1px,
+                    transparent 1px,
+                    transparent 2px);
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        .reset-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: transparent;
+            border: 1px solid #444;
+            color: #666;
+            font-family: 'VT323', monospace;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .reset-btn:hover {
+            border-color: #888;
+            color: #aaa;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="scanlines"></div>
+
+    <h1>OPTION 5: PIXEL FLASH</h1>
+    <p class="description">
+        No overlay, no delay. Just a quick 3-frame color flash on the selector itself.
+        Fast, subtle, retro. Like pressing a button in an NES game.
+    </p>
+
+    <div class="demo-panel">
+        <div class="panel-title">CONTRACT VIEW 🕹️</div>
+
+        <span class="select-label">Ticker</span>
+        <select id="ticker-select" class="ticker-select">
+            <option value="" selected disabled>SELECT</option>
+            <option value="NVDA">NVDA</option>
+            <option value="TSLA">TSLA</option>
+            <option value="AAPL">AAPL</option>
+            <option value="AMD">AMD</option>
+            <option value="META">META</option>
+        </select>
+
+        <div id="status" class="status">WAITING FOR SELECTION...</div>
+
+        <button id="reset-btn" class="reset-btn">↺ Reset Demo</button>
+    </div>
+
+    <div class="compare-section">
+        <div class="compare-title">ANIMATION SPEED VARIANTS</div>
+        <div class="speed-label">Try different timings:</div>
+        <div class="variant-row">
+            <button class="variant-btn" data-speed="150">ULTRA FAST (150ms)</button>
+            <button class="variant-btn active" data-speed="350">DEFAULT (350ms)</button>
+            <button class="variant-btn" data-speed="500">SLOWER (500ms)</button>
+        </div>
+    </div>
+
+    <script>
+        const tickerSelect = document.getElementById('ticker-select');
+        const statusEl = document.getElementById('status');
+        const resetBtn = document.getElementById('reset-btn');
+        const variantBtns = document.querySelectorAll('.variant-btn');
+
+        let animationDuration = 350; // Default
+
+        // Speed variant selection
+        variantBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                variantBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                animationDuration = parseInt(btn.dataset.speed);
+
+                // Update CSS animation duration
+                tickerSelect.style.animationDuration = `${animationDuration}ms`;
+            });
+        });
+
+        // The main event - ticker selection with pixel flash
+        tickerSelect.addEventListener('change', (e) => {
+            const ticker = e.target.value;
+            if (!ticker) return;
+
+            // Remove any existing animation classes
+            tickerSelect.classList.remove('flash-active', 'confirmed');
+
+            // Force reflow to restart animation
+            void tickerSelect.offsetWidth;
+
+            // Set custom animation duration
+            tickerSelect.style.animationDuration = `${animationDuration}ms`;
+
+            // Trigger the flash animation
+            tickerSelect.classList.add('flash-active');
+
+            // Update status immediately (no waiting)
+            statusEl.textContent = `LOADING ${ticker}...`;
+            statusEl.classList.remove('ready');
+
+            // After animation completes, show confirmed state
+            setTimeout(() => {
+                tickerSelect.classList.remove('flash-active');
+                tickerSelect.classList.add('confirmed');
+                statusEl.textContent = `${ticker} READY`;
+                statusEl.classList.add('ready');
+            }, animationDuration);
+        });
+
+        // Reset button
+        resetBtn.addEventListener('click', () => {
+            tickerSelect.value = '';
+            tickerSelect.classList.remove('flash-active', 'confirmed');
+            tickerSelect.style.cssText = '';
+            statusEl.textContent = 'WAITING FOR SELECTION...';
+            statusEl.classList.remove('ready');
+        });
+    </script>
+</body>
+
+</html>

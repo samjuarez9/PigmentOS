@@ -1,0 +1,36 @@
+
+============================================================
+POLYGON.IO - WDC Options Analysis (Tier 3)
+============================================================
+Fetching WDC options from 2026-01-25 to 2026-03-11...
+Total contracts returned: 250
+
+Found 28 qualifying WDC contracts:
+✅ WHALE | 145 call | Vol: 161 (OI: 178) | Prem: $1.5M | Exp: 2026-02-06
+✅ WHALE | 155 call | Vol: 160 (OI: 168) | Prem: $1.3M | Exp: 2026-02-06
+✅ WHALE | 240 call | Vol: 824 (OI: 442) | Prem: $1.1M | Exp: 2026-01-30
+✅ WHALE | 195 call | Vol: 150 (OI: 208) | Prem: $701k | Exp: 2026-02-06
+✅ WHALE | 250 call | Vol: 754 (OI: 656) | Prem: $660k | Exp: 2026-01-30
+✅ WHALE | 250 call | Vol: 380 (OI: 1144) | Prem: $494k | Exp: 2026-02-06
+✅ WHALE | 237.5 call | Vol: 187 (OI: 108) | Prem: $264k | Exp: 2026-01-30
+✅ WHALE | 225 put | Vol: 263 (OI: 109) | Prem: $244k | Exp: 2026-01-30
+✅ WHALE | 252.5 call | Vol: 277 (OI: 1003) | Prem: $224k | Exp: 2026-01-30
+✅ WHALE | 235 put | Vol: 138 (OI: 123) | Prem: $186k | Exp: 2026-01-30
+✅ WHALE | 255 call | Vol: 248 (OI: 647) | Prem: $184k | Exp: 2026-01-30
+✅ WHALE | 230 call | Vol: 103 (OI: 223) | Prem: $182k | Exp: 2026-01-30
+✅ WHALE | 230 put | Vol: 174 (OI: 122) | Prem: $181k | Exp: 2026-01-30
+✅ WHALE | 235 call | Vol: 112 (OI: 257) | Prem: $168k | Exp: 2026-01-30
+✅ WHALE | 242.5 call | Vol: 128 (OI: 63) | Prem: $153k | Exp: 2026-01-30
+✅ WHALE | 220 put | Vol: 199 (OI: 157) | Prem: $143k | Exp: 2026-01-30
+✅ UNUSUAL | 250 put | Vol: 66 (OI: 19) | Prem: $141k | Exp: 2026-01-30
+✅ WHALE | 245 call | Vol: 109 (OI: 129) | Prem: $119k | Exp: 2026-01-30
+✅ WHALE | 212.5 put | Vol: 226 (OI: 255) | Prem: $110k | Exp: 2026-01-30
+✅ WHALE | 215 put | Vol: 193 (OI: 122) | Prem: $109k | Exp: 2026-01-30
+✅ UNUSUAL | 237.5 call | Vol: 60 (OI: 46) | Prem: $109k | Exp: 2026-02-06
+✅ UNUSUAL | 232.5 put | Vol: 89 (OI: 69) | Prem: $105k | Exp: 2026-01-30
+✅ UNUSUAL | 217.5 put | Vol: 121 (OI: 27) | Prem: $77k | Exp: 2026-01-30
+✅ UNUSUAL | 265 call | Vol: 140 (OI: 45) | Prem: $73k | Exp: 2026-01-30
+✅ UNUSUAL | 275 call | Vol: 208 (OI: 48) | Prem: $61k | Exp: 2026-01-30
+✅ UNUSUAL | 110 call | Vol: 3 (OI: 2) | Prem: $36k | Exp: 2026-01-30
+✅ UNUSUAL | 247.5 call | Vol: 26 (OI: 9) | Prem: $25k | Exp: 2026-01-30
+✅ UNUSUAL | 125 call | Vol: 2 (OI: 1) | Prem: $24k | Exp: 2026-02-06

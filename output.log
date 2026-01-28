@@ -1,0 +1,26 @@
+✅ Firebase Admin SDK initialized successfully
+📂 Loaded 50 whale trades from cache (Filtered <= 30 DTE)
+🌙 Market closed - minimal startup (using cached data)
+🌙 Market closed - minimal startup (using cached data)
+🚀 PigmentOS Server running on port 8001
+ * Serving Flask app 'run'
+ * Debug mode: on
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8001
+ * Running on http://192.168.1.131:8001
+[33mPress CTRL+C to quit[0m
+✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
+✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
+✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
+✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
+✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
+✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
+✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
+✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
+⚠️ Finnhub News: HTTP 401
+⚠️ Finnhub News: HTTP 401
+127.0.0.1 - - [26/Jan/2026 22:36:24] "GET /unusual_flow HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 22:36:24] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+127.0.0.1 - - [26/Jan/2026 22:36:40] "GET /unusual_flow HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 22:36:40] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -

@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Option 3: Fighter Select Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-main: #0a0a0a;
+            --widget-bg: #111;
+            --border-color: #333;
+            --select-yellow: #FFD700;
+            --confirm-green: #00FF41;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: var(--bg-main);
+            color: #e0e0e0;
+            font-family: 'VT323', monospace;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 12px;
+            color: #FFD700;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .description {
+            color: #888;
+            font-size: 16px;
+            margin-bottom: 40px;
+            text-align: center;
+            max-width: 500px;
+        }
+
+        /* === FIGHTER SELECT GRID === */
+        .select-arena {
+            background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%);
+            border: 4px solid #333;
+            border-radius: 8px;
+            padding: 30px;
+            position: relative;
+            box-shadow:
+                inset 0 0 60px rgba(0, 0, 0, 0.5),
+                0 0 30px rgba(0, 0, 0, 0.8);
+        }
+
+        .arena-title {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            color: #666;
+            text-align: center;
+            margin-bottom: 25px;
+            letter-spacing: 2px;
+        }
+
+        .ticker-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            max-width: 400px;
+        }
+
+        /* Individual ticker "portrait" */
+        .ticker-cell {
+            width: 90px;
+            height: 70px;
+            background: linear-gradient(180deg, #2a2a3a 0%, #1a1a2a 100%);
+            border: 3px solid #444;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            transition: none;
+            /* No smooth transitions - pixel perfect */
+        }
+
+        .ticker-symbol {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 11px;
+            color: #888;
+            text-shadow: 1px 1px 0 #000;
+        }
+
+        .ticker-label {
+            font-size: 10px;
+            color: #555;
+            margin-top: 4px;
+            text-transform: uppercase;
+        }
+
+        /* Hover state - yellow selector box */
+        .ticker-cell:hover {
+            border-color: var(--select-yellow);
+            box-shadow:
+                0 0 0 2px #000,
+                0 0 0 4px var(--select-yellow),
+                0 0 15px rgba(255, 215, 0, 0.4);
+        }
+
+        .ticker-cell:hover .ticker-symbol {
+            color: var(--select-yellow);
+        }
+
+        /* === THE SELECTOR CURSOR (P1) === */
+        .selector-cursor {
+            position: absolute;
+            width: 98px;
+            height: 78px;
+            border: 4px solid var(--select-yellow);
+            pointer-events: none;
+            z-index: 10;
+            opacity: 0;
+            box-shadow:
+                0 0 0 2px #000,
+                inset 0 0 0 2px rgba(255, 215, 0, 0.3);
+        }
+
+        .selector-cursor.visible {
+            opacity: 1;
+        }
+
+        /* Corner accents like arcade select boxes */
+        .selector-cursor::before,
+        .selector-cursor::after {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border: 3px solid var(--select-yellow);
+        }
+
+        .selector-cursor::before {
+            top: -6px;
+            left: -6px;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        .selector-cursor::after {
+            bottom: -6px;
+            right: -6px;
+            border-left: none;
+            border-top: none;
+        }
+
+        /* P1 label */
+        .selector-cursor .p1-tag {
+            position: absolute;
+            top: -22px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Press Start 2P', cursive;
+            font-size: 8px;
+            color: #000;
+            background: var(--select-yellow);
+            padding: 2px 6px;
+            white-space: nowrap;
+        }
+
+        /* Blinking animation for cursor */
+        @keyframes cursor-blink {
+
+            0%,
+            100% {
+                border-color: var(--select-yellow);
+            }
+
+            50% {
+                border-color: #FFA500;
+            }
+        }
+
+        .selector-cursor.hovering {
+            animation: cursor-blink 0.3s steps(2) infinite;
+        }
+
+        /* === LOCKED IN STATE === */
+        .ticker-cell.locked {
+            border-color: var(--confirm-green) !important;
+            background: linear-gradient(180deg, #1a3a1a 0%, #0f2a0f 100%);
+            box-shadow:
+                0 0 0 2px #000,
+                0 0 0 4px var(--confirm-green),
+                0 0 20px rgba(0, 255, 65, 0.5),
+                inset 0 0 20px rgba(0, 255, 65, 0.2);
+        }
+
+        .ticker-cell.locked .ticker-symbol {
+            color: var(--confirm-green);
+            text-shadow: 0 0 10px var(--confirm-green);
+        }
+
+        .selector-cursor.locked {
+            border-color: var(--confirm-green);
+            animation: none;
+            box-shadow:
+                0 0 0 2px #000,
+                0 0 25px rgba(0, 255, 65, 0.6);
+        }
+
+        .selector-cursor.locked::before,
+        .selector-cursor.locked::after {
+            border-color: var(--confirm-green);
+        }
+
+        .selector-cursor.locked .p1-tag {
+            background: var(--confirm-green);
+        }
+
+        /* === LOCK-IN FLASH ANIMATION === */
+        @keyframes lock-flash {
+            0% {
+                filter: brightness(1);
+                transform: scale(1);
+            }
+
+            25% {
+                filter: brightness(3);
+                transform: scale(1.05);
+            }
+
+            50% {
+                filter: brightness(0.8);
+                transform: scale(0.98);
+            }
+
+            75% {
+                filter: brightness(1.5);
+                transform: scale(1.02);
+            }
+
+            100% {
+                filter: brightness(1);
+                transform: scale(1);
+            }
+        }
+
+        .ticker-cell.locking {
+            animation: lock-flash 0.4s steps(4) forwards;
+        }
+
+        /* === LOCKED IN BANNER === */
+        .lock-banner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            font-family: 'Press Start 2P', cursive;
+            font-size: 16px;
+            color: var(--confirm-green);
+            text-shadow:
+                3px 3px 0 #000,
+                0 0 20px var(--confirm-green);
+            white-space: nowrap;
+            opacity: 0;
+            z-index: 100;
+            letter-spacing: 4px;
+        }
+
+        @keyframes banner-slam {
+            0% {
+                transform: translate(-50%, -50%) scale(3);
+                opacity: 0;
+            }
+
+            40% {
+                transform: translate(-50%, -50%) scale(0.9);
+                opacity: 1;
+            }
+
+            60% {
+                transform: translate(-50%, -50%) scale(1.1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes banner-fade {
+            0% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(1.2);
+            }
+        }
+
+        .lock-banner.show {
+            animation: banner-slam 0.3s steps(4) forwards;
+        }
+
+        .lock-banner.fade {
+            animation: banner-fade 0.4s ease-out forwards;
+        }
+
+        /* Status area */
+        .status-bar {
+            margin-top: 25px;
+            padding: 12px 20px;
+            background: #0a0a0a;
+            border: 2px solid #333;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            color: #666;
+            text-align: center;
+            min-width: 300px;
+        }
+
+        .status-bar.ready {
+            border-color: var(--confirm-green);
+            color: var(--confirm-green);
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+        }
+
+        .reset-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: transparent;
+            border: 1px solid #444;
+            color: #666;
+            font-family: 'VT323', monospace;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .reset-btn:hover {
+            border-color: #888;
+            color: #aaa;
+        }
+
+        /* Scanlines */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(0deg,
+                    rgba(0, 0, 0, 0.1),
+                    rgba(0, 0, 0, 0.1) 1px,
+                    transparent 1px,
+                    transparent 2px);
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* Instruction text */
+        .instructions {
+            margin-top: 30px;
+            color: #555;
+            font-size: 12px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="scanlines"></div>
+
+    <h1>OPTION 3: FIGHTER SELECT</h1>
+    <p class="description">
+        Street Fighter / Mortal Kombat style character select. Hover shows the yellow selector box,
+        click to "LOCK IN" with a confirmation slam.
+    </p>
+
+    <div class="select-arena">
+        <div class="arena-title">— SELECT YOUR TICKER —</div>
+
+        <div class="ticker-grid" id="ticker-grid">
+            <div class="ticker-cell" data-ticker="NVDA">
+                <span class="ticker-symbol">NVDA</span>
+                <span class="ticker-label">NVIDIA</span>
+            </div>
+            <div class="ticker-cell" data-ticker="TSLA">
+                <span class="ticker-symbol">TSLA</span>
+                <span class="ticker-label">TESLA</span>
+            </div>
+            <div class="ticker-cell" data-ticker="AAPL">
+                <span class="ticker-symbol">AAPL</span>
+                <span class="ticker-label">APPLE</span>
+            </div>
+            <div class="ticker-cell" data-ticker="AMD">
+                <span class="ticker-symbol">AMD</span>
+                <span class="ticker-label">AMD</span>
+            </div>
+            <div class="ticker-cell" data-ticker="META">
+                <span class="ticker-symbol">META</span>
+                <span class="ticker-label">META</span>
+            </div>
+            <div class="ticker-cell" data-ticker="MSFT">
+                <span class="ticker-symbol">MSFT</span>
+                <span class="ticker-label">MICROSOFT</span>
+            </div>
+            <div class="ticker-cell" data-ticker="GOOGL">
+                <span class="ticker-symbol">GOOGL</span>
+                <span class="ticker-label">GOOGLE</span>
+            </div>
+            <div class="ticker-cell" data-ticker="AMZN">
+                <span class="ticker-symbol">AMZN</span>
+                <span class="ticker-label">AMAZON</span>
+            </div>
+        </div>
+
+        <!-- Animated selector cursor -->
+        <div class="selector-cursor" id="selector-cursor">
+            <span class="p1-tag">P1</span>
+        </div>
+
+        <!-- Lock-in banner -->
+        <div class="lock-banner" id="lock-banner">LOCKED IN!</div>
+    </div>
+
+    <div class="status-bar" id="status-bar">CHOOSE YOUR FIGHTER</div>
+
+    <button class="reset-btn" id="reset-btn">↺ Reset Selection</button>
+
+    <div class="instructions">
+        Hover over tickers to move the selector • Click to lock in
+    </div>
+
+    <script>
+        const grid = document.getElementById('ticker-grid');
+        const cells = document.querySelectorAll('.ticker-cell');
+        const cursor = document.getElementById('selector-cursor');
+        const banner = document.getElementById('lock-banner');
+        const statusBar = document.getElementById('status-bar');
+        const resetBtn = document.getElementById('reset-btn');
+
+        let isLocked = false;
+        let selectedTicker = null;
+
+        // Position cursor over a cell
+        function positionCursor(cell) {
+            const gridRect = grid.getBoundingClientRect();
+            const cellRect = cell.getBoundingClientRect();
+
+            cursor.style.left = (cellRect.left - gridRect.left - 4) + 'px';
+            cursor.style.top = (cellRect.top - gridRect.top - 4) + 'px';
+        }
+
+        // Hover effects
+        cells.forEach(cell => {
+            cell.addEventListener('mouseenter', () => {
+                if (isLocked) return;
+
+                cursor.classList.add('visible', 'hovering');
+                cursor.classList.remove('locked');
+                positionCursor(cell);
+
+                const ticker = cell.dataset.ticker;
+                statusBar.textContent = `→ ${ticker} ←`;
+                statusBar.classList.remove('ready');
+            });
+
+            cell.addEventListener('mouseleave', () => {
+                if (isLocked) return;
+                cursor.classList.remove('hovering');
+            });
+
+            // Click to lock in
+            cell.addEventListener('click', () => {
+                if (isLocked) return;
+
+                const ticker = cell.dataset.ticker;
+                selectedTicker = ticker;
+                isLocked = true;
+
+                // Remove hover state
+                cursor.classList.remove('hovering');
+
+                // Trigger lock animation on cell
+                cell.classList.add('locking');
+
+                // After lock animation, show locked state
+                setTimeout(() => {
+                    cell.classList.remove('locking');
+                    cell.classList.add('locked');
+                    cursor.classList.add('locked');
+
+                    // Show "LOCKED IN" banner
+                    banner.classList.add('show');
+
+                    // Fade banner after delay
+                    setTimeout(() => {
+                        banner.classList.remove('show');
+                        banner.classList.add('fade');
+
+                        // Update status
+                        statusBar.textContent = `${ticker} READY`;
+                        statusBar.classList.add('ready');
+
+                        // Clean up banner
+                        setTimeout(() => {
+                            banner.classList.remove('fade');
+                        }, 400);
+                    }, 800);
+                }, 400);
+            });
+        });
+
+        // Hide cursor when leaving grid
+        grid.addEventListener('mouseleave', () => {
+            if (!isLocked) {
+                cursor.classList.remove('visible', 'hovering');
+                statusBar.textContent = 'CHOOSE YOUR FIGHTER';
+            }
+        });
+
+        // Reset button
+        resetBtn.addEventListener('click', () => {
+            isLocked = false;
+            selectedTicker = null;
+
+            cells.forEach(c => {
+                c.classList.remove('locked', 'locking');
+            });
+
+            cursor.classList.remove('visible', 'hovering', 'locked');
+            banner.classList.remove('show', 'fade');
+
+            statusBar.textContent = 'CHOOSE YOUR FIGHTER';
+            statusBar.classList.remove('ready');
+        });
+    </script>
+</body>
+
+</html>

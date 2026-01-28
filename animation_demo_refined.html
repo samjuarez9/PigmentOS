@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Refined INSERT COIN Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Unusual Flow title colors */
+            --arcade-yellow: #FFFF00;
+            --arcade-magenta: #FF00FF;
+            --arcade-blue: #0000FF;
+            --arcade-cyan: #00FFFF;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: #0a0a0a;
+            color: #e0e0e0;
+            font-family: 'VT323', monospace;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 12px;
+            color: var(--arcade-yellow);
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 0 var(--arcade-magenta), 4px 4px 0 var(--arcade-blue);
+        }
+
+        .description {
+            color: #888;
+            font-size: 16px;
+            margin-bottom: 40px;
+            text-align: center;
+            max-width: 500px;
+        }
+
+        .demo-panel {
+            background: #111;
+            border: 2px solid #333;
+            border-radius: 8px;
+            padding: 30px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .panel-title {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .ticker-select {
+            width: 100%;
+            padding: 12px 16px;
+            background: #1a1a1a;
+            border: 2px solid #333;
+            color: #e0e0e0;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            cursor: pointer;
+            appearance: none;
+            border-radius: 4px;
+        }
+
+        .ticker-select:focus {
+            outline: none;
+            border-color: var(--arcade-magenta);
+        }
+
+        .reset-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: transparent;
+            border: 1px solid #444;
+            color: #666;
+            font-family: 'VT323', monospace;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .reset-btn:hover {
+            border-color: #888;
+            color: #aaa;
+        }
+
+        .status-msg {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .status-msg.ready {
+            color: var(--arcade-cyan);
+        }
+
+        /* === ARCADE COIN OVERLAY === */
+        .coin-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .coin-overlay.active {
+            display: flex;
+        }
+
+        .coin-content {
+            text-align: center;
+        }
+
+        /* Main text - solid 3D block style, no glow */
+        .coin-text {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 24px;
+            color: var(--arcade-yellow);
+            /* Solid 3D extrusion - no blur/glow */
+            text-shadow:
+                2px 2px 0 var(--arcade-magenta),
+                4px 4px 0 var(--arcade-magenta),
+                6px 6px 0 var(--arcade-blue),
+                8px 8px 0 var(--arcade-blue),
+                10px 10px 0 #000;
+            letter-spacing: 3px;
+            /* Stepped blink, not smooth */
+            animation: arcade-blink 0.6s steps(2) infinite;
+        }
+
+        @keyframes arcade-blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.6;
+            }
+        }
+
+        /* Ticker display - big and bold */
+        .coin-ticker {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 48px;
+            color: var(--arcade-cyan);
+            text-shadow:
+                3px 3px 0 var(--arcade-magenta),
+                6px 6px 0 var(--arcade-blue),
+                9px 9px 0 #000;
+            margin-top: 25px;
+            letter-spacing: 6px;
+            /* Stepped pulse */
+            animation: ticker-step-pulse 0.4s steps(2) infinite;
+        }
+
+        @keyframes ticker-step-pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.03);
+            }
+        }
+
+        /* Player 1 state */
+        .coin-text.player1 {
+            color: var(--arcade-magenta);
+            text-shadow:
+                2px 2px 0 var(--arcade-yellow),
+                4px 4px 0 var(--arcade-yellow),
+                6px 6px 0 var(--arcade-blue),
+                8px 8px 0 #000;
+            animation: none;
+        }
+
+        /* Ready state - flash between colors */
+        .coin-text.ready {
+            animation: ready-color-flash 0.15s steps(2) 4;
+        }
+
+        @keyframes ready-color-flash {
+
+            0%,
+            100% {
+                color: var(--arcade-yellow);
+                text-shadow:
+                    2px 2px 0 var(--arcade-magenta),
+                    4px 4px 0 var(--arcade-blue),
+                    6px 6px 0 #000;
+            }
+
+            50% {
+                color: var(--arcade-cyan);
+                text-shadow:
+                    2px 2px 0 var(--arcade-magenta),
+                    4px 4px 0 var(--arcade-blue),
+                    6px 6px 0 #000;
+            }
+        }
+
+        /* CRT Scanlines - matching load button style */
+        .coin-overlay::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(0deg,
+                    rgba(0, 0, 0, 0.25),
+                    rgba(0, 0, 0, 0.25) 1px,
+                    transparent 1px,
+                    transparent 2px);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Decorative corner brackets - white for clean contrast */
+        .corner-decor {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            border: 3px solid #fff;
+        }
+
+        .corner-decor.tl {
+            top: 25px;
+            left: 25px;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        .corner-decor.tr {
+            top: 25px;
+            right: 25px;
+            border-left: none;
+            border-bottom: none;
+        }
+
+        .corner-decor.bl {
+            bottom: 25px;
+            left: 25px;
+            border-right: none;
+            border-top: none;
+        }
+
+        .corner-decor.br {
+            bottom: 25px;
+            right: 25px;
+            border-left: none;
+            border-top: none;
+        }
+
+        /* Enhanced CRT Scanlines - matching load button style */
+        .scanline-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(0deg,
+                    rgba(0, 0, 0, 0.25),
+                    rgba(0, 0, 0, 0.25) 1px,
+                    transparent 1px,
+                    transparent 2px);
+            pointer-events: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>REFINED INSERT COIN</h1>
+    <p class="description">
+        Same flow as your current animation, but with arcade colors and solid 3D text instead of glowy effects.
+    </p>
+
+    <div class="demo-panel">
+        <div class="panel-title">CONTRACT VIEW 🕹️</div>
+
+        <select id="ticker-select" class="ticker-select">
+            <option value="" selected disabled>SELECT TICKER</option>
+            <option value="NVDA">NVDA</option>
+            <option value="TSLA">TSLA</option>
+            <option value="AAPL">AAPL</option>
+            <option value="AMD">AMD</option>
+            <option value="META">META</option>
+        </select>
+
+        <div id="status-msg" class="status-msg">Select a ticker to see the animation</div>
+
+        <button id="reset-btn" class="reset-btn">↺ Reset Demo</button>
+    </div>
+
+    <!-- Coin Overlay -->
+    <div id="coin-overlay" class="coin-overlay">
+        <div class="corner-decor tl"></div>
+        <div class="corner-decor tr"></div>
+        <div class="corner-decor bl"></div>
+        <div class="corner-decor br"></div>
+
+        <div class="coin-content">
+            <div id="coin-text" class="coin-text">INSERT COIN</div>
+            <div id="coin-ticker" class="coin-ticker"></div>
+        </div>
+    </div>
+
+    <script>
+        const tickerSelect = document.getElementById('ticker-select');
+        const overlay = document.getElementById('coin-overlay');
+        const coinText = document.getElementById('coin-text');
+        const coinTicker = document.getElementById('coin-ticker');
+        const statusMsg = document.getElementById('status-msg');
+        const resetBtn = document.getElementById('reset-btn');
+
+        function playCoinAnimation(ticker) {
+            return new Promise((resolve) => {
+                // Reset state
+                coinText.textContent = 'INSERT COIN';
+                coinText.className = 'coin-text';
+                coinTicker.textContent = '';
+
+                // Show overlay
+                overlay.classList.add('active');
+
+                // Step 1: "PLAYER 1" (400ms)
+                setTimeout(() => {
+                    coinText.textContent = 'PLAYER 1';
+                    coinText.classList.add('player1');
+                }, 400);
+
+                // Step 2: Show ticker (700ms)
+                setTimeout(() => {
+                    coinTicker.textContent = ticker;
+                }, 700);
+
+                // Step 3: "READY!" with flash (1100ms)
+                setTimeout(() => {
+                    coinText.textContent = 'READY!';
+                    coinText.classList.remove('player1');
+                    coinText.classList.add('ready');
+                }, 1100);
+
+                // Step 4: Hide (1500ms)
+                setTimeout(() => {
+                    overlay.classList.remove('active');
+                    coinText.textContent = 'INSERT COIN';
+                    coinText.className = 'coin-text';
+                    coinTicker.textContent = '';
+                    resolve();
+                }, 1500);
+            });
+        }
+
+        tickerSelect.addEventListener('change', async (e) => {
+            const ticker = e.target.value;
+            if (!ticker) return;
+
+            statusMsg.textContent = 'Loading...';
+            statusMsg.classList.remove('ready');
+
+            await playCoinAnimation(ticker);
+
+            statusMsg.textContent = `${ticker} READY`;
+            statusMsg.classList.add('ready');
+        });
+
+        resetBtn.addEventListener('click', () => {
+            tickerSelect.value = '';
+            statusMsg.textContent = 'Select a ticker to see the animation';
+            statusMsg.classList.remove('ready');
+            overlay.classList.remove('active');
+        });
+    </script>
+</body>
+
+</html>

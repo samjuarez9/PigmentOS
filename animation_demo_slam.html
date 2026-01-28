@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slam Down + Page Ripple Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --arcade-yellow: #FFFF00;
+            --arcade-magenta: #FF00FF;
+            --arcade-blue: #0000FF;
+            --arcade-cyan: #00FFFF;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: #0a0a0a;
+            color: #e0e0e0;
+            font-family: 'VT323', monospace;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        /* Page shake effect applied to body */
+        body.page-shake {
+            animation: page-ripple 0.3s ease-out;
+        }
+
+        @keyframes page-ripple {
+            0% {
+                transform: translateY(0);
+            }
+
+            15% {
+                transform: translateY(8px);
+            }
+
+            30% {
+                transform: translateY(-5px);
+            }
+
+            45% {
+                transform: translateY(4px);
+            }
+
+            60% {
+                transform: translateY(-2px);
+            }
+
+            75% {
+                transform: translateY(1px);
+            }
+
+            100% {
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 12px;
+            color: var(--arcade-yellow);
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 0 var(--arcade-magenta), 4px 4px 0 var(--arcade-blue);
+        }
+
+        .description {
+            color: #888;
+            font-size: 16px;
+            margin-bottom: 40px;
+            text-align: center;
+            max-width: 500px;
+        }
+
+        .demo-panel {
+            background: #111;
+            border: 2px solid #333;
+            border-radius: 8px;
+            padding: 30px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .panel-title {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .ticker-select {
+            width: 100%;
+            padding: 12px 16px;
+            background: #1a1a1a;
+            border: 2px solid #333;
+            color: #e0e0e0;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            cursor: pointer;
+            appearance: none;
+            border-radius: 4px;
+        }
+
+        .ticker-select:focus {
+            outline: none;
+            border-color: var(--arcade-magenta);
+        }
+
+        .reset-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: transparent;
+            border: 1px solid #444;
+            color: #666;
+            font-family: 'VT323', monospace;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .reset-btn:hover {
+            border-color: #888;
+            color: #aaa;
+        }
+
+        .status-msg {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .status-msg.ready {
+            color: var(--arcade-cyan);
+        }
+
+        /* === ARCADE COIN OVERLAY === */
+        .coin-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .coin-overlay.active {
+            display: flex;
+            animation: coin-fade-in 0.1s ease-out;
+        }
+
+        .coin-content {
+            text-align: center;
+            z-index: 2;
+        }
+
+        /* Main text with slam animation */
+        .coin-text {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 24px;
+            color: var(--arcade-yellow);
+            text-shadow:
+                2px 2px 0 var(--arcade-magenta),
+                4px 4px 0 var(--arcade-magenta),
+                6px 6px 0 var(--arcade-blue),
+                8px 8px 0 var(--arcade-blue),
+                10px 10px 0 #000;
+            letter-spacing: 3px;
+            animation: arcade-blink 0.6s steps(2) infinite;
+        }
+
+        /* Slam down animation for text */
+        .coin-text.slam-in {
+            animation: text-slam-down 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes text-slam-down {
+            0% {
+                opacity: 0;
+                transform: scale(2.5) translateY(-50px);
+            }
+
+            60% {
+                opacity: 1;
+                transform: scale(0.95) translateY(5px);
+            }
+
+            80% {
+                transform: scale(1.05) translateY(-2px);
+            }
+
+            100% {
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        /* Ticker slam animation */
+        .coin-ticker {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 48px;
+            color: var(--arcade-cyan);
+            text-shadow:
+                3px 3px 0 var(--arcade-magenta),
+                6px 6px 0 var(--arcade-blue),
+                9px 9px 0 #000;
+            margin-top: 25px;
+            letter-spacing: 6px;
+            opacity: 0;
+        }
+
+        .coin-ticker.slam-in {
+            animation: ticker-slam-down 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes ticker-slam-down {
+            0% {
+                opacity: 0;
+                transform: scale(3) translateY(-80px);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(0.9) translateY(8px);
+            }
+
+            75% {
+                transform: scale(1.08) translateY(-3px);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        @keyframes arcade-blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.6;
+            }
+        }
+
+        @keyframes coin-fade-in {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* Player 1 state */
+        .coin-text.player1 {
+            color: var(--arcade-magenta);
+            text-shadow:
+                2px 2px 0 var(--arcade-yellow),
+                4px 4px 0 var(--arcade-yellow),
+                6px 6px 0 var(--arcade-blue),
+                8px 8px 0 #000;
+            animation: none;
+        }
+
+        /* Ready state with final slam */
+        .coin-text.ready {
+            animation: ready-slam 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes ready-slam {
+            0% {
+                transform: scale(1.8);
+                color: #fff;
+            }
+
+            40% {
+                transform: scale(0.9);
+                color: var(--arcade-yellow);
+            }
+
+            70% {
+                transform: scale(1.1);
+            }
+
+            100% {
+                transform: scale(1);
+                color: var(--arcade-yellow);
+                text-shadow:
+                    2px 2px 0 var(--arcade-magenta),
+                    4px 4px 0 var(--arcade-blue),
+                    6px 6px 0 #000;
+            }
+        }
+
+        /* CRT scanlines */
+        .coin-overlay::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(0deg,
+                    rgba(0, 0, 0, 0.25),
+                    rgba(0, 0, 0, 0.25) 1px,
+                    transparent 1px,
+                    transparent 2px);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* White corner brackets */
+        .corner-decor {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            border: 3px solid #fff;
+            z-index: 2;
+        }
+
+        .corner-decor.tl {
+            top: 25px;
+            left: 25px;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        .corner-decor.tr {
+            top: 25px;
+            right: 25px;
+            border-left: none;
+            border-bottom: none;
+        }
+
+        .corner-decor.bl {
+            bottom: 25px;
+            left: 25px;
+            border-right: none;
+            border-top: none;
+        }
+
+        .corner-decor.br {
+            bottom: 25px;
+            right: 25px;
+            border-left: none;
+            border-top: none;
+        }
+
+        /* Screen flash on impact */
+        .impact-flash {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 10000;
+        }
+
+        .impact-flash.flash {
+            animation: white-flash 0.15s ease-out;
+        }
+
+        @keyframes white-flash {
+            0% {
+                opacity: 0.6;
+            }
+
+            100% {
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1>SLAM DOWN + PAGE RIPPLE</h1>
+    <p class="description">
+        Text slams down from above. When "READY!" hits, the whole page shakes like an impact ripple.
+    </p>
+
+    <div class="demo-panel">
+        <div class="panel-title">CONTRACT VIEW 🕹️</div>
+
+        <select id="ticker-select" class="ticker-select">
+            <option value="" selected disabled>SELECT TICKER</option>
+            <option value="NVDA">NVDA</option>
+            <option value="TSLA">TSLA</option>
+            <option value="AAPL">AAPL</option>
+            <option value="AMD">AMD</option>
+            <option value="META">META</option>
+        </select>
+
+        <div id="status-msg" class="status-msg">Select a ticker to see the animation</div>
+
+        <button id="reset-btn" class="reset-btn">↺ Reset Demo</button>
+    </div>
+
+    <!-- Impact Flash -->
+    <div id="impact-flash" class="impact-flash"></div>
+
+    <!-- Coin Overlay -->
+    <div id="coin-overlay" class="coin-overlay">
+        <div class="corner-decor tl"></div>
+        <div class="corner-decor tr"></div>
+        <div class="corner-decor bl"></div>
+        <div class="corner-decor br"></div>
+        <div class="coin-content">
+            <div id="coin-text" class="coin-text">INSERT COIN</div>
+            <div id="coin-ticker" class="coin-ticker"></div>
+        </div>
+    </div>
+
+    <script>
+        const tickerSelect = document.getElementById('ticker-select');
+        const overlay = document.getElementById('coin-overlay');
+        const coinText = document.getElementById('coin-text');
+        const coinTicker = document.getElementById('coin-ticker');
+        const statusMsg = document.getElementById('status-msg');
+        const resetBtn = document.getElementById('reset-btn');
+        const impactFlash = document.getElementById('impact-flash');
+
+        function triggerPageShake() {
+            document.body.classList.add('page-shake');
+            impactFlash.classList.add('flash');
+
+            setTimeout(() => {
+                document.body.classList.remove('page-shake');
+                impactFlash.classList.remove('flash');
+            }, 300);
+        }
+
+        function playCoinAnimation(ticker) {
+            return new Promise((resolve) => {
+                // Reset state
+                coinText.textContent = 'INSERT COIN';
+                coinText.className = 'coin-text';
+                coinTicker.textContent = '';
+                coinTicker.className = 'coin-ticker';
+
+                // Show overlay
+                overlay.classList.add('active');
+
+                // Step 1: "PLAYER 1" slams in (400ms)
+                setTimeout(() => {
+                    coinText.textContent = 'PLAYER 1';
+                    coinText.className = 'coin-text player1 slam-in';
+                }, 350);
+
+                // Step 2: Ticker slams in (750ms)
+                setTimeout(() => {
+                    coinTicker.textContent = ticker;
+                    coinTicker.classList.add('slam-in');
+                    // Small shake when ticker lands
+                    triggerPageShake();
+                }, 750);
+
+                // Step 3: "READY!" with big slam + page ripple (1200ms)
+                setTimeout(() => {
+                    coinText.textContent = 'READY!';
+                    coinText.className = 'coin-text ready';
+                }, 1200);
+
+                // Step 4: Hide (1650ms)
+                setTimeout(() => {
+                    overlay.classList.remove('active');
+                    coinText.textContent = 'INSERT COIN';
+                    coinText.className = 'coin-text';
+                    coinTicker.textContent = '';
+                    coinTicker.className = 'coin-ticker';
+                    resolve();
+                }, 1650);
+            });
+        }
+
+        tickerSelect.addEventListener('change', async (e) => {
+            const ticker = e.target.value;
+            if (!ticker) return;
+
+            statusMsg.textContent = 'Loading...';
+            statusMsg.classList.remove('ready');
+
+            await playCoinAnimation(ticker);
+
+            statusMsg.textContent = `${ticker} READY`;
+            statusMsg.classList.add('ready');
+        });
+
+        resetBtn.addEventListener('click', () => {
+            tickerSelect.value = '';
+            statusMsg.textContent = 'Select a ticker to see the animation';
+            statusMsg.classList.remove('ready');
+            overlay.classList.remove('active');
+        });
+    </script>
+</body>
+
+</html>
