@@ -533,18 +533,18 @@
 
         .greek-bar-track {
             width: 100%;
-            height: 12px;
-            /* Thicker for health bar look */
+            height: 8px;
+            /* Sleeker minimal bar */
             background: #000;
-            border: 1px solid #fff;
-            /* White pixel border */
+            border: 1px solid #444;
+            /* Subtle border */
             border-radius: 0;
             /* Sharp corners */
-            margin-top: 6px;
+            margin-top: 4px;
             overflow: hidden;
             position: relative;
-            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5);
-            /* Drop shadow depth */
+            box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.3);
+            /* Subtle shadow */
         }
 
         .greek-bar-fill {
@@ -561,11 +561,11 @@
 
             /* Mask to create "segments" (black lines) */
             mask-image: repeating-linear-gradient(90deg,
-                    #000, #000 8px,
-                    transparent 8px, transparent 10px);
+                    #000, #000 5px,
+                    transparent 5px, transparent 6px);
             -webkit-mask-image: repeating-linear-gradient(90deg,
-                    #000, #000 8px,
-                    transparent 8px, transparent 10px);
+                    #000, #000 5px,
+                    transparent 5px, transparent 6px);
         }
 
         /* Remove old specific color classes since we use a unified health bar gradient */
@@ -795,6 +795,13 @@
             background: #2a2a2a;
             color: #aaa;
         }
+
+        /* Mobile Responsive - Expand chart for readability */
+        @media (max-width: 768px) {
+            .chart-container {
+                height: 380px;
+            }
+        }
     </style>
     <link
         href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;700&family=VT323&family=Space+Mono:wght@400;700&display=swap"
@@ -1007,10 +1014,140 @@
             transform: skew(0deg);
         }
     }
+
+    /* Coin Insert Overlay Styles */
+    .coin-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.95);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+    }
+
+    .coin-overlay.active {
+        display: flex;
+        animation: coin-fade-in 0.1s ease-out;
+    }
+
+    .coin-content {
+        text-align: center;
+    }
+
+    .coin-text {
+        font-family: 'Press Start 2P', cursive;
+        font-size: 28px;
+        color: #FFD700;
+        text-shadow:
+            0 0 10px #FFD700,
+            0 0 20px #FFA500,
+            3px 3px 0 #000;
+        animation: coin-blink 0.5s ease-in-out infinite;
+        letter-spacing: 4px;
+    }
+
+    .coin-ticker {
+        font-family: 'Press Start 2P', cursive;
+        font-size: 48px;
+        color: #00FF00;
+        text-shadow:
+            0 0 15px #00FF00,
+            0 0 30px #00FF00,
+            4px 4px 0 #000;
+        margin-top: 20px;
+        animation: ticker-pulse 0.3s ease-in-out infinite;
+        letter-spacing: 6px;
+    }
+
+    @keyframes coin-blink {
+
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.7;
+        }
+    }
+
+    @keyframes ticker-pulse {
+
+        0%,
+        100% {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.05);
+        }
+    }
+
+    @keyframes coin-fade-in {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+
+    .coin-text.ready {
+        color: #00FFFF;
+        text-shadow:
+            0 0 10px #00FFFF,
+            0 0 20px #00FFFF,
+            3px 3px 0 #000;
+        animation: ready-flash 0.2s ease-in-out 3;
+    }
+
+    @keyframes ready-flash {
+
+        0%,
+        100% {
+            opacity: 1;
+            color: #00FFFF;
+        }
+
+        50% {
+            opacity: 0.5;
+            color: #FFFFFF;
+        }
+    }
+
+    /* CRT scanline effect on overlay */
+    .coin-overlay::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: repeating-linear-gradient(0deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 2px);
+        pointer-events: none;
+    }
 </style>
 </head>
 
 <body>
+    <!-- Coin Insert Overlay -->
+    <div id="coin-overlay" class="coin-overlay">
+        <div class="coin-content">
+            <div id="coin-text" class="coin-text">INSERT COIN</div>
+            <div id="coin-ticker" class="coin-ticker"></div>
+        </div>
+    </div>
+
     <div class="header">
         <div class="retro-title-3d">UNUSUAL FLOW</div>
         <a href="/" class="close-btn">X</a>
@@ -1108,7 +1245,8 @@
                     <div class="stat-label">Volume</div>
                     <div class="stat-value" id="display-vol">12,450</div>
                     <div class="stat-notional" id="display-notional"
-                        style="font-size: 10px; color: #bd00ff; margin-top: 4px; font-family: var(--font-mono);">$0
+                        style="font-size: 13px; color: #bd00ff; margin-top: 4px; font-family: var(--font-mono); font-weight: bold;">
+                        $0
                     </div>
                 </div>
                 <div class="stat-box">
@@ -1177,8 +1315,8 @@
             <!-- Vol/OI Ratio Chart -->
             <div class="chart-container">
                 <div class="chart-header">
-                    <div class="chart-title">VOL/OI RATIO <span id="unusual-badge"
-                            style="display:none; background:#ff9900; color:#000; padding:2px 6px; border-radius:3px; font-size:8px; margin-left:10px;">⚡
+                    <div class="chart-title">FLOW FEED <span id="unusual-badge"
+                            style="display:none; background:#ff9900; color:#000; padding:1px 4px; border-radius:2px; font-size:6px; margin-left:6px;">⚠️
                             UNUSUAL</span></div>
                     <div class="timeframe-toggle">
                         <button id="tf-6d" class="timeframe-btn active">6D</button>
@@ -1210,10 +1348,53 @@
         // State
         let availableContracts = []; // Store raw contract list to filter locally
 
+        // ==============================================
+        // COIN INSERT ANIMATION
+        // ==============================================
+        function playCoinAnimation(ticker) {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('coin-overlay');
+                const coinText = document.getElementById('coin-text');
+                const coinTicker = document.getElementById('coin-ticker');
+
+                // Reset state
+                coinText.classList.remove('ready');
+                coinTicker.textContent = '';
+
+                // Show overlay
+                overlay.classList.add('active');
+
+                // Animation sequence
+                setTimeout(() => {
+                    coinText.textContent = 'PLAYER 1';
+                }, 400);
+
+                setTimeout(() => {
+                    coinTicker.textContent = ticker;
+                }, 700);
+
+                setTimeout(() => {
+                    coinText.textContent = 'READY!';
+                    coinText.classList.add('ready');
+                }, 1100);
+
+                setTimeout(() => {
+                    overlay.classList.remove('active');
+                    coinText.textContent = 'INSERT COIN';
+                    coinText.classList.remove('ready');
+                    coinTicker.textContent = '';
+                    resolve();
+                }, 1500);
+            });
+        }
+
         // 1. Ticker Selected -> Fetch Contracts (Expiries)
         tickerSelect.addEventListener('change', async (e) => {
             const ticker = e.target.value;
             if (!ticker) return;
+
+            // Play coin animation first
+            await playCoinAnimation(ticker);
 
             // Reset downstream
             expirySelect.innerHTML = '<option>LOADING...</option>';
@@ -1599,15 +1780,17 @@
 
         // Format notional value with K/M/B suffixes
         function formatNotional(value) {
+            let formatted;
             if (value >= 1e9) {
-                return '$' + (value / 1e9).toFixed(2) + 'B';
+                formatted = '$' + (value / 1e9).toFixed(2) + 'B';
             } else if (value >= 1e6) {
-                return '$' + (value / 1e6).toFixed(2) + 'M';
+                formatted = '$' + (value / 1e6).toFixed(2) + 'M';
             } else if (value >= 1e3) {
-                return '$' + (value / 1e3).toFixed(1) + 'K';
+                formatted = '$' + (value / 1e3).toFixed(1) + 'K';
             } else {
-                return '$' + value.toFixed(0);
+                formatted = '$' + value.toFixed(0);
             }
+            return '💸 ' + formatted;
         }
 
         function updateMoneyness(spotPrice, strike, optionType) {
@@ -1783,96 +1966,96 @@
                         }
                     },
                     scales: {
-                                x: {
-                                    grid: { display: false, drawBorder: false },
-                                    ticks: { color: '#888', font: { family: "'VT323', monospace", size: 10 } }
-                                },
-                                y: {
-                                    type: 'linear',
-                                    display: true,
-                                    position: 'left',
-                                    beginAtZero: true,
-                                    grid: { color: '#222', drawBorder: false },
-                                    ticks: { color: '#888', font: { family: "'VT323', monospace" } },
-                                    title: { display: true, text: 'Vol/OI', color: '#555', font: { size: 10 } }
-                                },
-                                y1: {
-                                    type: 'linear',
-                                    display: true,
-                                    position: 'right',
-                                    beginAtZero: false,
-                                    grid: { drawOnChartArea: false, drawBorder: false },
-                                    ticks: {
-                                        color: '#555',
-                                        font: { family: "'VT323', monospace", size: 10 },
-                                        callback: function (value) { return '$' + value.toFixed(0); }
-                                    },
-                                    title: { display: false } // Handled by custom plugin
-                                },
-                                y2: {
-                                    type: 'linear',
-                                    display: true,
-                                    position: 'right',
-                                    beginAtZero: true,
-                                    grid: { drawOnChartArea: false, drawBorder: false },
-                                    ticks: {
-                                        color: '#0085FF',
-                                        font: { family: "'VT323', monospace", size: 8 },
-                                        callback: function (value) { return value.toFixed(0); }
-                                    },
-                                    title: { display: false }
-                                }
-                            }
+                        x: {
+                            grid: { display: false, drawBorder: false },
+                            ticks: { color: '#888', font: { family: "'VT323', monospace", size: 10 } }
                         },
-                        plugins: [{
-                            id: 'customAxisTitle',
-                            afterDraw: (chart) => {
-                                const { ctx, chartArea, scales } = chart;
-                                const yAxis = scales.y1;
-                                if (!yAxis) return;
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            beginAtZero: true,
+                            grid: { color: '#222', drawBorder: false },
+                            ticks: { color: '#888', font: { family: "'VT323', monospace" } },
+                            title: { display: true, text: 'Vol/OI', color: '#555', font: { size: 10 } }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            beginAtZero: false,
+                            grid: { drawOnChartArea: false, drawBorder: false },
+                            ticks: {
+                                color: '#555',
+                                font: { family: "'VT323', monospace", size: 10 },
+                                callback: function (value) { return '$' + value.toFixed(0); }
+                            },
+                            title: { display: false } // Handled by custom plugin
+                        },
+                        y2: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            beginAtZero: true,
+                            grid: { drawOnChartArea: false, drawBorder: false },
+                            ticks: {
+                                color: '#0085FF',
+                                font: { family: "'VT323', monospace", size: 8 },
+                                callback: function (value) { return value.toFixed(0); }
+                            },
+                            title: { display: false }
+                        }
+                    }
+                },
+                plugins: [{
+                    id: 'customAxisTitle',
+                    afterDraw: (chart) => {
+                        const { ctx, chartArea, scales } = chart;
+                        const yAxis = scales.y1;
+                        if (!yAxis) return;
 
-                                const x = chart.width - 10; // Right margin
-                                const y = (yAxis.top + yAxis.bottom) / 2;
+                        const x = chart.width - 10; // Right margin
+                        const y = (yAxis.top + yAxis.bottom) / 2;
 
-                                ctx.save();
-                                ctx.font = "10px 'VT323', monospace";
-                                ctx.textAlign = 'center';
-                                ctx.textBaseline = 'middle';
+                        ctx.save();
+                        ctx.font = "10px 'VT323', monospace";
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
 
-                                // Rotate for vertical axis label
-                                ctx.translate(x, y);
-                                ctx.rotate(-Math.PI / 2);
+                        // Rotate for vertical axis label
+                        ctx.translate(x, y);
+                        ctx.rotate(-Math.PI / 2);
 
-                                // Draw segments
-                                // Total text: "Avg Fill / VWAP / Avg Size"
-                                // Colors: Purple / Gray / Red / Gray / Cyan
+                        // Draw segments
+                        // Total text: "Avg Fill / VWAP / Avg Size"
+                        // Colors: Purple / Gray / Red / Gray / Cyan
 
-                                const textSegments = [
-                                    { text: 'Avg Fill', color: '#D15CFF' },
-                                    { text: ' / ', color: '#555' },
-                                    { text: 'VWAP', color: '#FF3333' },
-                                    { text: ' / ', color: '#555' },
-                                    { text: 'Avg Size', color: '#0085FF' }
-                                ];
+                        const textSegments = [
+                            { text: 'Avg Fill', color: '#D15CFF' },
+                            { text: ' / ', color: '#555' },
+                            { text: 'VWAP', color: '#FF3333' },
+                            { text: ' / ', color: '#555' },
+                            { text: 'Avg Size', color: '#0085FF' }
+                        ];
 
-                                let totalWidth = 0;
-                                textSegments.forEach(seg => {
-                                    seg.width = ctx.measureText(seg.text).width;
-                                    totalWidth += seg.width;
-                                });
+                        let totalWidth = 0;
+                        textSegments.forEach(seg => {
+                            seg.width = ctx.measureText(seg.text).width;
+                            totalWidth += seg.width;
+                        });
 
-                                let currentX = -totalWidth / 2; // Start centered
+                        let currentX = -totalWidth / 2; // Start centered
 
-                                textSegments.forEach(seg => {
-                                    ctx.fillStyle = seg.color;
-                                    ctx.fillText(seg.text, currentX + (seg.width / 2), 0); // fillText uses center alignment, so offset by half width
-                                    currentX += seg.width;
-                                });
+                        textSegments.forEach(seg => {
+                            ctx.fillStyle = seg.color;
+                            ctx.fillText(seg.text, currentX + (seg.width / 2), 0); // fillText uses center alignment, so offset by half width
+                            currentX += seg.width;
+                        });
 
-                                ctx.restore();
-                            }
-                        }]
-                    });
+                        ctx.restore();
+                    }
+                }]
+            });
         }
 
         // Chart timeframe state
@@ -2012,7 +2195,7 @@
                     type: 'line',
                     label: 'Avg Fill',
                     data: priceData,
-                    borderColor: '#D15CFF', // Lighter Purple
+                    borderColor: '#FFFF00', // Bright Yellow (matches title)
                     borderWidth: 1, // Minimalistic
                     borderDash: [4, 4], // Dotted
                     pointRadius: 0,
