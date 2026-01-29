@@ -3148,11 +3148,17 @@ document.addEventListener('DOMContentLoaded', () => {
         { title: "BOC RATE ANNOUNCEMENT", time: "10:00 AM ET", type: "CB", stars: 2, rawDate: "2026-01-28" },
         { title: "Q4 BIG TECH EARNINGS BEGIN", time: "4:00 PM ET", type: "EARNINGS", stars: 3, rawDate: "2026-01-28" },
         // === FEBRUARY 2026 ===
+        { title: "PLTR EARNINGS (Q4 FY25)", time: "4:00 PM ET", type: "EARNINGS", stars: 3, rawDate: "2026-02-02" },
+        { title: "GOOGL EARNINGS (Q4 FY25)", time: "4:00 PM ET", type: "EARNINGS", stars: 3, rawDate: "2026-02-04" },
         { title: "ECB MONETARY POLICY MEETING", time: "8:15 AM ET", type: "CB", stars: 2, rawDate: "2026-02-05" },
         { title: "BOE MPC DECISION", time: "7:00 AM ET", type: "CB", stars: 2, rawDate: "2026-02-05" },
+        { title: "AMZN EARNINGS (Q4 FY25)", time: "4:00 PM ET", type: "EARNINGS", stars: 3, rawDate: "2026-02-05" },
         { title: "JOBS REPORT (JAN 2026)", time: "8:30 AM ET", type: "LABOR", stars: 3, rawDate: "2026-02-06" },
         { title: "CHINA LUNAR NEW YEAR", time: "12:00 AM ET", type: "HOLIDAY", stars: 2, rawDate: "2026-02-17" },
         { title: "SUPREME COURT TARIFF RULINGS", time: "10:00 AM ET", type: "GOV", stars: 3, rawDate: "2026-02-15" },
+        { title: "NVDA EARNINGS (Q4 FY26)", time: "4:00 PM ET", type: "EARNINGS", stars: 3, rawDate: "2026-02-25" },
+        // === MARCH 2026 ===
+        { title: "FOMC RATE DECISION", time: "2:00 PM ET", type: "FED", stars: 3, rawDate: "2026-03-17" },
     ];
 
     const economicCalendar = {

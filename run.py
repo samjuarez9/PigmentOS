@@ -2844,11 +2844,11 @@ def refresh_polymarket_logic():
                 ],
                 "MACRO": [
                     "fed", "rate", "inflation", "cpi", "recession", "powell", "gold", 
-                    "treasury", "trump", "cabinet", "nominate", "tariff"
+                    "treasury", "trump", "cabinet", "nominate", "tariff", "shutdown"
                 ],
                 "TECH": [
                     "nvidia", "apple", "microsoft", "google", "tesla", "openai", "gemini", 
-                    "grok", "deepseek", "claude", "spacex", "starship", "robotaxi"
+                    "grok", "deepseek", "claude", "spacex", "starship", "robotaxi", "ipo"
                 ],
 
             }

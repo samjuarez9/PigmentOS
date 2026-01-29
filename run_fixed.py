@@ -3480,6 +3480,11 @@ def start_background_worker():
         
 
     def worker():
+        # COLD START FIX: Wait 10s before hydration to let workers accept requests first
+        # This prevents timeouts during Render cold boots (workers serve stale cache while hydrating)
+        print("⏳ Delaying hydration 10s to allow workers to start...", flush=True)
+        time.sleep(10)
+        
         # Run Hydration ONCE on startup (Background)
         try:
             hydrate_on_startup()
