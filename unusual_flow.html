@@ -672,14 +672,15 @@
         /* Volume Chart Container */
         .chart-container {
             position: relative;
-            height: 280px;
+            height: 300px;
             width: 100%;
             background: #050505;
             border: 2px solid #333;
             border-radius: 8px;
             margin-top: 20px;
             transition: border-color 0.3s;
-            padding: 10px;
+            padding: 5px 10px 15px;
+            overflow: hidden;
         }
 
         .chart-container.spike-alert {
@@ -755,12 +756,54 @@
             }
         }
 
+        /* Stacked Title Container for FLOW FEED + UNUSUAL badge */
+        .chart-title-stack {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 2px;
+            padding: 2px 5px 0;
+        }
+
+        .chart-title-stack .chart-title {
+            padding: 0;
+        }
+
+        /* Enhanced Unusual Badge - Stacked below title, minimal */
+        .unusual-badge-stacked {
+            display: inline-block;
+            background: #ff9900;
+            color: #000;
+            padding: 2px 6px;
+            border-radius: 2px;
+            font-family: var(--font-mono);
+            font-size: 7px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 0 6px rgba(255, 153, 0, 0.4);
+            animation: unusual-flash 2s ease-in-out infinite;
+        }
+
+        @keyframes unusual-flash {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+
         /* Chart Timeframe Toggle */
         .chart-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 10px 15px 5px;
+            padding: 2px 5px 0;
         }
 
         .timeframe-toggle {
@@ -1379,9 +1422,12 @@
             <!-- Vol/OI Ratio Chart -->
             <div class="chart-container">
                 <div class="chart-header">
-                    <div class="chart-title">FLOW FEED <span id="unusual-badge"
-                            style="display:none; background:#ff9900; color:#000; padding:1px 4px; border-radius:2px; font-size:6px; margin-left:6px;">⚠️
-                            UNUSUAL</span></div>
+                    <div class="chart-title-stack">
+                        <div class="chart-title">FLOW FEED</div>
+                        <div id="unusual-badge" class="unusual-badge-stacked" style="display:none;">
+                            ⚠️ UNUSUAL ACTIVITY
+                        </div>
+                    </div>
                     <div class="timeframe-toggle">
                         <button id="tf-6d" class="timeframe-btn active">6D</button>
                         <button id="tf-20d" class="timeframe-btn">20D</button>
@@ -2032,7 +2078,9 @@
                     },
                     layout: {
                         padding: {
-                            right: 30 // Add padding for custom axis title
+                            right: 30, // Add padding for custom axis title
+                            bottom: 10,
+                            top: 10
                         }
                     },
                     scales: {
@@ -2193,7 +2241,7 @@
 
             // Show/hide unusual badge
             const badge = document.getElementById('unusual-badge');
-            if (badge) badge.style.display = isUnusual ? 'inline' : 'none';
+            if (badge) badge.style.display = isUnusual ? 'inline-block' : 'none';
 
             // Calculate Premium vs ADV (Average Daily Premium)
             // Premium = Volume × Price × 100
