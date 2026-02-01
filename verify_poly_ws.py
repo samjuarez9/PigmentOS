@@ -20,12 +20,19 @@ def on_message(ws, message):
             if item.get('status') == 'auth_success':
                 print("✅ Authentication Successful!")
                 # Try subscribing to Trades (T) and Quotes (Q) for a test ticker
-                sub_msg = {"action": "subscribe", "params": "T.O:SPY251219C00650000,Q.O:SPY251219C00650000"}
+                # Try subscribing to ONE specific active NVDA contract
+                # Try Quotes for this specific contract - Should be VERY active
+                sub_msg = {"action": "subscribe", "params": "Q.O:NVDA260130C00050000"}
                 ws.send(json.dumps(sub_msg))
                 print(f"Sent subscription: {sub_msg}")
             if item.get('status') == 'success':
                 print(f"✅ Subscription Successful: {item.get('message')}")
-                ws.close() # We're good, close it
+                print(f"✅ Subscription Successful: {item.get('message')}")
+                # Keep listening for actual trades OR quotes
+            if item.get('ev') == 'T':
+                 print(f"🔥 TRADE: {item}")
+            if item.get('ev') == 'Q':
+                 print(f"🌊 QUOTE: {item}")
 
 def on_error(ws, error):
     print(f"Error: {error}")
@@ -48,10 +55,10 @@ if __name__ == "__main__":
                               on_error=on_error,
                               on_close=on_close)
 
-    # Run for max 5 seconds
+    # Run for max 15 seconds to ensure we catch data
     wst = threading.Thread(target=ws.run_forever, kwargs={"sslopt": {"cert_reqs": 0}})
     wst.daemon = True
     wst.start()
     
-    time.sleep(5)
+    time.sleep(15)
     ws.close()

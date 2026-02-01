@@ -10,7 +10,9 @@ from datetime import datetime
 # I will try to read it from the file directly to be safe.
 
 def get_api_key():
-    return "z5qccs10zpN5nVqpB_BLuXp0Fo8ejdlw"
+    from dotenv import load_dotenv
+    load_dotenv()
+    return os.environ.get("POLYGON_API_KEY")
 
 def check_polygon_trades():
     api_key = get_api_key()

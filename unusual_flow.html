@@ -759,9 +759,9 @@
         /* Stacked Title Container for FLOW FEED + UNUSUAL badge */
         .chart-title-stack {
             display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 2px;
+            flex-direction: row;
+            align-items: center;
+            gap: 10px;
             padding: 2px 5px 0;
         }
 
@@ -1275,6 +1275,7 @@
                         <option value="GOOGL">GOOGL</option>
                         <option value="INTC">INTC</option>
                         <option value="IREN">IREN</option>
+                        <option value="IWM">IWM</option>
                         <option value="LITE">LITE</option>
                         <option value="META">META</option>
                         <option value="MSFT">MSFT</option>
@@ -1282,7 +1283,9 @@
                         <option value="NVDA">NVDA</option>
                         <option value="ORCL">ORCL</option>
                         <option value="PLTR">PLTR</option>
+                        <option value="QQQ">QQQ</option>
                         <option value="SNDK">SNDK</option>
+                        <option value="SPY">SPY</option>
                         <option value="STX">STX</option>
                         <option value="TSLA">TSLA</option>
                         <option value="TSM">TSM</option>
@@ -1346,6 +1349,8 @@
                     <div class="premium-adv-badge" id="premium-adv-badge" style="display: none;">LOADING...</div>
                 </div>
             </div>
+
+
 
             <div class="stats-grid">
                 <div class="stat-box">
@@ -1424,11 +1429,19 @@
                 <div class="chart-header">
                     <div class="chart-title-stack">
                         <div class="chart-title">FLOW FEED</div>
+                        <select id="interval-select" class="styled-select"
+                            style="width: auto; padding: 2px 5px; font-size: 10px; height: 20px; margin-left: 10px; background: #222; color: #aaa; border: 1px solid #444;">
+                            <option value="15m">15 MIN</option>
+                            <option value="5m" selected>5 MIN</option>
+                            <option value="1m">1 MIN</option>
+                        </select>
                         <div id="unusual-badge" class="unusual-badge-stacked" style="display:none;">
                             ⚠️ UNUSUAL ACTIVITY
                         </div>
                     </div>
                     <div class="timeframe-toggle">
+                        <button id="tf-1d" class="timeframe-btn">1D</button>
+                        <button id="tf-3d" class="timeframe-btn">3D</button>
                         <button id="tf-6d" class="timeframe-btn active">6D</button>
                         <button id="tf-20d" class="timeframe-btn">20D</button>
                     </div>
@@ -1529,15 +1542,11 @@
                     populateExpiries(availableContracts);
                 }
 
-                // Fetch and display spot price
+                // Display spot price from contracts response
                 const spotPriceEl = document.getElementById('spot-price');
-                try {
-                    const priceRes = await fetch(`${API_BASE_URL}/api/price/${ticker}`);
-                    const priceData = await priceRes.json();
-                    if (priceData.price) {
-                        spotPriceEl.textContent = `SPOT: $${priceData.price.toFixed(2)}`;
-                    }
-                } catch (e) {
+                if (data.spot_price) {
+                    spotPriceEl.textContent = `SPOT: $${data.spot_price.toFixed(2)}`;
+                } else {
                     spotPriceEl.textContent = '';
                 }
             } catch (err) {
@@ -1615,13 +1624,13 @@
                     }))
                     .sort((a, b) => a.strike - b.strike);
             } else {
-                // No premium data - show all strikes with OI, sorted by strike
-                qualifyingStrikes = Object.entries(strikeOI)
-                    .filter(([strike, oi]) => oi > 0)
-                    .map(([strike, oi]) => ({
+                // No premium data - show all strikes sorted by strike price
+                // (Reference API doesn't include OI, so we show all)
+                qualifyingStrikes = Object.keys(strikePremiums)
+                    .map(strike => ({
                         strike: parseFloat(strike),
                         premium: null,
-                        oi,
+                        oi: strikeOI[strike] || 0,
                         iv: strikeIV[strike]
                     }))
                     .sort((a, b) => a.strike - b.strike);
@@ -1640,16 +1649,8 @@
                 qualifyingStrikes.forEach(({ strike, premium, oi, iv }) => {
                     const opt = document.createElement('option');
                     opt.value = strike;
-                    // Show premium if available, otherwise show OI
-                    let infoStr;
-                    if (premium !== null && premium > 0) {
-                        infoStr = premium >= 1e6
-                            ? `$${(premium / 1e6).toFixed(1)}M`
-                            : `$${(premium / 1e3).toFixed(0)}K`;
-                    } else {
-                        infoStr = `OI: ${oi.toLocaleString()}`;
-                    }
-                    opt.textContent = `$${strike} (${infoStr})`;
+                    // Just show strike price (no OI since Reference API doesn't include it)
+                    opt.textContent = `$${strike}`;
                     strikeSelect.appendChild(opt);
                 });
             }
@@ -1796,6 +1797,7 @@
             const details = data.details || {};
             const greeks = data.greeks || {};
             const day = data.day || {};
+            const quote = data.last_quote || {};
 
             const typeWord = typeSelect.value === 'C' ? '<span style="color:#00FF00;">CALL</span>' : '<span style="color:#FF3333;">PUT</span>';
             document.getElementById('display-name').innerHTML = `${tickerSelect.value} $${strikeSelect.value} ${typeWord}`;
@@ -2061,15 +2063,21 @@
                                             `Avg Size: ${historyItem.transactions ? (historyItem.volume / historyItem.transactions).toFixed(0) : 'Loading...'}`,
                                             `Tx Count: ${historyItem.transactions || 'Loading...'}`
                                         ];
-                                    } else if (label === 'Vol/OI Ratio') {
-                                        if (!historyItem) return `Vol/OI: ${context.raw?.toFixed(2)}x`;
+                                    } else if (label === 'Premium') {
+                                        if (!historyItem) return `Premium: $${context.raw?.toLocaleString()}`;
                                         const isToday = idx === (window.chartHistoryData.length - 1);
                                         const volLabel = isToday ? "Today's Volume" : "Volume";
-                                        return [
-                                            `Vol/OI: ${context.raw?.toFixed(2) || '0'}x`,
-                                            `${volLabel}: ${historyItem.volume?.toLocaleString() || '-'}`,
-                                            `OI: ${historyItem.oi?.toLocaleString() || '-'}`
+
+                                        const tooltipLines = [
+                                            `Premium: $${context.raw?.toLocaleString()}`,
+                                            `${volLabel}: ${historyItem.volume?.toLocaleString() || '-'}`
                                         ];
+
+                                        if (isToday) {
+                                            tooltipLines.push(`OI: ${historyItem.oi?.toLocaleString() || '-'}`);
+                                        }
+
+                                        return tooltipLines;
                                     }
                                     return '';
                                 }
@@ -2094,8 +2102,16 @@
                             position: 'left',
                             beginAtZero: true,
                             grid: { color: '#222', drawBorder: false },
-                            ticks: { color: '#888', font: { family: "'VT323', monospace" } },
-                            title: { display: true, text: 'Vol/OI', color: '#555', font: { size: 10 } }
+                            ticks: {
+                                color: '#888',
+                                font: { family: "'VT323', monospace" },
+                                callback: function (value) {
+                                    if (value >= 1e6) return '$' + (value / 1e6).toFixed(1) + 'M';
+                                    if (value >= 1e3) return '$' + (value / 1e3).toFixed(1) + 'K';
+                                    return '$' + value;
+                                }
+                            },
+                            title: { display: true, text: 'PREMIUM', color: '#555', font: { size: 10 } }
                         },
                         y1: {
                             type: 'linear',
@@ -2151,7 +2167,7 @@
                         const textSegments = [
                             { text: 'Avg Fill', color: '#D15CFF' },
                             { text: ' / ', color: '#555' },
-                            { text: 'VWAP', color: '#FF3333' },
+                            { text: 'VWAP', color: '#FFFF00' },
                             { text: ' / ', color: '#555' },
                             { text: 'Avg Size', color: '#0085FF' }
                         ];
@@ -2183,11 +2199,52 @@
         let lastOI = 0;
 
         // Timeframe toggle handlers
+
+
+
+
+        document.getElementById('tf-1d').addEventListener('click', () => {
+            if (chartDays === 1) return;
+            chartDays = 1;
+            document.getElementById('tf-1d').classList.add('active');
+            document.getElementById('tf-3d').classList.remove('active');
+            document.getElementById('tf-6d').classList.remove('active');
+            document.getElementById('tf-20d').classList.remove('active');
+
+            // Show interval selector for intraday views
+            const selector = document.getElementById('interval-select');
+            selector.style.display = 'inline-block';
+            selector.value = '1m';
+
+            if (lastContractId) fetchVolumeHistory(lastContractId, lastContractType, lastOI);
+        });
+
+        document.getElementById('tf-3d').addEventListener('click', () => {
+            if (chartDays === 3) return;
+            chartDays = 3;
+            document.getElementById('tf-3d').classList.add('active');
+            document.getElementById('tf-1d').classList.remove('active');
+            document.getElementById('tf-6d').classList.remove('active');
+            document.getElementById('tf-20d').classList.remove('active');
+
+            // Show interval selector for 3D views (typically hourly/intraday)
+            document.getElementById('interval-select').style.display = 'inline-block';
+
+            if (lastContractId) fetchVolumeHistory(lastContractId, lastContractType, lastOI);
+        });
+
         document.getElementById('tf-6d').addEventListener('click', () => {
             if (chartDays === 6) return;
             chartDays = 6;
             document.getElementById('tf-6d').classList.add('active');
+            document.getElementById('tf-3d').classList.remove('active');
+            document.getElementById('tf-1d').classList.remove('active');
             document.getElementById('tf-20d').classList.remove('active');
+
+            // Hardcode daily interval and hide selector
+            document.getElementById('interval-select').value = '1d';
+            document.getElementById('interval-select').style.display = 'none';
+
             if (lastContractId) fetchVolumeHistory(lastContractId, lastContractType, lastOI);
         });
 
@@ -2195,35 +2252,54 @@
             if (chartDays === 20) return;
             chartDays = 20;
             document.getElementById('tf-20d').classList.add('active');
+            document.getElementById('tf-3d').classList.remove('active');
             document.getElementById('tf-6d').classList.remove('active');
+            document.getElementById('tf-1d').classList.remove('active');
+
+            // Hardcode daily interval and hide selector
+            document.getElementById('interval-select').value = '1d';
+            document.getElementById('interval-select').style.display = 'none';
+
+            if (lastContractId) fetchVolumeHistory(lastContractId, lastContractType, lastOI);
+        });
+
+        // Interval Change Listener
+        document.getElementById('interval-select').addEventListener('change', () => {
             if (lastContractId) fetchVolumeHistory(lastContractId, lastContractType, lastOI);
         });
 
         async function fetchVolumeHistory(contractId, type, currentOI) {
-            const chartLoading = document.getElementById('chart-loading');
-            chartLoading.style.display = 'block';
+            const loadingEl = document.getElementById('chart-loading');
+            loadingEl.style.display = 'block';
 
-            // Store for toggle refetch
             lastContractId = contractId;
             lastContractType = type;
             lastOI = currentOI;
 
             try {
-                // Use Vol/OI History endpoint with days param
-                const res = await fetch(`${API_BASE_URL}/api/flow/vol_oi_history/${encodeURIComponent(contractId)}?days=${chartDays}`);
+                // Get selected interval
+                // Strict override: 6D/20D must use '1d'
+                let interval;
+                if (chartDays === 6 || chartDays === 20) {
+                    interval = '1d';
+                } else {
+                    interval = document.getElementById('interval-select').value;
+                }
+                console.log(`Fetching history for ${contractId} (${chartDays} days, ${interval})`);
+
+                const res = await fetch(`${API_BASE_URL}/api/flow/vol_oi_history/${encodeURIComponent(contractId)}?days=${chartDays}&interval=${interval}`);
                 const data = await res.json();
 
-                chartLoading.style.display = 'none';
+                // If we have granular data, we might get more points.
+                // The backend handles the aggregation, so we just render what we get.
 
-                if (data.error) {
-                    console.error('Chart error:', data.error);
-                    return;
-                }
-
+                window.chartHistoryData = data.history || [];
                 updateVolOIChart(data, type);
-            } catch (e) {
-                console.error('Chart fetch error:', e);
-                chartLoading.style.display = 'none';
+
+            } catch (err) {
+                console.error("Error fetching history:", err);
+            } finally {
+                loadingEl.style.display = 'none';
             }
         }
 
@@ -2275,14 +2351,72 @@
             }
 
             // Prepare Chart Data
-            const labels = history.map(h => {
-                const date = new Date(h.date + 'T12:00:00');
-                return `${date.getMonth() + 1}/${date.getDate()}`;
-            });
+            // Prepare Chart Data
+            let labels;
+            const intervalVal = document.getElementById('interval-select').value;
+            const isIntraday = intervalVal !== '1d' || chartDays === 1;
+
+            if (isIntraday) {
+                // Intraday: Show Time (HH:MM) or Date + Time depending on span
+                // Clean X-Axis Logic: Date at start of new day, Time otherwise
+                labels = history.map((h, index) => {
+                    // Start by checking if we have a valid timestamp (ms) or ISO string
+                    let date;
+                    if (h.timestamp) {
+                        date = new Date(h.timestamp);
+                    } else if (h.date && h.date.includes('T')) {
+                        date = new Date(h.date);
+                    } else {
+                        // Fallback processing
+                        date = new Date(h.date);
+                    }
+
+                    if (!isNaN(date.getTime())) {
+                        const m = date.toLocaleString('en-US', { month: 'short' });
+                        const d = date.getDate();
+                        const hStr = String(date.getHours()).padStart(2, '0');
+                        const minStr = String(date.getMinutes()).padStart(2, '0');
+
+                        // Check if day changed from previous point
+                        let showDate = false;
+                        if (index === 0) {
+                            showDate = true;
+                        } else {
+                            const prevH = history[index - 1];
+                            let prevDate;
+                            if (prevH.timestamp) prevDate = new Date(prevH.timestamp);
+                            else if (prevH.date && prevH.date.includes('T')) prevDate = new Date(prevH.date);
+                            else prevDate = new Date(prevH.date);
+
+                            if (prevDate.getDate() !== d) {
+                                showDate = true;
+                            }
+                        }
+
+                        if (showDate) {
+                            return `${m} ${d}`;
+                        } else {
+                            return `${hStr}:${minStr}`;
+                        }
+                    }
+                    return h.date; // fallback
+                });
+            } else {
+                // Daily: date is "YYYY-MM-DD"
+                labels = history.map(h => {
+                    const date = new Date(h.date + 'T12:00:00');
+                    return `${date.getMonth() + 1}/${date.getDate()}`;
+                });
+            }
 
             const volData = history.map(h => h.volume);
             const oiData = history.map(h => h.oi);
-            const ratioData = history.map(h => h.vol_oi_ratio);
+            // Calculate Premium: Volume * Price (VWAP or Price) * 100
+            const premiumData = history.map(h => {
+                if ((h.volume || 0) <= 100) return null;
+                const price = h.vwap || h.price || 0;
+                return h.volume * price * 100;
+            });
             const priceData = history.map(h => h.price);
 
 
@@ -2297,104 +2431,127 @@
 
             // Update Chart
             volumeChart.data.labels = labels;
-            volumeChart.data.datasets = [
-                {
-                    type: 'line',
-                    label: 'VWAP',
-                    data: vwapData,
-                    borderColor: '#FF3333', // Red
-                    borderWidth: 1,
-                    pointRadius: 0,
-                    pointHoverRadius: 4,
-                    yAxisID: 'y1',
-                    order: 0
-                },
-                {
-                    type: 'line',
-                    label: 'Avg Fill',
-                    data: priceData,
-                    borderColor: '#FFFF00', // Bright Yellow (matches title)
-                    borderWidth: 1, // Minimalistic
-                    borderDash: [4, 4], // Dotted
-                    pointRadius: 0,
-                    yAxisID: 'y1',
-                    order: 1
-                },
 
-                {
-                    type: 'bar',
-                    label: 'Vol/OI Ratio',
-                    data: ratioData,
-                    backgroundColor: function (context) {
-                        const chart = context.chart;
-                        const { ctx, chartArea } = chart;
-                        // Color logic: Green for Calls, Red for Puts
-                        const color = isCall ? '#00ff88' : '#cc0000';
+            if (chartDays === 1) {
+                // === INTRADAY BAR (Simple Volume) ===
+                const simpleVolData = history.map(h => ((h.volume || 0) > 100 ? h.volume : null));
 
-                        if (!chartArea) {
-                            return color;
-                        }
-                        return createScanlinePattern(ctx, color);
+                volumeChart.data.datasets = [
+                    {
+                        type: 'line',
+                        label: 'VWAP',
+                        data: vwapData,
+                        borderColor: '#FFFF00', // Yellow Dotted
+                        borderWidth: 1,
+                        borderDash: [4, 4], // Dotted
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        yAxisID: 'y1',
+                        order: 0
                     },
-                    yAxisID: 'y',
-                    order: 2
-                },
-                {
-                    type: 'line',
-                    label: 'Avg Trade Size',
-                    data: avgSizeData,
-                    borderColor: '#0085FF', // Pepsi Blue (Brighter for dark mode)
-                    borderWidth: 1,
-                    pointRadius: 0,
-                    pointHoverRadius: 5,
-                    yAxisID: 'y2', // New Right Axis
-                    order: 0
-                }
-            ];
+                    {
+                        type: 'line',
+                        label: 'Price',
+                        data: priceData,
+                        borderColor: '#FF00FF', // Pink Price Line
+                        backgroundColor: 'rgba(255, 0, 255, 0.1)', // Pink Fill
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.1,
+                        fill: true,
+                        yAxisID: 'y1',
+                        order: 1
+                    },
+                    {
+                        type: 'line',
+                        label: 'Avg Trade Size',
+                        data: avgSizeData,
+                        borderColor: '#00ffff', // Cyan
+                        borderWidth: 1,
+                        borderDash: [], // Solid line
+                        pointRadius: 0,
+                        yAxisID: 'y2', // Separate axis for Size (hidden)
+                        order: 2
+                    },
+                    {
+                        type: 'bar',
+                        label: 'Volume',
+                        data: simpleVolData,
+                        backgroundColor: function (context) {
+                            const chart = context.chart;
+                            const { ctx, chartArea } = chart;
+                            const color = isCall ? '#00ff88' : '#cc0000';
+                            if (!chartArea) return color;
+                            return createScanlinePattern(ctx, color);
+                        },
+                        yAxisID: 'y',
+                        order: 3
+                    }
+                ];
+            } else {
+                // === DAILY AGGREGATE CHART (Standard) ===
+                volumeChart.data.datasets = [
+                    {
+                        type: 'line',
+                        label: 'VWAP',
+                        data: vwapData,
+                        borderColor: '#FFFF00', // Yellow Dotted
+                        borderWidth: 1,
+                        borderDash: [4, 4], // Dotted
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        yAxisID: 'y1',
+                        order: 0
+                    },
+                    {
+                        type: 'line',
+                        label: 'Avg Fill',
+                        data: priceData,
+                        borderColor: '#FF00FF', // Pink Price Line
+                        backgroundColor: 'rgba(255, 0, 255, 0.1)', // Pink Fill
+                        borderWidth: 2,
+                        borderDash: [], // Solid line
+                        pointRadius: 0,
+                        fill: true,
+                        tension: 0.1,
+                        yAxisID: 'y1',
+                        order: 1
+                    },
+                    {
+                        type: 'bar',
+                        label: 'Premium',
+                        data: premiumData,
+                        backgroundColor: function (context) {
+                            const chart = context.chart;
+                            const { ctx, chartArea } = chart;
+                            const color = isCall ? '#00ff88' : '#cc0000';
+                            if (!chartArea) return color;
+                            return createScanlinePattern(ctx, color);
+                        },
+                        yAxisID: 'y',
+                        order: 2
+                    },
+                    {
+                        type: 'line',
+                        label: 'Avg Trade Size',
+                        data: avgSizeData,
+                        borderColor: '#0085FF',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        pointHoverRadius: 5,
+                        yAxisID: 'y2', // New Right Axis
+                        order: 0
+                    }
+                ];
+            }
 
             // Add annotation for average line
-            volumeChart.options.plugins.annotation = {
-                annotations: {
-                    avgLine: {
-                        type: 'line',
-                        yMin: avgVolOI,
-                        yMax: avgVolOI,
-                        borderColor: 'rgba(255, 255, 255, 0.3)',
-                        borderWidth: 1,
-                        borderDash: [4, 4],
-                        label: {
-                            display: true,
-                            content: `Avg: ${avgVolOI.toFixed(2)}x`,
-                            color: '#888',
-                            font: { size: 7 },
-                            position: 'end'
-                        }
-                    },
-                    unusualLine: {
-                        type: 'line',
-                        yMin: 5, // Fixed 5x threshold for visual reference
-                        yMax: 5,
-                        borderColor: 'rgba(255, 51, 51, 0.5)',
-                        borderWidth: 1,
-                        label: {
-                            display: true,
-                            content: 'BASELINE',
-                            color: '#ff3333',
-                            font: { size: 7 },
-                            position: 'start'
-                        }
-                    }
-                }
-            };
+            // Removed Vol/OI average line and baseline as they are less relevant for Premium view
+            volumeChart.options.plugins.annotation = {};
 
-            // Flash alert if any bar > 5x
-            const maxRatio = Math.max(...ratioData);
+            // Flash alert if any bar > 5x (Removed for now as ratio logic is gone)
             const container = document.querySelector('.chart-container');
-            if (maxRatio >= 5) {
-                container.classList.add('spike-alert');
-            } else {
-                container.classList.remove('spike-alert');
-            }
+            container.classList.remove('spike-alert');
 
 
 

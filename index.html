@@ -564,17 +564,7 @@
                     }
 
                     // Show appropriate UI based on status
-                    if (status.status === 'trialing') {
-                        const days = status.days_remaining !== undefined ? status.days_remaining : 3;
-                        // Integrate with Critical Events (Economic Calendar)
-                        if (window.economicCalendar && window.economicCalendar.addTrialAlert) {
-                            window.economicCalendar.addTrialAlert(days);
-                        }
-
-                        if (status.login_count > 1) {
-                            showPriceNotification();
-                        }
-                    } else if (status.status === 'active') {
+                    if (status.status === 'active') {
                         // Show Billing Button for Paying Customers
                         setupBillingButton(user);
 
@@ -600,23 +590,6 @@
 
 
 
-        function showPriceNotification() {
-            // Delay slightly so it appears after page loads
-            setTimeout(() => {
-                const modal = document.createElement('div');
-                modal.className = 'price-modal';
-                modal.innerHTML = `
-                    <div class="price-modal-content">
-                        <h2>Welcome Back! 👋</h2>
-                        <p>Enjoying PigmentOS? Lock in your access for just</p>
-                        <div class="price-highlight">$15<span>/month</span></div>
-                        <a href="/upgrade.html" class="price-cta" onclick="window.pigmentAnalytics && window.pigmentAnalytics.logEvent(window.pigmentAnalytics.analytics, 'upgrade_click', {location: 'price_modal'})">Secure My Rate →</a>
-                        <button class="price-dismiss" onclick="this.parentElement.parentElement.remove()">Maybe later</button>
-                    </div>
-                `;
-                document.body.appendChild(modal);
-            }, 1500);
-        }
 
         function hideLoadingScreen() {
             const loader = document.getElementById('loading-screen');

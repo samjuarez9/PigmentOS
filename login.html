@@ -1082,7 +1082,7 @@
                 </button>
 
                 <div style="font-family: 'VT323', monospace; font-size: 10px; color: #666; margin-top: 12px;">
-                    New users automatically get a free trial!
+                    Subscription required for access
                 </div>
             </div>
         </div>
@@ -1154,21 +1154,15 @@
                 const result = await signInWithPopup(auth, provider);
                 console.log("Google Sign-In successful:", result.user);
 
-                // Ensure user document exists in Firestore with a trialStartDate
-                // Using merge: true ensures we don't overwrite if they already have a date
+                // Ensure user document exists in Firestore
                 await setDoc(doc(db, "users", result.user.uid), {
                     email: result.user.email,
-                    trialStartDate: serverTimestamp(),
-                    subscriptionStatus: "trialing"
+                    createdAt: serverTimestamp()
                 }, { merge: true });
 
                 // Analytics
                 if (result.user.metadata.creationTime === result.user.metadata.lastSignInTime) {
                     logEvent(analytics, 'sign_up', { method: 'Google' });
-                    logEvent(analytics, 'trial_started', {
-                        method: 'Google',
-                        source: 'login_page'
-                    });
                 } else {
                     logEvent(analytics, 'login', { method: 'Google' });
                 }

@@ -9,3 +9,15 @@ frontend.log
 monitor.log
 
 unusual_flow_backup.html
+
+# Demos and Local Sandbox
+demo_*.html
+mock_*.py
+sandbox_*.py
+check_*.py
+verify_*.py
+test_*.py
+debug_*.py
+fetch_*.py
+research_*.py
+googl_contracts.json

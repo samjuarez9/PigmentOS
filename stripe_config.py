@@ -22,7 +22,7 @@ STRIPE_CONFIG = {
     "live": {
         "secret_key": os.environ.get("STRIPE_SECRET_KEY", ""),
         "publishable_key": "pk_live_51ScWFSGh2zQhHuerwyHWNhJC1WSoHenIky5sYcd8rPmntuLsnmypY6ob6Pj4J9oRXnQ9EhxPmyNGczqKMJFs4MUA00HBHGHhmm",
-        "price_id": "price_1SdWyEGh2zQhHuersehF6t0x",
+        "price_id": "price_1SqHVEGh2zQhHuervW1gZa30",  # $30/month
         "webhook_secret": os.environ.get("STRIPE_WEBHOOK_SECRET", "")
     }
 }
@@ -37,7 +37,6 @@ STRIPE_PRICE_ID = CURRENT_CONFIG["price_id"]
 STRIPE_WEBHOOK_SECRET = CURRENT_CONFIG["webhook_secret"]
 
 # Common Configuration
-TRIAL_DAYS = 5
 FIREBASE_CREDENTIALS_B64 = os.environ.get("FIREBASE_CREDENTIALS_B64", "")
 
 # URLs

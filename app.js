@@ -3185,28 +3185,6 @@ document.addEventListener('DOMContentLoaded', () => {
             this.render();
         },
 
-        addTrialAlert: function (daysRemaining) {
-            if (daysRemaining > 3) return;
-
-            // Check if already added to avoid duplicates
-            if (this.events.some(e => e.title === "TRIAL EXPIRING")) return;
-
-            const alertEvent = {
-                title: "TRIAL EXPIRING",
-                time: `IN ${daysRemaining} DAYS`,
-                type: "SYSTEM ALERT",
-                status: "ACTIVE",
-                critical: true,
-                stars: 3,
-                rawDate: new Date(Date.now() + (daysRemaining * 86400000))
-            };
-
-            // Prepend to events
-            this.events.unshift(alertEvent);
-            this.render();
-            console.log(`⚠️ Trial alert added to Critical Events: ${daysRemaining} days left`);
-        },
-
         cacheDOM: function () {
             this.modal = document.getElementById('economic-calendar-modal');
             this.closeBtn = document.getElementById('close-calendar-btn');
