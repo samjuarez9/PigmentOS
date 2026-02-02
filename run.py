@@ -1,6 +1,11 @@
 from gevent import monkey
 monkey.patch_all()
 
+# ENABLE gRPC Gevent Compatibility (Critical for Firebase/Firestore)
+# This prevents deadlocks when using Firestore with Gunicorn+Gevent
+import grpc.experimental.gevent
+grpc.experimental.gevent.init_gevent()
+
 import json
 import time
 import random
@@ -2355,7 +2360,17 @@ def subscription_status():
         # 3. CHECK FIRESTORE STATUS (Synced via Webhooks)
         try:
             user_ref = firestore_db.collection('users').document(user_uid)
-            user_doc = user_ref.get()
+            # Add timeout to prevent hanging (Google Cloud defaults to infinite)
+            try:
+                user_doc = user_ref.get(timeout=5)
+            except Exception as fs_err:
+                print(f"⚠️ Firestore Timeout/Error for {user_email}: {fs_err}")
+                # Fail open or closed? Closed -> subscription required.
+                return jsonify({
+                    'status': 'error',
+                    'has_access': False, 
+                    'reason': 'verification_timeout'
+                }), 504
             
             if not user_doc.exists:
                 # New user - no subscription
