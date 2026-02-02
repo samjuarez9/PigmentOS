@@ -909,8 +909,11 @@ def get_flow_contracts():
         
         all_contracts = []
         
-        # Fetch with pagination
-        while url:
+        # Fetch with pagination (Limit to 3 pages / ~3000 requests to prevent timeouts)
+        page_count = 0
+        MAX_PAGES = 3
+        
+        while url and page_count < MAX_PAGES:
             resp = requests.get(url, params=params, timeout=15)
             if resp.status_code != 200:
                 print(f"Reference API Error: {resp.status_code} - {resp.text[:200]}")
@@ -4449,6 +4452,10 @@ def start_background_worker():
         
 
     def worker():
+        # Load Cache INSIDE the worker to prevent blocking main thread import
+        load_whale_cache()
+        mark_whale_cache_cleared()
+        
         # Run Hydration ONCE on startup (Background)
         try:
             hydrate_on_startup()
@@ -4634,9 +4641,8 @@ def start_background_worker():
 
 # Start the background worker immediately on import
 # Guard ensures it only runs once even if module is imported multiple times
-if not hasattr(start_background_worker, '_started'):
-    load_whale_cache()  # Restore persisted whale data
-    mark_whale_cache_cleared()  # Mark this session's start time
+# IMPORTANT: DO NOT RUN ON IMPORT IN PRODUCTION (Gunicorn handles it manually)
+if not hasattr(start_background_worker, '_started') and not os.environ.get('GUNICORN_WORKER'):
     start_background_worker()  # Enabled for local dev (production uses gunicorn_config.py)
     start_background_worker._started = True
 
@@ -4729,17 +4735,22 @@ def api_library_options():
             except:
                 continue
         
-        # Fetch trades for valid contracts (in batches to avoid URL length limits)
+        # Fetch trades for valid contracts (in batches to avoid URL length limits) AND PARALLELIZE
         all_trades = []
         batch_size = 20  # Alpaca allows multiple symbols per request
         
         # 30-day lookback for stateless history
         start_date = (now_et - timedelta(days=30)).strftime("%Y-%m-%dT00:00:00Z")
         
+        batches = []
         for i in range(0, len(valid_contracts), batch_size):
-            batch = valid_contracts[i:i+batch_size]
-            symbols_param = ",".join(batch)
+            batches.append(valid_contracts[i:i+batch_size])
+
+        def fetch_batch_trades(batch_symbols):
+            """Helper to fetch a single batch of trades"""
+            if not batch_symbols: return []
             
+            symbols_param = ",".join(batch_symbols)
             trades_url = "https://data.alpaca.markets/v1beta1/options/trades"
             params = {
                 "symbols": symbols_param,
@@ -4747,13 +4758,15 @@ def api_library_options():
                 "limit": 1000
             }
             
+            local_trades = []
             try:
-                trades_resp = requests.get(trades_url, headers=headers, params=params, timeout=15)
+                # Short timeout per batch
+                trades_resp = requests.get(trades_url, headers=headers, params=params, timeout=10)
                 if trades_resp.status_code == 200:
                     trades_data = trades_resp.json().get("trades", {})
                     for option_symbol, trades in trades_data.items():
                         for trade in trades:
-                            all_trades.append({
+                            local_trades.append({
                                 "symbol": option_symbol,
                                 "price": float(trade.get("p", 0)),
                                 "size": int(trade.get("s", 0)),
@@ -4763,8 +4776,24 @@ def api_library_options():
                             })
             except Exception as e:
                 print(f"Trade fetch error for batch: {e}")
-                continue
+            
+            return local_trades
+
+        # Run batches in parallel
+        # Max workers = 5 to be safe with Alpaca rate limits (200 requests/min is standard, we are doing heavy queries)
+        # 5 workers * 20 symbols = 100 symbols concurrently
+        import concurrent.futures
         
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_batch = {executor.submit(fetch_batch_trades, batch): batch for batch in batches}
+            
+            for future in concurrent.futures.as_completed(future_to_batch):
+                try:
+                    batch_trades = future.result()
+                    all_trades.extend(batch_trades)
+                except Exception as exc:
+                    print(f"Batch execution exception: {exc}")
+
         # Process trades: calculate premium, filter by size, etc.
         MIN_PREMIUM = 50000  # $50k minimum per trade for significant flow
         MIN_SIZE = 10    # Minimum contracts per trade (relaxed to catch high-premium trades)
