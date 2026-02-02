@@ -519,6 +519,145 @@
                 transform: rotate(360deg);
             }
         }
+
+        /* Mobile Responsiveness for Fish Finder */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            /* Stack Selection Panel */
+            .selection-panel {
+                padding: 15px;
+            }
+
+            .drill-down-row {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+
+            .select-group {
+                width: 100%;
+            }
+
+            .styled-select {
+                width: 100% !important;
+                height: 34px;
+                font-size: 14px;
+            }
+
+            .go-btn {
+                width: 100%;
+                height: 34px;
+                justify-content: center;
+                font-size: 12px;
+            }
+
+            .type-toggle-wrapper {
+                height: 34px !important;
+            }
+
+            /* Transform Table to Cards */
+            .table-container {
+                border: none;
+                background: transparent;
+            }
+
+            table,
+            thead,
+            tbody,
+            th,
+            td,
+            tr {
+                display: block;
+            }
+
+            thead tr {
+                position: absolute;
+                top: -9999px;
+                left: -9999px;
+            }
+
+            tr {
+                background: #111;
+                border: 1px solid #333;
+                border-radius: 8px;
+                margin-bottom: 12px;
+                padding: 10px;
+            }
+
+            td {
+                border: none;
+                border-bottom: 1px solid #222;
+                position: relative;
+                padding-left: 45% !important;
+                text-align: right !important;
+                min-height: 25px;
+                display: flex;
+                align-items: center;
+                justify-content: flex-end;
+            }
+
+            td:last-child {
+                border-bottom: 0;
+            }
+
+            td:before {
+                position: absolute;
+                left: 10px;
+                width: 40%;
+                white-space: nowrap;
+                text-align: left;
+                font-weight: bold;
+                color: #666;
+                text-transform: uppercase;
+                font-size: 9px;
+                content: attr(data-label);
+            }
+
+            /* Special handling for certain cells */
+            td.code {
+                text-align: right !important;
+            }
+
+            td.code[data-label="CONTRACT"] {
+                border-bottom: 2px solid #333;
+                margin-bottom: 5px;
+                padding-bottom: 5px;
+                justify-content: center;
+                padding-left: 10px !important;
+            }
+
+            td.code[data-label="CONTRACT"]:before {
+                display: none;
+            }
+
+            td.code[data-label="CONTRACT"] div {
+                justify-content: center;
+                width: 100%;
+            }
+
+            td.code[data-label="TAGS"] {
+                padding-left: 10px !important;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+
+            td.code[data-label="TAGS"]:before {
+                display: none;
+            }
+
+            td.code[data-label="EXCHANGE"] {
+                justify-content: flex-end;
+            }
+        }
     </style>
 </head>
 
@@ -999,13 +1138,13 @@
                 tagsHtml += `</div>`;
 
                 tr.innerHTML = `
-                    <td class="code">
+                    <td class="code" data-label="CONTRACT">
                         <div style="display: flex; align-items: baseline;">
                             <span style="color: #fff; font-weight: bold; font-size: 13px;">${rowTicker}</span>
                             <span class="${typeClass}" style="font-weight: bold; margin-left: 6px;">${rowStrike}${typeLabel}</span>
                         </div>
                     </td>
-                    <td class="timestamp" title="${fullTimeStr}">
+                    <td class="timestamp" title="${fullTimeStr}" data-label="TIME (EST)">
                         <div>${dateStr}</div>
                         <div style="font-size: 9px; color: #888;">${timeStr}</div>
                     </td>
@@ -1014,14 +1153,14 @@
                         $${price.toFixed(2)}
                     </td>
                     -->
-                    <td class="size">
+                    <td class="size" data-label="SIZE">
                         <div>${size}</div>
                         <div style="font-size: 8px; color: #555; text-transform: uppercase;">CONTRACTS</div>
                     </td>
-                    <td class="code" style="font-size: 11px; color: #ccc;">${rowExpiry}</td>
-                    <td class="premium ${rowType === 'CALL' || rowType === 'call' || rowType === 'C' ? 'premium-call' : (rowType === 'PUT' || rowType === 'put' || rowType === 'P' ? 'premium-put' : '')}" title="Price: $${price.toFixed(2)}">${costStr}</td>
-                    <td class="code">${exchangeCell}</td>
-                    <td class="code" style="text-align: right;">${tagsHtml}</td>
+                    <td class="code" style="font-size: 11px; color: #ccc;" data-label="EXPIRY">${rowExpiry}</td>
+                    <td class="premium ${rowType === 'CALL' || rowType === 'call' || rowType === 'C' ? 'premium-call' : (rowType === 'PUT' || rowType === 'put' || rowType === 'P' ? 'premium-put' : '')}" title="Price: $${price.toFixed(2)}" data-label="PREMIUM">${costStr}</td>
+                    <td class="code" data-label="EXCHANGE">${exchangeCell}</td>
+                    <td class="code" style="text-align: right;" data-label="TAGS">${tagsHtml}</td>
                 `;
 
                 tbody.appendChild(tr);
