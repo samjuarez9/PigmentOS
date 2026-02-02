@@ -2491,6 +2491,19 @@
                                         }
 
                                         return tooltipLines;
+                                    } else if (label === 'Volume') {
+                                        // 1D Intraday View
+                                        if (!historyItem) return `Volume: ${context.raw?.toLocaleString()}`;
+
+                                        const volume = context.raw || 0;
+                                        const price = historyItem.vwap || historyItem.price || 0;
+                                        const premium = volume * price * 100;
+
+                                        return [
+                                            `Contracts: ${volume.toLocaleString()}`,
+                                            `Premium: $${premium.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
+                                            `Price: $${price.toFixed(2)}`
+                                        ];
                                     }
                                     return '';
                                 }
