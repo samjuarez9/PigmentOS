@@ -469,8 +469,8 @@
         }
 
         onAuthStateChanged(auth, async (user) => {
-            // CLEAR SAFETY TIMEOUT since we have a response
-            clearTimeout(safetyTimeout);
+            // Safety timeout removed for speed
+            // clearTimeout(safetyTimeout);
 
             // DEV MODE BYPASS
             // Only enable if explicitly set in localStorage

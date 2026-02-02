@@ -633,8 +633,17 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(`${API_BASE_URL}/api/movers`);
             if (!response.ok) throw new Error('Movers API Failed');
-            moversData = await response.json();
 
+            const result = await response.json();
+
+            // Check if backend is loading
+            if (result.loading) {
+                // Keep using existing static data or wait
+                console.log("⏳ Movers backend is loading...");
+                return;
+            }
+
+            moversData = result; // Assume it's the array now
             updateMoversTape();
         } catch (err) {
             console.warn('Movers API Error:', err);
