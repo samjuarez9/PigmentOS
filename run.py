@@ -2347,7 +2347,8 @@ def subscription_status():
             'jaxnailedit@gmail.com', 
             'gtmichael9218@gmail.com',
             'Montoyamiguel35@gmail.com',
-            'saulr165@gmail.com'
+            'saulr165@gmail.com',
+            'govstocktracker@icloud.com'
         ]
         
         if user_email.lower().strip() in [e.lower() for e in ADMIN_EMAILS]:
