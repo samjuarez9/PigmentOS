@@ -919,7 +919,8 @@
             border: 2px solid var(--border-color);
             border-radius: 12px;
             padding: 10px;
-            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 600px;
         }
 
         .fish-finder-table {
@@ -973,7 +974,7 @@
             font-size: 10px;
             font-weight: bold;
             font-family: var(--font-mono);
-            color: #ffff00;
+            color: #ffffff;
             text-transform: uppercase;
         }
 
@@ -1001,9 +1002,9 @@
         }
 
         .tag-atm {
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 68, 68, 0.1);
+            color: #ff4444;
+            border: 1px solid rgba(255, 68, 68, 0.2);
             font-size: 8px;
             padding: 2px 4px;
             border-radius: 2px;
@@ -1011,7 +1012,7 @@
 
         .tag-bullish {
             background: rgba(0, 255, 0, 0.2);
-            color: #00ff00;
+            color: #ffffff;
             font-size: 9px;
             padding: 2px 8px;
             border-radius: 4px;
@@ -1021,7 +1022,7 @@
 
         .tag-bearish {
             background: rgba(153, 0, 0, 0.2);
-            color: #ff3333;
+            color: #ffffff;
             font-size: 9px;
             padding: 2px 8px;
             border-radius: 4px;
@@ -1048,12 +1049,13 @@
         }
 
         .tag-dark-pool {
-            background: rgba(0, 0, 0, 0.5);
-            color: #888;
+            background: #5c49e2;
+            color: #ffffff;
             font-size: 8px;
-            padding: 2px 4px;
-            border-radius: 2px;
-            border: 1px solid #333;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            border: none;
         }
 
         .loading-spinner-small {
@@ -1769,7 +1771,7 @@
                         <tr>
                             <td colspan="7"
                                 style="text-align:center; padding: 40px; color: #444; font-family: var(--font-pixel); font-size: 10px;">
-                                SELECT A TICKER ABOVE TO VIEW TRADES.</td>
+                                SELECT A TICKER AND HIT SCAN TO VIEW TRADES ($50k+).</td>
                         </tr>
                     </tbody>
                 </table>
@@ -3118,7 +3120,7 @@
                 const price = trade.price || trade.p;
                 const size = trade.size || trade.s;
                 const cost = trade.notional_value || (price * size * 100);
-                if (cost < 100000) return;
+                if (cost < 50000) return;
 
                 const tsMs = trade.sip_timestamp ? (Number(trade.sip_timestamp) / 1000000) : (Number(trade.timestamp) * 1000);
                 const d = new Date(tsMs);
@@ -3153,7 +3155,7 @@
 
                 const conds = (trade.conditions || trade.condition || trade.c || []);
                 const isSweep = Array.isArray(conds) ? conds.some(c => c === 233 || c === 'I' || c === 'Sweep' || c === 'F') : (conds === 233 || conds === 'I');
-                if (isSweep) tags += '<span class="badge-sweep">SWEEP ⚡</span>';
+                if (isSweep) tags += '<span class="badge-sweep">SWEEP <span style="color: #ffff00;">⚡</span></span>';
                 tags += isCall ? '<span class="tag-bullish">BULLISH</span>' : '<span class="tag-bearish">BEARISH</span>';
 
                 const tr = document.createElement('tr');
@@ -3169,7 +3171,7 @@
                 `;
                 fishTbody.appendChild(tr);
             });
-            if (!fishTbody.children.length) fishTbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px; color: #444;">NO TRADES OVER $100k FOUND</td></tr>';
+            if (!fishTbody.children.length) fishTbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px; color: #444;">NO TRADES OVER $50k FOUND</td></tr>';
         }
 
         function populateFishWeeks(trades) {

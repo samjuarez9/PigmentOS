@@ -4503,7 +4503,7 @@ def api_library_options():
                 continue
         
         # Process trades: calculate premium, filter by size, etc.
-        MIN_PREMIUM = 100000  # $100k minimum per trade for significant flow
+        MIN_PREMIUM = 50000  # $50k minimum per trade for significant flow
         MIN_SIZE = 100  # Minimum contracts per trade
         
         # Group trades by contract to apply Tick Test
