@@ -3365,43 +3365,54 @@ def api_movers():
     global CACHE
     current_time = time.time()
     
-    if current_time - CACHE["movers"]["timestamp"] < 3600 and CACHE["movers"]["data"]:
+    # 1. serve Cached Data Immediately if available (even if stale)
+    if CACHE["movers"]["data"]:
+        # Trigger background refresh if stale (> 1 hour)
+        if current_time - CACHE["movers"]["timestamp"] > 3600:
+             # Check if refresh is already running (simple lock mechanism)
+             # For now, we rely on the fact that multiple refreshes are okay-ish, or add a flag
+             if not CACHE["movers"].get("refreshing", False):
+                 CACHE["movers"]["refreshing"] = True
+                 threading.Thread(target=background_movers_fetch).start()
+        
         return jsonify(CACHE["movers"]["data"])
     
-    MOVERS_TICKERS = [
-        # Mag 7 & Tech Giants
-        "NVDA", "TSLA", "AAPL", "MSFT", "AMZN", "META", "GOOGL",
-        
-        # Semiconductors & AI
-        "AMD", "INTC", "AVGO", "MU", "ARM", "SMCI",
-        
-        # FinTwit Meme Stocks & High Volume
-        "PLTR",
-        
-        # Growth Tech & SaaS
-        "CRWD",
-        
-        # Consumer & Entertainment
-        "NFLX", "DIS", "UBER", "DASH", "ABNB", "PTON", "NKE", "SBUX",
-        # Removed SQ due to delisting/API errors
-    ]
-    
+    # 2. If NO data, we must fetch (blocking) or return loading
+    # Ideally return loading state to frontend
+    if not CACHE["movers"].get("refreshing", False):
+         CACHE["movers"]["refreshing"] = True
+         threading.Thread(target=background_movers_fetch).start()
+
+    return jsonify({"loading": True, "message": "Fetching initial data", "data": []})
+
+def background_movers_fetch():
+    """Background task to fetch movers data"""
+    global CACHE
+    print("🔄 Starting background movers fetch...")
     try:
-        movers = []
+        MOVERS_TICKERS = [
+            "NVDA", "TSLA", "AAPL", "MSFT", "AMZN", "META", "GOOGL",
+            "AMD", "INTC", "AVGO", "MU", "ARM", "SMCI",
+            "PLTR", "CRWD",
+            "NFLX", "DIS", "UBER", "DASH", "ABNB", "PTON", "NKE", "SBUX"
+        ]
         
-        # Use yfinance for movers (Polygon rate limits at 50+ tickers)
         def fetch_movers_tickers():
-            return yf.Tickers(" ".join(MOVERS_TICKERS))
+           return yf.Tickers(" ".join(MOVERS_TICKERS))
         
+        # Use our timeout utility
         tickers_obj = with_timeout(fetch_movers_tickers, timeout_seconds=20)
+        
         if not tickers_obj:
             print("⏰ Movers tickers fetch timed out")
-            return jsonify({"error": "timeout"})
-        
+            CACHE["movers"]["refreshing"] = False
+            return
+            
         def fetch_ticker_data(symbol):
             try:
-                time.sleep(random.uniform(0.01, 0.05))  # Small jitter
+                time.sleep(random.uniform(0.01, 0.05))
                 t = tickers_obj.tickers[symbol]
+                # Accessing fast_info triggers the fetch
                 last = t.fast_info.last_price
                 prev = t.fast_info.previous_close
                 if last and prev:
@@ -3412,25 +3423,27 @@ def api_movers():
                         "type": "gain" if change >= 0 else "loss"
                     }
             except Exception as e:
-                print(f"❌ Mover Fetch Error ({symbol}): {e}")
+                # print(f"❌ ({symbol})", end=" ") 
                 return None
             return None
         
-        # Parallel fetch
+        # Using a smaller pool for background work to not starve main threads
+        results = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            # Add timeout to iterator? No, just let it run in background
             results = list(executor.map(fetch_ticker_data, MOVERS_TICKERS))
         
         movers = [r for r in results if r is not None]
         movers.sort(key=lambda x: x['change'], reverse=True)
         
         CACHE["movers"]["data"] = movers
-        CACHE["movers"]["timestamp"] = current_time
-        print(f"📊 Movers: Fetched {len(movers)} tickers via yfinance")
-        return jsonify(movers)
+        CACHE["movers"]["timestamp"] = time.time()
+        print(f"✅ Movers Updated: {len(movers)} tickers")
         
     except Exception as e:
-        print(f"Movers Error: {e}")
-        return jsonify({"error": str(e)})
+        print(f"❌ Movers Background Error: {e}")
+    finally:
+        CACHE["movers"]["refreshing"] = False
 
 
 
