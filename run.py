@@ -2311,6 +2311,7 @@ def create_checkout_session():
 @limiter.limit("30 per minute")
 def subscription_status():
     """Check if user has active subscription - PAID ONLY (No Free Trial)"""
+    print(f"🔍 Subscription check received for: {request.get_json().get('email', 'unknown')}")
     try:
         # 1. VERIFY FIREBASE TOKEN
         auth_header = request.headers.get('Authorization', '')

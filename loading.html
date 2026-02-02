@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INITIALIZING // PIGMENT OS</title>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #000;
+            color: #ccc;
+            font-family: 'VT323', monospace;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            overflow: hidden;
+            text-transform: uppercase;
+        }
+
+        .container {
+            text-align: center;
+            width: 80%;
+            max-width: 600px;
+        }
+
+        .logo {
+            font-size: 48px;
+            color: #FFFF00;
+            /* Yellow */
+            text-shadow: 2px 2px 0 #FF00FF;
+            /* Pink shadow */
+            margin-bottom: 20px;
+            letter-spacing: 4px;
+        }
+
+        .status-box {
+            border: 2px solid #555;
+            background: #111;
+            padding: 20px;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.1);
+        }
+
+        .status-text {
+            font-size: 24px;
+            color: #00FFFF;
+            /* Cyan */
+            margin-bottom: 10px;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 4px;
+            background: #333;
+            margin-top: 15px;
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: #00FF00;
+            /* Green */
+            width: 0%;
+            transition: width 0.2s ease;
+            box-shadow: 0 0 5px #00FF00;
+        }
+
+        .log-console {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+            text-align: left;
+            width: 100%;
+            height: 80px;
+            overflow: hidden;
+            border-top: 1px solid #333;
+            padding-top: 10px;
+        }
+
+        .log-line {
+            opacity: 0;
+            animation: fadeIn 0.2s forwards;
+            margin-bottom: 2px;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* Scanlines */
+        body::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 100;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="logo">PIGMENT OS</div>
+
+        <div class="status-box">
+            <div id="status-message" class="status-text">SYSTEM INITIALIZATION</div>
+            <div class="progress-bar-container">
+                <div id="progress" class="progress-bar"></div>
+            </div>
+        </div>
+
+        <div id="console" class="log-console"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCEtjs3kYaB7usZjplg797NYtM4MFIdm7g",
+            authDomain: "pigmentos-49d50.firebaseapp.com",
+            projectId: "pigmentos-49d50",
+            storageBucket: "pigmentos-49d50.firebasestorage.app",
+            messagingSenderId: "52957674554",
+            appId: "1:52957674554:web:2a3b295c23978980a6c903",
+            measurementId: "G-RDE19D05G2"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const analytics = getAnalytics(app);
+
+        // Utility: Update Log
+        const consoleDiv = document.getElementById('console');
+        const progressBar = document.getElementById('progress');
+        const statusMsg = document.getElementById('status-message');
+
+        function log(msg) {
+            const line = document.createElement('div');
+            line.className = 'log-line';
+            line.textContent = `> ${msg}`;
+            consoleDiv.insertBefore(line, consoleDiv.firstChild);
+            // Limit logs
+            if (consoleDiv.children.length > 5) {
+                consoleDiv.lastChild.remove();
+            }
+        }
+
+        function setProgress(percent) {
+            progressBar.style.width = `${percent}%`;
+        }
+
+        // Hardcoded Admins (synced with index.html logic)
+        const ADMIN_EMAILS = [
+            'sam.juarez092678@gmail.com',
+            'jaxnailedit@gmail.com',
+            'gtmichael9218@gmail.com',
+            'Montoyamiguel35@gmail.com',
+            'saulr165@gmail.com'
+        ];
+
+        async function checkSubscription(user) {
+            log(`AUTHENTICATED: ${user.email}`);
+            setProgress(40);
+
+            // 1. Check Admin Bypass
+            if (ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase())) {
+                log('ADMIN CLEARANCE RECOGNIZED');
+                statusMsg.textContent = 'ACCESS GRANTED [ADMIN]';
+                progressBar.style.background = '#FFFF00'; // Yellow for admin
+                setProgress(100);
+                setTimeout(() => {
+                    window.location.href = '/index.html?verified=true';
+                }, 800);
+                return;
+            }
+
+            // 2. API Check
+            statusMsg.textContent = 'VERIFYING SUBSCRIPTION...';
+            log('Contacting Mainframe...');
+
+            try {
+                const idToken = await user.getIdToken();
+                const response = await fetch('/api/subscription-status', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${idToken}`
+                    },
+                    body: JSON.stringify({ email: user.email })
+                });
+
+                if (!response.ok) throw new Error('Verification Server Error');
+
+                const data = await response.json();
+
+                setProgress(80);
+
+                if (data.has_access) {
+                    log('SUBSCRIPTION: ACTIVE');
+                    statusMsg.textContent = 'ACCESS GRANTED';
+                    setProgress(100);
+                    setTimeout(() => {
+                        window.location.href = '/index.html?verified=true';
+                    }, 500);
+                } else {
+                    log(`ACCESS DENIED: ${data.reason || 'UNPAID'}`);
+                    statusMsg.textContent = 'SUBSCRIPTION REQUIRED';
+                    statusMsg.style.color = '#FF0000';
+                    progressBar.style.background = '#FF0000';
+                    setProgress(100);
+
+                    setTimeout(() => {
+                        // Pass reason to upgrade page
+                        const reason = data.reason === 'subscription_past_due' ? 'past_due' : 'expired';
+                        window.location.href = `/upgrade.html?reason=${reason}`;
+                    }, 1500);
+                }
+
+            } catch (e) {
+                log(`ERROR: ${e.message}`);
+                console.error(e);
+                // Fail Closed -> Upgrade
+                statusMsg.textContent = 'VERIFICATION FAILED';
+                statusMsg.style.color = '#FF0000';
+                setTimeout(() => {
+                    window.location.href = '/upgrade.html?error=verification_error';
+                }, 2000);
+            }
+        }
+
+        // Auth Listener
+        log('INITIALIZING FIREBASE AUTH...');
+        setProgress(10);
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                checkSubscription(user);
+            } else {
+                log('NO USER FOUND');
+                statusMsg.textContent = 'LOGIN REQUIRED';
+                setTimeout(() => {
+                    window.location.href = '/login.html';
+                }, 1000);
+            }
+        });
+
+        // Safety Timeout (Fail Safe)
+        setTimeout(() => {
+            if (progressBar.style.width !== '100%') {
+                log('TIMEOUT - REDIRECTING TO LOGIN');
+                window.location.href = '/login.html';
+            }
+        }, 10000);
+
+    </script>
+</body>
+
+</html>

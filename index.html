@@ -403,13 +403,8 @@
         const db = getFirestore(app);
         const analytics = getAnalytics(app);
 
-        // SAFETY TIMEOUT: Force-show page after 3s even if Firebase is slow
-        // This prevents navigation hang when Firebase SDK takes too long to initialize
-        const safetyTimeout = setTimeout(() => {
-            console.warn('⚠️ Firebase took too long - force-showing page');
-            hideLoadingScreen();
-            document.body.style.visibility = 'visible';
-        }, 3000);
+        // Safety Timeout removed - handled by loading.html
+        // const safetyTimeout = setTimeout(...)
 
         // Track page view
         logEvent(analytics, 'page_view', { page_title: 'Dashboard' });
@@ -577,13 +572,13 @@
                     }
 
                 } catch (error) {
-                    // FAIL OPEN: If check fails (network, 500, etc), ALLOW ACCESS
-                    console.warn('⚠️ Background subscription check failed - Allowing Optimistic Access:', error.name || error.message);
+                    // FAIL CLOSED: If check fails (network, 500, etc), FAIL SAFE -> Redirect
+                    console.error('⚠️ Background subscription check failed - Denying Access:', error.name || error.message);
 
-                    // Optional: Show a subtle toast or log to analytics
+                    // Log error but enforce security
                     logEvent(analytics, 'subscription_check_error', { error: error.message });
 
-                    // DO NOT REDIRECT
+                    window.location.href = '/upgrade.html?error=verification_failed';
                 }
             }, 3000); // 3-second buffer for smooth loading
         });
