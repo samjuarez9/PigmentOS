@@ -34,6 +34,7 @@ load_dotenv()  # Load .env file for POLYGON_API_KEY and other secrets
 ALPACA_API_KEY = os.getenv("ALPACA_API_KEY")
 ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY")
 ALPACA_DATA_URL = "https://data.alpaca.markets/v1beta1/options"
+MASSIVE_API_KEY = os.getenv("MASSIVE_API_KEY")
 
 import ssl
 import calendar
@@ -4644,6 +4645,41 @@ def demo_stream():
             time.sleep(1) # Fast update for demo
 
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
+
+
+# === MASSIVE API PROXY (FISH HISTORY) ===
+@app.route('/api/fish/trades/<path:optionsTicker>')
+def get_fish_history(optionsTicker):
+    """
+    Proxy to Massive API for trade history.
+    """
+    if not MASSIVE_API_KEY:
+        print("⚠️ MASSIVE_API_KEY missing")
+        return jsonify({"error": "MASSIVE_API_KEY not configured"}), 500
+
+    try:
+        # Construct URL: https://api.massive.com/v3/trades/{optionsTicker}
+        # Handle cases where optionsTicker might be URL encoded or contain slash? 
+        # path param handles slashes, but ticker shouldn't have them usually.
+        url = f"https://api.massive.com/v3/trades/{optionsTicker}"
+        
+        # Pass query params (timestamp, limit, sort, etc.) directly from request
+        params = request.args.to_dict()
+        params['apiKey'] = MASSIVE_API_KEY 
+        
+        # print(f"🐟 Fetching Fish: {url} | Params: {params}")
+
+        resp = requests.get(url, params=params, timeout=10)
+        
+        if resp.ok:
+            return jsonify(resp.json())
+        else:
+            print(f"🐟 Massive API Error {resp.status_code}: {resp.text}")
+            return jsonify({"error": f"Massive API Error: {resp.status_code}", "details": resp.text}), resp.status_code
+
+    except Exception as e:
+        print(f"🐟 Fish History Error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     # Start background worker

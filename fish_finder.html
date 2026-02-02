@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PigmentOS - Fish Finder</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #000000;
+            --text-color: #e0e0e0;
+            --accent-cyan: #00ffff;
+            --accent-purple: #bd00ff;
+            --border-color: #333;
+            --widget-bg: #111;
+            --font-mono: 'JetBrains Mono', monospace;
+            --font-pixel: 'Press Start 2P', cursive;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-mono);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            /* Reduced header margin */
+            border-bottom: 1px solid var(--border-color);
+            /* Thinner border */
+            padding-bottom: 5px;
+            /* Reduced padding */
+        }
+
+        .title {
+            font-family: var(--font-pixel);
+            font-size: 16px;
+            color: #fff;
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        .back-btn {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            padding: 4px 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 10px;
+            font-family: var(--font-mono);
+        }
+
+        /* Widget Styles Ported from Unusual Flow */
+        .selection-panel {
+            background: var(--widget-bg);
+            border: 1px solid var(--border-color);
+            /* Thinner border */
+            border-radius: 8px;
+            /* Slightly smaller radius */
+            padding: 10px;
+            /* Reduced padding */
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            /* Reduced gap */
+            margin-bottom: 15px;
+            /* Reduced margin */
+        }
+
+        .panel-title {
+            font-family: var(--font-pixel);
+            font-size: 10px;
+            /* Smaller title */
+            color: #888;
+            /* Greyed out to be less intrusive */
+            margin-bottom: 5px;
+            /* Reduced margin */
+            text-transform: uppercase;
+        }
+
+        .drill-down-row {
+            display: flex;
+            align-items: flex-end;
+            /* Align bottom to match inputs */
+            gap: 15px;
+            margin-bottom: 5px;
+            flex-wrap: wrap;
+        }
+
+        .select-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            /* Tighter gap */
+            flex: initial;
+            /* Auto width */
+            min-width: 0;
+        }
+
+        .select-label {
+            font-size: 9px;
+            /* Smaller label */
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-left: 2px;
+        }
+
+        .styled-select {
+            background: #000;
+            color: #fff;
+            border: 1px solid #333;
+            padding: 4px 6px;
+            /* Smaller padding */
+            font-family: var(--font-mono);
+            font-size: 11px;
+            /* Smaller font */
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+            min-width: 80px;
+            /* Reduced width */
+            transition: border-color 0.2s;
+            height: 26px;
+            /* Fixed height for alignment */
+        }
+
+        .styled-select:focus {
+            border-color: #00ffff;
+        }
+
+        .spot-price,
+        #status {
+            font-size: 9px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-family: var(--font-mono);
+            margin-top: 4px;
+        }
+
+        .strike-nav-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .strike-nav-wrapper .styled-select {
+            flex: 1;
+        }
+
+        .strike-nav-btn {
+            background: #1a1a1a;
+            color: #fff;
+            border: 1px solid #444;
+            width: 28px;
+            height: 34px;
+            font-family: var(--font-mono);
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .strike-nav-btn:hover:not(:disabled) {
+            background: var(--accent-purple);
+            border-color: var(--accent-purple);
+            transform: scale(1.05);
+        }
+
+        .strike-nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .type-toggle-wrapper {
+            display: flex;
+            gap: 0;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid #333;
+        }
+
+        .type-toggle-btn {
+            flex: 1;
+            padding: 8px 12px;
+            font-family: var(--font-pixel);
+            font-size: 9px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.15s;
+            background: #1a1a1a;
+            color: #666;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .type-toggle-btn::after,
+        .go-btn::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%);
+            background-size: 100% 2px;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .type-toggle-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .type-toggle-btn.call {
+            border-right: 1px solid #333;
+        }
+
+        .type-toggle-btn.call.active {
+            background: linear-gradient(180deg, #00cc00 0%, #009900 100%);
+            color: #000;
+            text-shadow: 0 0 8px rgba(0, 255, 0, 0.5);
+        }
+
+        .type-toggle-btn.put.active {
+            background: linear-gradient(180deg, #cc0000 0%, #990000 100%);
+            color: #fff;
+            text-shadow: 0 0 8px rgba(255, 0, 0, 0.5);
+        }
+
+        .type-toggle-btn.active:not(.call):not(.put) {
+            background: linear-gradient(180deg, #0088ff 0%, #0055aa 100%);
+            color: #000;
+            text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+        }
+
+        .go-btn {
+            background: linear-gradient(135deg, #a349ff, #6350e6);
+            color: #fff;
+            border: none;
+            padding: 0 12px;
+            font-family: var(--font-press-start);
+            font-size: 10px;
+            /* Smaller button text */
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+            border-radius: 4px;
+            height: 26px;
+            /* Match inputs */
+            display: flex;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(163, 73, 255, 0.3);
+        }
+
+        .go-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, #bc79ff, #7a68ff);
+            transform: translateY(-1px);
+            box-shadow: 0 0 15px rgba(163, 73, 255, 0.5);
+        }
+
+        .go-btn:disabled {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* Data Table */
+        .table-container {
+            background: var(--widget-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 2px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        th {
+            background: #222;
+            color: #666;
+            padding: 10px;
+            text-align: left;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            border-bottom: 1px solid var(--border-color);
+            text-transform: uppercase;
+        }
+
+        td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #222;
+        }
+
+        tr:hover {
+            background: #1a1a1a;
+        }
+
+        .code {
+            font-family: var(--font-mono);
+            color: #aaa;
+        }
+
+        .price {
+            color: #00ff00;
+        }
+
+        .size {
+            color: #aaaaaa;
+            font-weight: 500;
+        }
+
+        .premium {
+            font-weight: bold;
+            font-family: var(--font-mono);
+        }
+
+        .premium-call {
+            color: #00ff00;
+        }
+
+        .premium-put {
+            color: #ff3333;
+        }
+
+        .timestamp {
+            color: #888;
+        }
+
+        .type-c {
+            color: #00ff88;
+        }
+
+        .type-p {
+            color: #ff4444;
+        }
+
+        .expiry-date {
+            font-size: 10px;
+            color: #666;
+        }
+
+        .tag-dark-pool {
+            background: #440066;
+            color: #ff00ff;
+            font-size: 8px;
+            padding: 1px 4px;
+            border-radius: 2px;
+            font-weight: bold;
+            display: inline-block;
+            margin-bottom: 2px;
+            border: 1px solid #ff00ff55;
+        }
+
+        .exchange-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        /* Condition Badges */
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+            font-family: var(--font-mono);
+            margin: 2px;
+            text-transform: uppercase;
+        }
+
+        .badge-sweep {
+            background: transparent;
+            color: #ffff00;
+            border: none;
+            box-shadow: none;
+            animation: none;
+            padding: 0;
+            margin-right: 4px;
+        }
+
+        .badge-trade {
+            color: #888;
+            border: 1px solid #444;
+            background: rgba(136, 136, 136, 0.1);
+        }
+
+        .badge-split {
+            color: #0088ff;
+            border: 1px solid #0088ff;
+            background: rgba(0, 136, 255, 0.1);
+        }
+
+        .badge-split {
+            color: #0088ff;
+            border: 1px solid #0088ff;
+            background: rgba(0, 136, 255, 0.1);
+        }
+
+        .itm-row {
+            background: rgba(255, 255, 255, 0.03);
+            /* Subtle highlight for ITM */
+            border-left: 2px solid #aaa;
+        }
+
+        /* Moneyness Badges (Whales Style) */
+        .tag-itm {
+            background: rgba(0, 255, 0, 0.2);
+            color: #00ff00;
+            border: 1px solid rgba(0, 255, 0, 0.3);
+            font-size: 8px;
+            padding: 1px 3px;
+            border-radius: 2px;
+            margin-left: 6px;
+        }
+
+        .tag-otm {
+            background: #440066;
+            color: #ff00ff;
+            border: 1px solid #ff00ff55;
+            font-size: 8px;
+            padding: 1px 3px;
+            border-radius: 2px;
+            margin-left: 6px;
+        }
+
+        .tag-atm {
+            background: rgba(255, 0, 0, 0.2);
+            color: #ff4444;
+            border: 1px solid rgba(255, 0, 0, 0.3);
+            font-size: 8px;
+            padding: 1px 3px;
+            border-radius: 2px;
+            margin-left: 6px;
+        }
+
+        .tag-bullish {
+            background: #00876c;
+            color: #fff;
+            font-size: 9px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            margin-left: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tag-bearish {
+            background: #d43d51;
+            color: #fff;
+            font-size: 9px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            margin-left: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tag-0dte {
+            background: #333;
+            color: #fff;
+            border: 1px solid #666;
+            font-size: 8px;
+            padding: 1px 3px;
+            border-radius: 2px;
+            margin-left: 6px;
+        }
+
+        .tag-leap {
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
+            border: 1px solid rgba(255, 215, 0, 0.4);
+            font-size: 8px;
+            padding: 1px 3px;
+            border-radius: 2px;
+            margin-left: 6px;
+        }
+
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(0, 255, 255, 0.1);
+            border-top: 2px solid #00ffff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div class="title">
+            FISH FINDER
+        </div>
+        <a href="/" class="back-btn">EXIT</a>
+    </div>
+
+    <!-- Selection Panel (Ported Widget) -->
+    <div class="selection-panel">
+        <div class="panel-title">SELECT CONTRACT <span style="font-size: 14px;">🎣</span></div>
+        <div class="drill-down-row">
+            <!-- 1. Ticker + Scan Button -->
+            <div class="select-group">
+                <span class="select-label">Ticker</span>
+                <div style="display: flex; gap: 8px;">
+                    <select id="ticker-select" class="styled-select" style="width: 120px;">
+                        <option value="" selected disabled>SELECT</option>
+                        <option value="AAPL">AAPL</option>
+                        <option value="AMD">AMD</option>
+                        <option value="AMZN">AMZN</option>
+                        <option value="GOOGL">GOOGL</option>
+                        <option value="INTC">INTC</option>
+                        <option value="IREN">IREN</option>
+                        <option value="LITE">LITE</option>
+                        <option value="META">META</option>
+                        <option value="MSFT">MSFT</option>
+                        <option value="MU">MU</option>
+                        <option value="NVDA">NVDA</option>
+                        <option value="ORCL">ORCL</option>
+                        <option value="PLTR">PLTR</option>
+                        <option value="SNDK">SNDK</option>
+                        <option value="STX">STX</option>
+                        <option value="TSLA">TSLA</option>
+                        <option value="TSM">TSM</option>
+                    </select>
+                    <button id="scan-ticker-btn" class="go-btn" disabled>SCAN</button>
+                </div>
+                <div id="spot-price" class="spot-price" style="margin-top: 4px;"></div>
+            </div>
+
+            <!-- Divider -->
+            <div class="secondary-filter"
+                style="display: none; width: 1px; height: 30px; background: #333; margin: 0 10px;"></div>
+
+            <!-- 2. Filters (Compact) -->
+            <div class="select-group secondary-filter" style="display: none;">
+                <span class="select-label">Expiry</span>
+                <select id="expiry-select" class="styled-select" style="min-width: 80px;" disabled>
+                    <option value="ALL" selected>ALL</option>
+                </select>
+            </div>
+
+            <div class="select-group secondary-filter" style="display: none;">
+                <span class="select-label">Week</span>
+                <select id="week-select" class="styled-select" style="min-width: 80px;" disabled>
+                    <option value="ALL" selected>ALL</option>
+                </select>
+            </div>
+
+            <div class="select-group secondary-filter" style="display: none;">
+                <span class="select-label">Type</span>
+                <div class="type-toggle-wrapper"
+                    style="display: flex; border: 1px solid #333; border-radius: 4px; overflow: hidden; height: 26px;">
+                    <button id="type-call" class="type-toggle-btn call"
+                        style="border: none; padding: 0 10px; font-family: var(--font-mono); font-size: 10px; cursor: pointer; height: 100%; border-right: 1px solid #333;"
+                        disabled>CALL</button>
+                    <button id="type-put" class="type-toggle-btn put"
+                        style="border: none; padding: 0 10px; font-family: var(--font-mono); font-size: 10px; cursor: pointer; height: 100%; border-right: 1px solid #333;"
+                        disabled>PUT</button>
+                    <button id="type-any" class="type-toggle-btn active"
+                        style="border: none; padding: 0 10px; font-family: var(--font-mono); font-size: 10px; cursor: pointer; height: 100%;"
+                        disabled>ANY</button>
+                </div>
+                <input type="hidden" id="type-select" value="ANY">
+            </div>
+
+            <!-- Hidden Fetch Button Wrapper (logic moved) -->
+            <div class="fetch-btn-wrapper" style="display: none;"></div>
+        </div>
+        <div id="status">Ready</div>
+    </div>
+
+    <!-- Results -->
+    <div class="table-container">
+        <table id="trades-table">
+            <thead>
+                <tr>
+                    <th>CONTRACT</th>
+                    <th>TIME (EST)</th>
+                    <!-- PRICE Hidden -->
+                    <th>SIZE</th>
+                    <th>EXPIRY</th>
+                    <th>PREMIUM</th>
+                    <th>EXCHANGE</th>
+                    <th>TAGS</th>
+                </tr>
+            </thead>
+            <tbody id="trades-body">
+                <!-- Rows injected here -->
+                <tr>
+                    <td colspan="8" style="text-align:center; padding: 20px; color: #444;">SELECT A CONTRACT ABOVE TO
+                        VIEW TRADES.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        const API_BASE_URL = window.location.protocol === 'file:' ? 'http://localhost:8001' : '';
+        let availableContracts = []; // Store raw contract list
+
+        // Elements
+        const tickerSelect = document.getElementById('ticker-select');
+        const expirySelect = document.getElementById('expiry-select');
+        const typeSelect = document.getElementById('type-select');
+        const scanTickerBtn = document.getElementById('scan-ticker-btn');
+        const statusEl = document.getElementById('status');
+        const tbody = document.getElementById('trades-body');
+
+        // Filter Buttons
+        const typeCallBtn = document.getElementById('type-call');
+        const typePutBtn = document.getElementById('type-put');
+        const typeAnyBtn = document.getElementById('type-any');
+
+        let allScanData = []; // Store full scan results for client-side filtering
+
+        // 1. Ticker Selected -> Fetch Contracts (Background) & Enable Scan
+        tickerSelect.addEventListener('change', async (e) => {
+            const ticker = e.target.value;
+            if (!ticker) return;
+
+            statusEl.innerText = "Ready to Scan";
+            scanTickerBtn.disabled = false; // Enable Scan Ticker immediately
+
+            // Reset filters
+            allScanData = [];
+            expirySelect.innerHTML = '<option value="ALL" selected>ALL EXPIRIES</option>';
+            expirySelect.disabled = true;
+            resetTypeButtons();
+
+            // Re-hide secondary filters until scan
+            document.querySelectorAll('.secondary-filter').forEach(el => el.style.display = 'none');
+
+            try {
+                // Determine Spot Price
+                // For demo, we might fetch it or just rely on the scan to populate it later
+                const res = await fetch(`${API_BASE_URL}/api/flow/contracts?ticker=${ticker}`);
+                const data = await res.json();
+
+                if (data.spot_price) {
+                    window.currentSpotPrice = data.spot_price; // Store globally
+                    document.getElementById('spot-price').textContent = `SPOT: $${data.spot_price.toFixed(2)}`;
+                }
+            } catch (err) {
+                console.error(err);
+                // Non-critical if just spot price fails
+            }
+        });
+
+        // 5. SCAN TICKER Button
+        scanTickerBtn.addEventListener('click', async () => {
+            const ticker = tickerSelect.value;
+            if (!ticker) return;
+
+            statusEl.textContent = `SCANNING ALL FLOW FOR ${ticker}...`;
+            statusEl.textContent = `SCANNING ALL FLOW FOR ${ticker}...`;
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px;"><div class="loading-spinner"></div></td></tr>';
+
+            // Disable filters during scan
+            expirySelect.disabled = true;
+            disableTypeButtons();
+
+            try {
+                // Use the Library Ticker Scan endpoint
+                const res = await fetch(`${API_BASE_URL}/api/library/options?symbol=${ticker}`);
+                const json = await res.json();
+
+                if (json.error) throw new Error(json.error);
+
+                const rawTrades = json.data || [];
+                // Sort by timestamp descending
+                rawTrades.sort((a, b) => b.timestamp - a.timestamp);
+
+                // Store Global Data
+                allScanData = rawTrades;
+
+                // Update Spot from Scan if available
+                if (json.current_price) {
+                    window.currentSpotPrice = json.current_price;
+                    document.getElementById('spot-price').textContent = `SPOT: $${json.current_price.toFixed(2)}`;
+                }
+
+                // Populate Filters
+                populateExpiries(allScanData);
+                populateWeeks(allScanData);
+                enableTypeButtons();
+
+                // 3. REVEAL FILTERS
+                document.querySelectorAll('.secondary-filter').forEach(el => el.style.display = '');
+
+                renderTable(allScanData, ticker);
+                statusEl.textContent = `SCAN COMPLETE: FOUND ${rawTrades.length} SIGNIFICANT TRADES`;
+
+            } catch (err) {
+                console.error("Scan Error:", err);
+                statusEl.textContent = `SCAN FAILED: ${err.message}`;
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: #ff5555; padding: 20px;">ERROR: ${err.message}</td></tr>`;
+            }
+        });
+
+        // === FILTER LOGIC ===
+
+        function populateExpiries(trades) {
+            const expiries = new Set();
+            trades.forEach(t => {
+                if (t.expiry) expiries.add(t.expiry);
+            });
+
+            const sortedExpiries = Array.from(expiries).sort();
+
+            expirySelect.innerHTML = '<option value="ALL" selected>ALL EXPIRIES</option>';
+            sortedExpiries.forEach(date => {
+                const opt = document.createElement('option');
+                opt.value = date;
+                opt.textContent = date;
+                expirySelect.appendChild(opt);
+            });
+            expirySelect.disabled = false;
+        }
+
+        expirySelect.addEventListener('change', () => {
+            applyFilters();
+        });
+
+        const weekSelect = document.getElementById('week-select');
+        weekSelect.addEventListener('change', () => {
+            applyFilters();
+        });
+
+        function resetTypeButtons() {
+            typeSelect.value = 'ANY';
+            typeAnyBtn.classList.add('active');
+            typeCallBtn.classList.remove('active');
+            typePutBtn.classList.remove('active');
+            disableTypeButtons();
+        }
+
+        function disableTypeButtons() {
+            typeCallBtn.disabled = true;
+            typePutBtn.disabled = true;
+            typeAnyBtn.disabled = true;
+        }
+
+        function enableTypeButtons() {
+            typeCallBtn.disabled = false;
+            typePutBtn.disabled = false;
+            typeAnyBtn.disabled = false;
+        }
+
+        typeCallBtn.addEventListener('click', () => {
+            typeSelect.value = 'CALL';
+            updateTypeVisuals(typeCallBtn);
+        });
+        typePutBtn.addEventListener('click', () => {
+            typeSelect.value = 'PUT';
+            updateTypeVisuals(typePutBtn);
+        });
+        typeAnyBtn.addEventListener('click', () => {
+            typeSelect.value = 'ANY';
+            updateTypeVisuals(typeAnyBtn);
+        });
+
+        function updateTypeVisuals(activeBtn) {
+            [typeCallBtn, typePutBtn, typeAnyBtn].forEach(btn => btn.classList.remove('active'));
+            activeBtn.classList.add('active');
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const expiryFilter = expirySelect.value;
+            const typeFilter = typeSelect.value;
+            const ticker = tickerSelect.value;
+
+            let filtered = allScanData;
+
+            if (expiryFilter !== 'ALL') {
+                filtered = filtered.filter(t => t.expiry === expiryFilter);
+            }
+
+            if (typeFilter !== 'ANY') {
+                // Check mapped type (C/P/CALL/PUT)
+                filtered = filtered.filter(t => {
+                    const tType = (t.type || '').toUpperCase();
+                    if (typeFilter === 'CALL') return tType === 'CALL' || tType === 'C';
+                    if (typeFilter === 'PUT') return tType === 'PUT' || tType === 'P';
+                    return true;
+                });
+            }
+
+            // Week Filter
+            const weekVal = weekSelect.value;
+            if (weekVal !== 'ALL') {
+                filtered = filtered.filter(t => {
+                    const ts = t.sip_timestamp || t.timestamp;
+                    if (!ts) return false;
+                    const d = new Date(ts / 1000000); // Massive is nano
+
+                    // Simple "Week of X" formatting
+                    const day = d.getDay() || 7;
+                    if (day !== 1) d.setHours(-24 * (day - 1));
+                    const mondayStr = (d.getMonth() + 1) + '/' + d.getDate();
+
+                    return mondayStr === weekVal;
+                });
+            }
+
+            renderTable(filtered, ticker);
+            statusEl.textContent = `FILTERED: ${filtered.length} TRADES`;
+        }
+
+        function renderTable(trades, ticker) {
+            tbody.innerHTML = '';
+
+            // Sort by sip_timestamp desc (for Massive) or timestamp desc (for Library)
+            trades.sort((a, b) => (b.sip_timestamp || b.timestamp) - (a.sip_timestamp || a.timestamp));
+
+            trades.forEach(trade => {
+                // Normalization: Library format vs Massive format
+                const price = trade.price || trade.p;
+                const size = trade.size || trade.s;
+                const cost = trade.notional_value || (price * size * 100);
+
+                if (cost < 100000) return; // Filter for significant trades
+
+                const tr = document.createElement('tr');
+
+                // Time Display Logic
+                // Massive uses nanoseconds (sip_timestamp), Library uses seconds (timestamp)
+                const tsMs = trade.sip_timestamp ? (Number(trade.sip_timestamp) / 1000000) : (Number(trade.timestamp) * 1000);
+                const tradeDate = new Date(tsMs);
+
+                // Date Part (MM/DD)
+                const mm = String(tradeDate.getMonth() + 1).padStart(2, '0');
+                const dd = String(tradeDate.getDate()).padStart(2, '0');
+                const dateStr = `${mm}/${dd}`;
+
+                // Time Part (HH:MM:SS)
+                const timeStr = tradeDate.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+                // Full timestamp for tooltip
+                const fullTimeStr = tradeDate.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) + `.${tradeDate.getMilliseconds().toString().padStart(3, '0')}`;
+
+                // Premium Formatting (Show M for millions)
+                let costStr = "";
+                if (cost >= 1000000) {
+                    costStr = `$${(cost / 1000000).toFixed(2)}M`;
+                } else {
+                    costStr = `$${(cost / 1000).toFixed(1)}k`;
+                }
+                const exchange = trade.exchange || trade.x;
+
+                // For Library format, ticker is in the trade object
+                const rowTicker = trade.ticker || ticker;
+                const rowStrike = trade.strike ? `$${trade.strike}` : '';
+                const rowType = trade.type || '';
+                let rowExpiry = trade.expiry || '';
+                if (rowExpiry && rowExpiry.includes('-')) {
+                    // Convert YYYY-MM-DD to MM/DD
+                    rowExpiry = rowExpiry.slice(5).replace('-', '/');
+                }
+
+                // Exchange Logic
+                // Standard Lit Exchanges (Massive/MarketData): 300-330
+                // Non-standard or TRF: 0, 4, D, OTC, etc.
+                const isDarkPool = (exchange == 0 || exchange === 'OTC' || exchange === 'TRF' || exchange === 'D' || exchange === '4' || exchange === 'J' || exchange === 'U');
+                let exchangeHtml = '';
+                if (isDarkPool) {
+                    exchangeHtml = `
+                        <div class="exchange-cell">
+                            <span class="tag-dark-pool">DARK POOL</span>
+                        </div>
+                    `;
+                } else {
+                    exchangeHtml = `
+                        <div class="exchange-cell">
+                            <div style="font-size: 14px;">🇺🇸</div>
+                        </div>
+                    `;
+                }
+
+                const conditions = formatConditions(trade.conditions || trade.condition || trade.c || []);
+                const sipTs = trade.sip_timestamp || trade.timestamp || '-';
+
+                const isCall = rowType === 'CALL' || rowType === 'call' || rowType === 'C';
+                const typeClass = isCall ? 'type-c' : 'type-p';
+                const typeLabel = isCall ? 'C' : 'P';
+
+                // Moneyness Logic (vs Current Spot)
+                let moneynessHtml = '';
+                if (window.currentSpotPrice && trade.strike) {
+                    const s = parseFloat(trade.strike);
+                    const diffPct = Math.abs(s - window.currentSpotPrice) / window.currentSpotPrice;
+
+                    if (diffPct < 0.005) {
+                        moneynessHtml = '<span class="tag-atm">ATM</span>';
+                    } else {
+                        let isITM = false;
+                        if (isCall && window.currentSpotPrice > s) isITM = true;
+                        if (!isCall && window.currentSpotPrice < s) isITM = true;
+
+                        if (isITM) {
+                            moneynessHtml = '<span class="tag-itm">ITM</span>';
+                            tr.classList.add('itm-row');
+                        } else {
+                            moneynessHtml = '<span class="tag-otm">OTM</span>';
+                        }
+                    }
+                }
+
+
+                // Combined Exchange/Cond Cell
+                let comboHtml = `<div style="display: flex; align-items: center; justify-content: flex-start; gap: 8px;">`;
+
+                // 1. Exchange Info (Left)
+                comboHtml += `<div>${exchangeHtml}</div>`;
+
+                // Combined Exchange Cell
+                const exchangeCell = `<div style="display: flex; align-items: center;">${exchangeHtml}</div>`;
+
+                // Combined Tags Cell (Sweep + Moneyness)
+                let tagsHtml = `<div style="display: flex; align-items: center; justify-content: flex-end; gap: 4px;">`;
+
+                if (moneynessHtml) {
+                    tagsHtml += `<div>${moneynessHtml}</div>`;
+                }
+
+                // DTE Tags (0DTE, LEAP)
+                if (rowExpiry) {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const expParts = rowExpiry.split('/');
+                    if (expParts.length === 2 && rowExpiry.includes('/')) {
+                        // Assuming Expiry is MM/DD. We need year. Assuming current year or next.
+                        // Actually rowExpiry logic above seemed to strip year. Let's use raw trade.expiry if possible.
+                        // ... wait, the code earlier sorts raw trades. Check trade.expiry format.
+                        // Usually YYYY-MM-DD.
+                        let expDate = new Date(trade.expiry);
+                        if (expDate && !isNaN(expDate.getTime())) {
+                            const diffTime = expDate - today;
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                            if (diffDays <= 0) {
+                                tagsHtml += `<div><span class="tag-0dte">0DTE</span></div>`;
+                            } else if (diffDays > 180) {
+                                tagsHtml += `<div><span class="tag-leap">LEAP</span></div>`;
+                            }
+                        }
+                    }
+                }
+
+                if (conditions) {
+                    tagsHtml += `<div>${conditions}</div>`;
+                }
+
+                // Bullish/Bearish Logic (Simple Call/Put for Demo)
+                let sentimentHtml = '';
+                if (isCall) {
+                    sentimentHtml = `<span class="tag-bullish">BULLISH</span>`;
+                } else {
+                    sentimentHtml = `<span class="tag-bearish">BEARISH</span>`;
+                }
+
+                tagsHtml += `<div>${sentimentHtml}</div>`;
+                tagsHtml += `</div>`;
+
+                tr.innerHTML = `
+                    <td class="code">
+                        <div style="display: flex; align-items: baseline;">
+                            <span style="color: #fff; font-weight: bold; font-size: 13px;">${rowTicker}</span>
+                            <span class="${typeClass}" style="font-weight: bold; margin-left: 6px;">${rowStrike}${typeLabel}</span>
+                        </div>
+                    </td>
+                    <td class="timestamp" title="${fullTimeStr}">
+                        <div>${dateStr}</div>
+                        <div style="font-size: 9px; color: #888;">${timeStr}</div>
+                    </td>
+                    <!-- Price Hidden
+                    <td class="code" style="color: #fff; font-weight: bold;">
+                        $${price.toFixed(2)}
+                    </td>
+                    -->
+                    <td class="size">
+                        <div>${size}</div>
+                        <div style="font-size: 8px; color: #555; text-transform: uppercase;">CONTRACTS</div>
+                    </td>
+                    <td class="code" style="font-size: 11px; color: #ccc;">${rowExpiry}</td>
+                    <td class="premium ${rowType === 'CALL' || rowType === 'call' || rowType === 'C' ? 'premium-call' : (rowType === 'PUT' || rowType === 'put' || rowType === 'P' ? 'premium-put' : '')}" title="Price: $${price.toFixed(2)}">${costStr}</td>
+                    <td class="code">${exchangeCell}</td>
+                    <td class="code" style="text-align: right;">${tagsHtml}</td>
+                `;
+
+                tbody.appendChild(tr);
+            });
+
+            if (tbody.children.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">NO TRADES OVER $100k FOUND</td></tr>';
+            }
+        }
+
+        function populateWeeks(trades) {
+            const select = document.getElementById('week-select');
+            select.innerHTML = '<option value="ALL" selected>ALL</option>';
+            select.disabled = false;
+
+            const weeks = new Set();
+            trades.forEach(t => {
+                const ts = t.sip_timestamp || t.timestamp;
+                if (!ts) return;
+
+                const d = new Date(ts / 1000000); // Nano to ms
+
+                // Get Monday
+                const day = d.getDay() || 7;
+                if (day !== 1) d.setHours(-24 * (day - 1));
+
+                const mondayStr = (d.getMonth() + 1) + '/' + d.getDate();
+                weeks.add(mondayStr);
+            });
+
+            // Sort weeks descending (newest first)
+            const sorted = Array.from(weeks).sort((a, b) => {
+                // Simple sort for now, assuming same year
+                return b.localeCompare(a);
+            });
+
+            sorted.forEach(w => {
+                const opt = document.createElement('option');
+                opt.value = w;
+                opt.textContent = `Week of ${w}`;
+                select.appendChild(opt);
+            });
+        }
+
+        function formatConditions(codes) {
+            if (!codes || codes.length === 0) return '-';
+            if (!codes || codes.length === 0) return '';
+
+            // Normalize to array
+            const codeList = Array.isArray(codes) ? codes : [codes];
+
+            return codeList.map(code => {
+                // High Priority: SWEEP ONLY
+                if (code === 233 || code === 'I' || code === 'Sweep' || code === 'F') {
+                    return '<span class="badge badge-sweep"><span style="color: #ffffff;">SWEEP</span> <span style="color: #ffff00;">⚡</span></span>';
+                }
+
+                // IGNORE ALL OTHERS (SPLIT, TRADE, ETC)
+                return '';
+            }).join('');
+        }
+    </script>
+</body>
+
+</html>

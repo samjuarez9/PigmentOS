@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PigmentOS - Unusual Flow (Single Contract)</title>
+    <title>PigmentOS - Flow</title>
     <style>
         :root {
             --bg-color: #000000;
@@ -94,7 +94,7 @@
             display: flex;
             flex-direction: column;
             gap: 20px;
-            max-width: 800px;
+            max-width: 1200px;
             margin: 0 auto;
         }
 
@@ -845,6 +845,225 @@
                 height: 380px;
             }
         }
+
+        /* --- TABS SYSTEM --- */
+        .tabs-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            max-width: 1200px;
+            margin: 0 auto 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 0;
+        }
+
+        .tab-btn {
+            background: rgba(18, 18, 18, 0.8);
+            border: 2px solid #333;
+            border-bottom: none;
+            color: #666;
+            padding: 12px 24px;
+            font-family: var(--font-pixel);
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-radius: 8px 8px 0 0;
+            position: relative;
+            top: 2px;
+        }
+
+        .tab-btn:hover {
+            color: #aaa;
+            background: #1a1a1a;
+        }
+
+        .tab-btn.active {
+            color: #fff;
+            background: var(--widget-bg);
+            border-color: var(--accent-purple);
+            border-width: 2px 2px 0 2px;
+            z-index: 2;
+            box-shadow: 0 -4px 15px rgba(189, 0, 255, 0.2);
+        }
+
+        .tab-btn.active::after {
+            content: "";
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: var(--widget-bg);
+            z-index: 3;
+        }
+
+        .view-section {
+            display: none;
+        }
+
+        .view-section.active {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* --- FISH FINDER SPECIFIC STYLES --- */
+        .secondary-filter-fish {
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+        }
+
+        .table-container-fish {
+            background: var(--widget-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 10px;
+            overflow-x: auto;
+        }
+
+        .fish-finder-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+
+        .fish-finder-table th {
+            background: #1a1a1a;
+            color: #888;
+            padding: 12px 10px;
+            text-align: left;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            border-bottom: 1px solid var(--border-color);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .fish-finder-table td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #222;
+        }
+
+        .fish-finder-table tr:hover {
+            background: #1a1a1a;
+        }
+
+        /* Re-using some Fish Finder specific classes */
+        .premium-call {
+            color: #00ff00;
+        }
+
+        .premium-put {
+            color: #ff3333;
+        }
+
+        .type-c {
+            color: #00ff88;
+        }
+
+        .type-p {
+            color: #ff4444;
+        }
+
+        .badge-sweep {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+            font-family: var(--font-mono);
+            color: #ffff00;
+            text-transform: uppercase;
+        }
+
+        .itm-row {
+            background: rgba(255, 255, 255, 0.03);
+            box-shadow: inset 4px 0 0 rgba(189, 0, 255, 0.4);
+        }
+
+        .tag-itm {
+            background: rgba(0, 255, 0, 0.1);
+            color: #00ff00;
+            border: 1px solid rgba(0, 255, 0, 0.2);
+            font-size: 8px;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+
+        .tag-otm {
+            background: rgba(189, 0, 255, 0.1);
+            color: #bd00ff;
+            border: 1px solid rgba(189, 0, 255, 0.2);
+            font-size: 8px;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+
+        .tag-atm {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 8px;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+
+        .tag-bullish {
+            background: rgba(0, 255, 0, 0.2);
+            color: #00ff00;
+            font-size: 9px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            border: 1px solid rgba(0, 255, 0, 0.3);
+        }
+
+        .tag-bearish {
+            background: rgba(153, 0, 0, 0.2);
+            color: #ff3333;
+            font-size: 9px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            border: 1px solid rgba(153, 0, 0, 0.3);
+        }
+
+        .tag-0dte {
+            background: #333;
+            color: #fff;
+            border: 1px solid #666;
+            font-size: 8px;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+
+        .tag-leap {
+            background: rgba(255, 215, 0, 0.1);
+            color: #ffd700;
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            font-size: 8px;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+
+        .tag-dark-pool {
+            background: rgba(0, 0, 0, 0.5);
+            color: #888;
+            font-size: 8px;
+            padding: 2px 4px;
+            border-radius: 2px;
+            border: 1px solid #333;
+        }
+
+        .loading-spinner-small {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(0, 255, 255, 0.1);
+            border-top: 2px solid #00ffff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
     </style>
     <link
         href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;700&family=VT323&family=Space+Mono:wght@400;700&display=swap"
@@ -1259,195 +1478,301 @@
         <a href="/" class="close-btn">X</a>
     </div>
 
+    <div class="tabs-container">
+        <button id="tab-contract" class="tab-btn active" onclick="switchView('contract')">FLOW 🏂</button>
+        <button id="tab-fish" class="tab-btn" onclick="switchView('fish')">FISH FINDER 🎣</button>
+    </div>
+
     <div class="main-content">
-        <!-- Selection Panel -->
-        <div class="selection-panel">
-            <div class="panel-title">CONTRACT VIEW <span style="font-size: 14px;">🕹️</span></div>
-            <div class="drill-down-row">
-                <!-- 1. Ticker -->
-                <div class="select-group">
-                    <span class="select-label">Ticker</span>
-                    <select id="ticker-select" class="styled-select">
-                        <option value="" selected disabled>SELECT</option>
-                        <option value="AAPL">AAPL</option>
-                        <option value="AMD">AMD</option>
-                        <option value="AMZN">AMZN</option>
-                        <option value="GOOGL">GOOGL</option>
-                        <option value="INTC">INTC</option>
-                        <option value="IREN">IREN</option>
-                        <option value="IWM">IWM</option>
-                        <option value="LITE">LITE</option>
-                        <option value="META">META</option>
-                        <option value="MSFT">MSFT</option>
-                        <option value="MU">MU</option>
-                        <option value="NVDA">NVDA</option>
-                        <option value="ORCL">ORCL</option>
-                        <option value="PLTR">PLTR</option>
-                        <option value="QQQ">QQQ</option>
-                        <option value="SNDK">SNDK</option>
-                        <option value="SPY">SPY</option>
-                        <option value="STX">STX</option>
-                        <option value="TSLA">TSLA</option>
-                        <option value="TSM">TSM</option>
-                    </select>
-                    <div id="spot-price" class="spot-price"></div>
-                </div>
-
-                <!-- 2. Expiration -->
-                <div class="select-group">
-                    <span class="select-label">Expiration</span>
-                    <select id="expiry-select" class="styled-select" disabled>
-                        <option value="" selected disabled>SELECT TICKER FIRST</option>
-                    </select>
-                </div>
-
-                <!-- 3. Strike -->
-                <div class="select-group">
-                    <span class="select-label">Strike</span>
-                    <div class="strike-nav-wrapper">
-                        <button id="strike-down" class="strike-nav-btn" disabled title="Previous Strike (↓)">−</button>
-                        <select id="strike-select" class="styled-select" disabled>
-                            <option value="" selected disabled>WAITING...</option>
+        <!-- VIEW 1: FLOW -->
+        <div id="view-contract" class="view-section active">
+            <!-- Selection Panel -->
+            <div class="selection-panel">
+                <div class="panel-title">CONTRACT VIEW <span style="font-size: 14px;">🕹️</span></div>
+                <div class="drill-down-row">
+                    <!-- 1. Ticker -->
+                    <div class="select-group">
+                        <span class="select-label">Ticker</span>
+                        <select id="ticker-select" class="styled-select">
+                            <option value="" selected disabled>SELECT</option>
+                            <option value="AAPL">AAPL</option>
+                            <option value="AMD">AMD</option>
+                            <option value="AMZN">AMZN</option>
+                            <option value="GOOGL">GOOGL</option>
+                            <option value="INTC">INTC</option>
+                            <option value="IREN">IREN</option>
+                            <option value="IWM">IWM</option>
+                            <option value="LITE">LITE</option>
+                            <option value="META">META</option>
+                            <option value="MSFT">MSFT</option>
+                            <option value="MU">MU</option>
+                            <option value="NVDA">NVDA</option>
+                            <option value="ORCL">ORCL</option>
+                            <option value="PLTR">PLTR</option>
+                            <option value="QQQ">QQQ</option>
+                            <option value="SNDK">SNDK</option>
+                            <option value="SPY">SPY</option>
+                            <option value="STX">STX</option>
+                            <option value="TSLA">TSLA</option>
+                            <option value="TSM">TSM</option>
                         </select>
-                        <button id="strike-up" class="strike-nav-btn" disabled title="Next Strike (↑)">+</button>
+                        <div id="spot-price" class="spot-price"></div>
                     </div>
-                </div>
 
-                <!-- 4. Type -->
-                <div class="select-group">
-                    <span class="select-label">Type</span>
-                    <div class="type-toggle-wrapper">
-                        <button id="type-call" class="type-toggle-btn call active" disabled>CALL</button>
-                        <button id="type-put" class="type-toggle-btn put" disabled>PUT</button>
-                    </div>
-                    <input type="hidden" id="type-select" value="C">
-                </div>
-
-                <button id="go-btn" class="go-btn" disabled>LOAD</button>
-            </div>
-        </div>
-
-        <!-- Loading State -->
-        <div id="loading-indicator" style="display: none;">
-            <div class="spinner"></div>
-            <div style="text-align: center; font-size: 10px; color: #666;">FETCHING SNAPSHOT...</div>
-        </div>
-
-        <!-- Snapshot Result -->
-        <div id="snapshot-card" class="snapshot-card">
-            <div class="contract-header">
-                <div>
-                    <div class="contract-name" id="display-name">NVDA $150 Call</div>
-                    <div class="contract-id" id="display-id">O:NVDA250117C00150000</div>
-                </div>
-                <div style="text-align: right;">
-                    <div style="display: flex; align-items: baseline; justify-content: flex-end; gap: 8px;">
-                        <div class="price-large" id="display-price">$4.20</div>
-                        <div id="display-change" style="font-size: 12px; font-weight: bold;">+5.2%</div>
-                    </div>
-                    <div class="price-label">CURRENT PRICE</div>
-                    <div class="premium-adv-badge" id="premium-adv-badge" style="display: none;">LOADING...</div>
-                </div>
-            </div>
-
-
-
-            <div class="stats-grid">
-                <div class="stat-box">
-                    <div class="stat-label">Volume</div>
-                    <div class="stat-value" id="display-vol">12,450</div>
-                    <div class="stat-notional" id="display-notional"
-                        style="font-size: 13px; color: #bd00ff; margin-top: 4px; font-family: var(--font-mono); font-weight: bold;">
-                        $0
-                    </div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Open Interest</div>
-                    <div class="stat-value" id="display-oi">5,000</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Implied Vol</div>
-                    <div class="stat-value" id="display-iv">45.2%</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Break Even</div>
-                    <div class="stat-value" id="display-be">$154.20</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Moneyness</div>
-                    <div class="stat-value" id="display-moneyness">
-                        <span class="moneyness-badge otm">OTM</span>
-                        <span class="moneyness-pct" id="moneyness-pct">-8.3%</span>
-                    </div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Days to Expiry</div>
-                    <div class="stat-value" id="display-dte">
-                        <span class="dte-badge safe" id="dte-badge">--</span>
-                        <div class="dte-label" id="dte-expiry-date"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="greeks-section">
-                <div class="greek-item"
-                    data-tooltip="How much the option price moves per $1 change in stock price. 0.50 = 50¢ move per $1.">
-                    <div class="stat-label">🏎️ DELTA <span class="tooltip-icon">?</span></div>
-                    <div class="greek-val" id="display-delta">0.45</div>
-                    <div class="greek-bar-track">
-                        <div class="greek-bar-fill delta" id="delta-bar"></div>
-                    </div>
-                </div>
-                <div class="greek-item"
-                    data-tooltip="Rate of delta change. High gamma = explosive moves near the money. Think of it as acceleration.">
-                    <div class="stat-label">💣 GAMMA <span class="tooltip-icon">?</span></div>
-                    <div class="greek-val" id="display-gamma">0.02</div>
-                    <div class="greek-bar-track">
-                        <div class="greek-bar-fill gamma" id="gamma-bar"></div>
-                    </div>
-                </div>
-                <div class="greek-item"
-                    data-tooltip="Daily time decay. Shows how much value you lose each day. -0.15 = lose 15¢/day just from time passing.">
-                    <div class="stat-label">⏳ THETA <span class="tooltip-icon">?</span></div>
-                    <div class="greek-val" id="display-theta">-0.15</div>
-                    <div class="greek-bar-track">
-                        <div class="greek-bar-fill theta" id="theta-bar"></div>
-                    </div>
-                </div>
-                <div class="greek-item"
-                    data-tooltip="Sensitivity to implied volatility. High vega = big moves when IV spikes or crushes.">
-                    <div class="stat-label">🌊 VEGA <span class="tooltip-icon">?</span></div>
-                    <div class="greek-val" id="display-vega">0.08</div>
-                    <div class="greek-bar-track">
-                        <div class="greek-bar-fill vega" id="vega-bar"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Vol/OI Ratio Chart -->
-            <div class="chart-container">
-                <div class="chart-header">
-                    <div class="chart-title-stack">
-                        <div class="chart-title">FLOW FEED</div>
-                        <select id="interval-select" class="styled-select"
-                            style="width: auto; padding: 2px 5px; font-size: 10px; height: 20px; margin-left: 10px; background: #222; color: #aaa; border: 1px solid #444;">
-                            <option value="15m">15 MIN</option>
-                            <option value="5m" selected>5 MIN</option>
-                            <option value="1m">1 MIN</option>
+                    <!-- 2. Expiration -->
+                    <div class="select-group">
+                        <span class="select-label">Expiration</span>
+                        <select id="expiry-select" class="styled-select" disabled>
+                            <option value="" selected disabled>SELECT TICKER FIRST</option>
                         </select>
-                        <div id="unusual-badge" class="unusual-badge-stacked" style="display:none;">
-                            ⚠️ UNUSUAL ACTIVITY
+                    </div>
+
+                    <!-- 3. Strike -->
+                    <div class="select-group">
+                        <span class="select-label">Strike</span>
+                        <div class="strike-nav-wrapper">
+                            <button id="strike-down" class="strike-nav-btn" disabled
+                                title="Previous Strike (↓)">−</button>
+                            <select id="strike-select" class="styled-select" disabled>
+                                <option value="" selected disabled>WAITING...</option>
+                            </select>
+                            <button id="strike-up" class="strike-nav-btn" disabled title="Next Strike (↑)">+</button>
                         </div>
                     </div>
-                    <div class="timeframe-toggle">
-                        <button id="tf-1d" class="timeframe-btn">1D</button>
-                        <button id="tf-3d" class="timeframe-btn">3D</button>
-                        <button id="tf-6d" class="timeframe-btn active">6D</button>
-                        <button id="tf-20d" class="timeframe-btn">20D</button>
+
+                    <!-- 4. Type -->
+                    <div class="select-group">
+                        <span class="select-label">Type</span>
+                        <div class="type-toggle-wrapper">
+                            <button id="type-call" class="type-toggle-btn call active" disabled>CALL</button>
+                            <button id="type-put" class="type-toggle-btn put" disabled>PUT</button>
+                        </div>
+                        <input type="hidden" id="type-select" value="C">
+                    </div>
+
+                    <button id="go-btn" class="go-btn" disabled>LOAD</button>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loading-indicator" style="display: none;">
+                <div class="spinner"></div>
+                <div style="text-align: center; font-size: 10px; color: #666;">FETCHING SNAPSHOT...</div>
+            </div>
+
+            <!-- Snapshot Result -->
+            <div id="snapshot-card" class="snapshot-card">
+                <div class="contract-header">
+                    <div>
+                        <div class="contract-name" id="display-name">NVDA $150 Call</div>
+                        <div class="contract-id" id="display-id">O:NVDA250117C00150000</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="display: flex; align-items: baseline; justify-content: flex-end; gap: 8px;">
+                            <div class="price-large" id="display-price">$4.20</div>
+                            <div id="display-change" style="font-size: 12px; font-weight: bold;">+5.2%</div>
+                        </div>
+                        <div class="price-label">CURRENT PRICE</div>
+                        <div class="premium-adv-badge" id="premium-adv-badge" style="display: none;">LOADING...</div>
                     </div>
                 </div>
-                <canvas id="volumeChart"></canvas>
-                <div id="chart-loading" style="display: none;">LOADING CHART...</div>
+
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-label">Volume</div>
+                        <div class="stat-value" id="display-vol">12,450</div>
+                        <div class="stat-notional" id="display-notional"
+                            style="font-size: 13px; color: #bd00ff; margin-top: 4px; font-family: var(--font-mono); font-weight: bold;">
+                            $0
+                        </div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Open Interest</div>
+                        <div class="stat-value" id="display-oi">5,000</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Implied Vol</div>
+                        <div class="stat-value" id="display-iv">45.2%</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Break Even</div>
+                        <div class="stat-value" id="display-be">$154.20</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Moneyness</div>
+                        <div class="stat-value" id="display-moneyness">
+                            <span class="moneyness-badge otm">OTM</span>
+                            <span class="moneyness-pct" id="moneyness-pct">-8.3%</span>
+                        </div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Days to Expiry</div>
+                        <div class="stat-value" id="display-dte">
+                            <span class="dte-badge safe" id="dte-badge">--</span>
+                            <div class="dte-label" id="dte-expiry-date"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="greeks-section">
+                    <div class="greek-item"
+                        data-tooltip="How much the option price moves per $1 change in stock price. 0.50 = 50¢ move per $1.">
+                        <div class="stat-label">🏎️ DELTA <span class="tooltip-icon">?</span></div>
+                        <div class="greek-val" id="display-delta">0.45</div>
+                        <div class="greek-bar-track">
+                            <div class="greek-bar-fill delta" id="delta-bar"></div>
+                        </div>
+                    </div>
+                    <div class="greek-item"
+                        data-tooltip="Rate of delta change. High gamma = explosive moves near the money. Think of it as acceleration.">
+                        <div class="stat-label">💣 GAMMA <span class="tooltip-icon">?</span></div>
+                        <div class="greek-val" id="display-gamma">0.02</div>
+                        <div class="greek-bar-track">
+                            <div class="greek-bar-fill gamma" id="gamma-bar"></div>
+                        </div>
+                    </div>
+                    <div class="greek-item"
+                        data-tooltip="Daily time decay. Shows how much value you lose each day. -0.15 = lose 15¢/day just from time passing.">
+                        <div class="stat-label">⏳ THETA <span class="tooltip-icon">?</span></div>
+                        <div class="greek-val" id="display-theta">-0.15</div>
+                        <div class="greek-bar-track">
+                            <div class="greek-bar-fill theta" id="theta-bar"></div>
+                        </div>
+                    </div>
+                    <div class="greek-item"
+                        data-tooltip="Sensitivity to implied volatility. High vega = big moves when IV spikes or crushes.">
+                        <div class="stat-label">🌊 VEGA <span class="tooltip-icon">?</span></div>
+                        <div class="greek-val" id="display-vega">0.08</div>
+                        <div class="greek-bar-track">
+                            <div class="greek-bar-fill vega" id="vega-bar"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vol/OI Ratio Chart -->
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <div class="chart-title-stack">
+                            <div class="chart-title">FLOW FEED</div>
+                            <select id="interval-select" class="styled-select"
+                                style="width: auto; padding: 2px 5px; font-size: 10px; height: 20px; margin-left: 10px; background: #222; color: #aaa; border: 1px solid #444;">
+                                <option value="15m">15 MIN</option>
+                                <option value="5m" selected>5 MIN</option>
+                                <option value="1m">1 MIN</option>
+                            </select>
+                            <div id="unusual-badge" class="unusual-badge-stacked" style="display:none;">
+                                ⚠️ UNUSUAL ACTIVITY
+                            </div>
+                        </div>
+                        <div class="timeframe-toggle">
+                            <button id="tf-1d" class="timeframe-btn">1D</button>
+                            <button id="tf-3d" class="timeframe-btn">3D</button>
+                            <button id="tf-6d" class="timeframe-btn active">6D</button>
+                            <button id="tf-20d" class="timeframe-btn">20D</button>
+                        </div>
+                    </div>
+                    <canvas id="volumeChart"></canvas>
+                    <div id="chart-loading" style="display: none;">LOADING CHART...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 2: FISH FINDER -->
+        <div id="view-fish" class="view-section">
+            <div class="selection-panel">
+                <div class="panel-title">SELECT TICKER <span style="font-size: 14px;">🎣</span></div>
+                <div class="drill-down-row">
+                    <!-- 1. Ticker + Scan Button -->
+                    <div class="select-group">
+                        <span class="select-label">Ticker</span>
+                        <div style="display: flex; gap: 8px;">
+                            <select id="fish-ticker-select" class="styled-select" style="width: 120px;">
+                                <option value="" selected disabled>SELECT</option>
+                                <option value="AAPL">AAPL</option>
+                                <option value="AMD">AMD</option>
+                                <option value="AMZN">AMZN</option>
+                                <option value="GOOGL">GOOGL</option>
+                                <option value="INTC">INTC</option>
+                                <option value="IREN">IREN</option>
+                                <option value="LITE">LITE</option>
+                                <option value="META">META</option>
+                                <option value="MSFT">MSFT</option>
+                                <option value="MU">MU</option>
+                                <option value="NVDA">NVDA</option>
+                                <option value="ORCL">ORCL</option>
+                                <option value="PLTR">PLTR</option>
+                                <option value="SNDK">SNDK</option>
+                                <option value="STX">STX</option>
+                                <option value="TSLA">TSLA</option>
+                                <option value="TSM">TSM</option>
+                            </select>
+                            <button id="scan-ticker-btn" class="go-btn" disabled>SCAN</button>
+                        </div>
+                        <div id="fish-spot-price" class="spot-price" style="margin-top: 4px;"></div>
+                    </div>
+
+                    <!-- Divider -->
+                    <div id="secondary-filter-fish-divider"
+                        style="display: none; width: 1px; height: 30px; background: #333; margin: 0 10px;"></div>
+
+                    <!-- 2. Filters (Compact) -->
+                    <div class="select-group secondary-filter-fish" style="display: none;">
+                        <span class="select-label">Expiry</span>
+                        <select id="fish-expiry-select" class="styled-select" style="min-width: 80px;" disabled>
+                            <option value="ALL" selected>ALL</option>
+                        </select>
+                    </div>
+
+                    <div class="select-group secondary-filter-fish" style="display: none;">
+                        <span class="select-label">Week</span>
+                        <select id="fish-week-select" class="styled-select" style="min-width: 80px;" disabled>
+                            <option value="ALL" selected>ALL</option>
+                        </select>
+                    </div>
+
+                    <div class="select-group secondary-filter-fish" style="display: none;">
+                        <span class="select-label">Type</span>
+                        <div class="type-toggle-wrapper"
+                            style="display: flex; border: 1px solid #333; border-radius: 4px; overflow: hidden; height: 34px;">
+                            <button id="fish-type-call" class="type-toggle-btn call"
+                                style="border: none; padding: 0 10px; font-family: var(--font-mono); font-size: 10px; cursor: pointer; height: 100%; border-right: 1px solid #333;"
+                                disabled>CALL</button>
+                            <button id="fish-type-put" class="type-toggle-btn put"
+                                style="border: none; padding: 0 10px; font-family: var(--font-mono); font-size: 10px; cursor: pointer; height: 100%; border-right: 1px solid #333;"
+                                disabled>PUT</button>
+                            <button id="fish-type-any" class="type-toggle-btn active"
+                                style="border: none; padding: 0 10px; font-family: var(--font-mono); font-size: 10px; cursor: pointer; height: 100%;"
+                                disabled>ANY</button>
+                        </div>
+                        <input type="hidden" id="fish-type-select-val" value="ANY">
+                    </div>
+                </div>
+                <div id="fish-status"
+                    style="font-size: 10px; color: #888; text-transform: uppercase; margin-top: 10px;">Ready</div>
+            </div>
+
+            <!-- Results -->
+            <div class="table-container-fish">
+                <table id="fish-trades-table" class="fish-finder-table">
+                    <thead>
+                        <tr>
+                            <th>CONTRACT</th>
+                            <th>TIME (EST)</th>
+                            <th>SIZE</th>
+                            <th>EXPIRY</th>
+                            <th>PREMIUM</th>
+                            <th>EXCHANGE</th>
+                            <th style="text-align: right;">TAGS</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fish-trades-body">
+                        <tr>
+                            <td colspan="7"
+                                style="text-align:center; padding: 40px; color: #444; font-family: var(--font-pixel); font-size: 10px;">
+                                SELECT A TICKER ABOVE TO VIEW TRADES.</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -1470,6 +1795,54 @@
 
         // State
         let availableContracts = []; // Store raw contract list to filter locally
+
+        // --- VIEW SWITCHING LOGIC ---
+        function switchView(viewName) {
+            const mainContent = document.querySelector('.main-content');
+            const tabsContainer = document.querySelector('.tabs-container');
+
+            // Update Tab states
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                const isActive = (viewName === 'contract' && btn.id === 'tab-contract') ||
+                    (viewName === 'fish' && btn.id === 'tab-fish');
+                btn.classList.toggle('active', isActive);
+            });
+
+            // Update Section states
+            document.querySelectorAll('.view-section').forEach(sec => {
+                sec.classList.toggle('active', sec.id === `view-${viewName}`);
+            });
+
+            // Update Layout Width
+            mainContent.style.maxWidth = '1200px';
+            tabsContainer.style.maxWidth = '1200px';
+
+            if (viewName === 'contract') {
+                mainContent.classList.add('contract-view');
+                tabsContainer.classList.add('contract-view');
+            } else {
+                mainContent.classList.remove('contract-view');
+                tabsContainer.classList.remove('contract-view');
+            }
+
+            // Sync Ticker Selectors
+            const contractTicker = document.getElementById('ticker-select');
+            const fishTicker = document.getElementById('fish-ticker-select');
+
+            if (viewName === 'fish') {
+                if (contractTicker.value && !fishTicker.value) {
+                    fishTicker.value = contractTicker.value;
+                    // Trigger fish ticker change logic
+                    fishTicker.dispatchEvent(new Event('change'));
+                }
+            } else {
+                if (fishTicker.value && !contractTicker.value) {
+                    contractTicker.value = fishTicker.value;
+                    // Trigger contract ticker change logic
+                    contractTicker.dispatchEvent(new Event('change'));
+                }
+            }
+        }
 
         // ==============================================
         // COIN INSERT ANIMATION - Arcade Edition
@@ -1521,9 +1894,6 @@
         tickerSelect.addEventListener('change', async (e) => {
             const ticker = e.target.value;
             if (!ticker) return;
-
-            // Play coin animation first
-            await playCoinAnimation(ticker);
 
             // Reset downstream
             expirySelect.innerHTML = '<option>LOADING...</option>';
@@ -2591,6 +2961,235 @@
         // Initialize chart on page load
         document.addEventListener('DOMContentLoaded', initChart);
 
+        // ==============================================
+        // FISH FINDER LOGIC (PORTED)
+        // ==============================================
+        const fishTickerSelect = document.getElementById('fish-ticker-select');
+        const fishExpirySelect = document.getElementById('fish-expiry-select');
+        const fishWeekSelect = document.getElementById('fish-week-select');
+        const fishTypeSelectVal = document.getElementById('fish-type-select-val');
+        const scanTickerBtn = document.getElementById('scan-ticker-btn');
+        const fishStatusEl = document.getElementById('fish-status');
+        const fishTbody = document.getElementById('fish-trades-body');
+
+        // Filter Buttons (Fish Finder)
+        const fishTypeCallBtn = document.getElementById('fish-type-call');
+        const fishTypePutBtn = document.getElementById('fish-type-put');
+        const fishTypeAnyBtn = document.getElementById('fish-type-any');
+
+        let allScanData = [];
+
+        fishTickerSelect.addEventListener('change', async (e) => {
+            const ticker = e.target.value;
+            if (!ticker) return;
+
+            fishStatusEl.innerText = "Ready to Scan";
+            scanTickerBtn.disabled = false;
+
+            allScanData = [];
+            fishExpirySelect.innerHTML = '<option value="ALL" selected>ALL EXPIRIES</option>';
+            fishExpirySelect.disabled = true;
+            resetFishTypeButtons();
+
+            document.querySelectorAll('.secondary-filter-fish').forEach(el => el.style.display = 'none');
+            const divider = document.getElementById('secondary-filter-fish-divider');
+            if (divider) divider.style.display = 'none';
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/flow/contracts?ticker=${ticker}`);
+                const data = await res.json();
+                if (data.spot_price) {
+                    window.currentSpotPrice = data.spot_price;
+                    document.getElementById('fish-spot-price').textContent = `SPOT: $${data.spot_price.toFixed(2)}`;
+                }
+            } catch (err) { console.error(err); }
+        });
+
+        scanTickerBtn.addEventListener('click', async () => {
+            const ticker = fishTickerSelect.value;
+            if (!ticker) return;
+
+            fishStatusEl.textContent = `SCANNING ALL FLOW FOR ${ticker}...`;
+            fishTbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px;"><div class="loading-spinner-small" style="margin: 0 auto;"></div></td></tr>';
+
+            fishExpirySelect.disabled = true;
+            disableFishTypeButtons();
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/library/options?symbol=${ticker}`);
+                const json = await res.json();
+                if (json.error) throw new Error(json.error);
+
+                allScanData = json.data || [];
+                allScanData.sort((a, b) => (b.sip_timestamp || b.timestamp) - (a.sip_timestamp || a.timestamp));
+
+                if (json.current_price) {
+                    window.currentSpotPrice = json.current_price;
+                    document.getElementById('fish-spot-price').textContent = `SPOT: $${json.current_price.toFixed(2)}`;
+                }
+
+                populateFishExpiries(allScanData);
+                populateFishWeeks(allScanData);
+                enableFishTypeButtons();
+
+                document.querySelectorAll('.secondary-filter-fish').forEach(el => el.style.display = 'flex');
+                const divider = document.getElementById('secondary-filter-fish-divider');
+                if (divider) divider.style.display = 'block';
+
+                renderFishTable(allScanData, ticker);
+                fishStatusEl.textContent = `SCAN COMPLETE: FOUND ${allScanData.length} SIGNIFICANT TRADES`;
+
+            } catch (err) {
+                console.error("Scan Error:", err);
+                fishStatusEl.textContent = `SCAN FAILED: ${err.message}`;
+                fishTbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: #ff5555; padding: 20px;">ERROR: ${err.message}</td></tr>`;
+            }
+        });
+
+        function populateFishExpiries(trades) {
+            const expiries = new Set();
+            trades.forEach(t => { if (t.expiry) expiries.add(t.expiry); });
+            const sorted = Array.from(expiries).sort();
+            fishExpirySelect.innerHTML = '<option value="ALL" selected>ALL EXPIRIES</option>';
+            sorted.forEach(date => {
+                const opt = document.createElement('option');
+                opt.value = date;
+                opt.textContent = date;
+                fishExpirySelect.appendChild(opt);
+            });
+            fishExpirySelect.disabled = false;
+        }
+
+        fishExpirySelect.addEventListener('change', applyFishFilters);
+        fishWeekSelect.addEventListener('change', applyFishFilters);
+
+        function resetFishTypeButtons() {
+            fishTypeSelectVal.value = 'ANY';
+            [fishTypeCallBtn, fishTypePutBtn, fishTypeAnyBtn].forEach(btn => btn.classList.remove('active'));
+            fishTypeAnyBtn.classList.add('active');
+            disableFishTypeButtons();
+        }
+
+        function disableFishTypeButtons() { [fishTypeCallBtn, fishTypePutBtn, fishTypeAnyBtn].forEach(btn => btn.disabled = true); }
+        function enableFishTypeButtons() { [fishTypeCallBtn, fishTypePutBtn, fishTypeAnyBtn].forEach(btn => btn.disabled = false); }
+
+        fishTypeCallBtn.addEventListener('click', () => { fishTypeSelectVal.value = 'CALL'; updateFishTypeVisuals(fishTypeCallBtn); applyFishFilters(); });
+        fishTypePutBtn.addEventListener('click', () => { fishTypeSelectVal.value = 'PUT'; updateFishTypeVisuals(fishTypePutBtn); applyFishFilters(); });
+        fishTypeAnyBtn.addEventListener('click', () => { fishTypeSelectVal.value = 'ANY'; updateFishTypeVisuals(fishTypeAnyBtn); applyFishFilters(); });
+
+        function updateFishTypeVisuals(activeBtn) {
+            [fishTypeCallBtn, fishTypePutBtn, fishTypeAnyBtn].forEach(btn => btn.classList.remove('active'));
+            activeBtn.classList.add('active');
+        }
+
+        function applyFishFilters() {
+            const exp = fishExpirySelect.value;
+            const typeF = fishTypeSelectVal.value;
+            const weekF = fishWeekSelect.value;
+
+            let filtered = allScanData;
+            if (exp !== 'ALL') filtered = filtered.filter(t => t.expiry === exp);
+            if (typeF !== 'ANY') {
+                filtered = filtered.filter(t => {
+                    const tT = (t.type || '').toUpperCase();
+                    if (typeF === 'CALL') return tT === 'CALL' || tT === 'C';
+                    if (typeF === 'PUT') return tT === 'PUT' || tT === 'P';
+                    return true;
+                });
+            }
+            if (weekF !== 'ALL') {
+                filtered = filtered.filter(t => {
+                    const ts = t.sip_timestamp || t.timestamp;
+                    if (!ts) return false;
+                    const d = new Date(t.sip_timestamp ? ts / 1000000 : ts * 1000);
+                    const day = d.getDay() || 7;
+                    if (day !== 1) d.setDate(d.getDate() - (day - 1));
+                    const monStr = (d.getMonth() + 1) + '/' + d.getDate();
+                    return monStr === weekF;
+                });
+            }
+            renderFishTable(filtered, fishTickerSelect.value);
+            fishStatusEl.textContent = `FILTERED: ${filtered.length} TRADES`;
+        }
+
+        function renderFishTable(trades, ticker) {
+            fishTbody.innerHTML = '';
+            trades.forEach(trade => {
+                const price = trade.price || trade.p;
+                const size = trade.size || trade.s;
+                const cost = trade.notional_value || (price * size * 100);
+                if (cost < 100000) return;
+
+                const tsMs = trade.sip_timestamp ? (Number(trade.sip_timestamp) / 1000000) : (Number(trade.timestamp) * 1000);
+                const d = new Date(tsMs);
+                const dateStr = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+                const timeStr = d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+                let costStr = cost >= 1000000 ? `$${(cost / 1000000).toFixed(2)}M` : `$${(cost / 1000).toFixed(1)}k`;
+                const exch = trade.exchange || trade.x;
+                const isDP = (exch == 0 || exch === 'OTC' || exch === 'TRF' || exch === 'D' || exch === '4' || exch === 'J' || exch === 'U');
+
+                const rType = trade.type || '';
+                const isCall = rType === 'CALL' || rType === 'call' || rType === 'C';
+
+                let rowExp = trade.expiry || '';
+                if (rowExp.includes('-')) rowExp = rowExp.slice(5).replace('-', '/');
+
+                let tags = '';
+                if (window.currentSpotPrice && trade.strike) {
+                    const s = parseFloat(trade.strike);
+                    const diff = Math.abs(s - window.currentSpotPrice) / window.currentSpotPrice;
+                    if (diff < 0.005) tags += '<span class="tag-atm">ATM</span>';
+                    else if ((isCall && window.currentSpotPrice > s) || (!isCall && window.currentSpotPrice < s)) tags += '<span class="tag-itm">ITM</span>';
+                    else tags += '<span class="tag-otm">OTM</span>';
+                }
+
+                if (trade.expiry) {
+                    const expD = new Date(trade.expiry);
+                    const diffD = Math.ceil((expD - new Date().setHours(0, 0, 0, 0)) / 86400000);
+                    if (diffD <= 0) tags += '<span class="tag-0dte">0DTE</span>';
+                    else if (diffD > 180) tags += '<span class="tag-leap">LEAP</span>';
+                }
+
+                const conds = (trade.conditions || trade.condition || trade.c || []);
+                const isSweep = Array.isArray(conds) ? conds.some(c => c === 233 || c === 'I' || c === 'Sweep' || c === 'F') : (conds === 233 || conds === 'I');
+                if (isSweep) tags += '<span class="badge-sweep">SWEEP ⚡</span>';
+                tags += isCall ? '<span class="tag-bullish">BULLISH</span>' : '<span class="tag-bearish">BEARISH</span>';
+
+                const tr = document.createElement('tr');
+                if (tags.includes('ITM')) tr.classList.add('itm-row');
+                tr.innerHTML = `
+                    <td class="code"><b>${trade.ticker || ticker}</b> <span class="${isCall ? 'type-c' : 'type-p'}">$${trade.strike}${isCall ? 'C' : 'P'}</span></td>
+                    <td class="code">${dateStr} <small style="color:#555">${timeStr}</small></td>
+                    <td class="code">${size}</td>
+                    <td class="code">${rowExp}</td>
+                    <td class="${isCall ? 'premium-call' : 'premium-put'}"><b>${costStr}</b></td>
+                    <td class="code">${isDP ? '<span class="tag-dark-pool">DARK POOL</span>' : '🇺🇸'}</td>
+                    <td style="text-align: right;">${tags}</td>
+                `;
+                fishTbody.appendChild(tr);
+            });
+            if (!fishTbody.children.length) fishTbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px; color: #444;">NO TRADES OVER $100k FOUND</td></tr>';
+        }
+
+        function populateFishWeeks(trades) {
+            fishWeekSelect.innerHTML = '<option value="ALL" selected>ALL WEEKS</option>';
+            const weeks = new Set();
+            trades.forEach(t => {
+                const ts = t.sip_timestamp || t.timestamp;
+                if (!ts) return;
+                const d = new Date(t.sip_timestamp ? ts / 1000000 : ts * 1000);
+                const day = d.getDay() || 7;
+                if (day !== 1) d.setDate(d.getDate() - (day - 1));
+                weeks.add((d.getMonth() + 1) + '/' + d.getDate());
+            });
+            Array.from(weeks).sort((a, b) => b.localeCompare(a)).forEach(w => {
+                const opt = document.createElement('option'); opt.value = w; opt.textContent = `Week of ${w}`; fishWeekSelect.appendChild(opt);
+            });
+            fishWeekSelect.disabled = false;
+        }
+
+        // Final closing script and body tags
     </script>
 </body>
 
