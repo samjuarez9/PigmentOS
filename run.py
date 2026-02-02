@@ -61,9 +61,8 @@ else:
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Polygon WebSocket Client
-from polygon import WebSocketClient
-from polygon.websocket import Feed, Market
+# Massive WebSocket Integration
+import websocket
 from collections import deque
 import threading
 
@@ -311,6 +310,20 @@ def mark_whale_cache_cleared():
     global WHALE_CACHE_LAST_CLEAR
     WHALE_CACHE_LAST_CLEAR = time.time()
 
+def is_currently_market_hours():
+    """Check if US markets are currently open (9:30 AM - 4:15 PM ET).
+    ETFs like SPY/QQQ trade until 4:15 PM ET.
+    """
+    tz_eastern = pytz.timezone('US/Eastern')
+    now = datetime.now(tz_eastern)
+    
+    # Check if weekday
+    if now.weekday() >= 5:
+        return False
+        
+    current_time = now.hour + now.minute / 60
+    return 9.5 <= current_time < 16.25 # 9:30 AM to 4:15 PM
+
 def get_cached_price(symbol):
     """Get price from cache or fetch from yfinance if stale/missing."""
     global PRICE_CACHE
@@ -354,25 +367,36 @@ POLYGON_PRICE_CACHE_TTL = 180  # 3 minute TTL (safe with locking)
 POLYGON_PRICE_LOCK = threading.Lock()  # Prevent cache stampede
 
 def get_polygon_price(symbol):
-    """Get price from Polygon.io API (used by Gamma Wall and Unusual Whales only).
+    """Get price for Gamma Wall and Unusual Whales.
     
-    Uses Polygon Previous Close or Last Trade API.
-    Has its own cache to avoid affecting yfinance-based features.
+    PRIORITY Logic:
+    1. During Market Hours: Prefer yfinance/Cache (Real-time).
+    2. After Hours/Weekends: Prefer Polygon (Official Previous Close).
+    
+    This ensures GEX and Moneyness use the most 'responsive' price available.
     """
     global POLYGON_PRICE_CACHE
     
     if not POLYGON_API_KEY:
-        return None
+        return get_cached_price(symbol)
     
     now = time.time()
+    is_live = is_currently_market_hours()
     
-    # Check cache first
+    # 1. During market hours, yfinance/Cache is the primary source for real-time movement
+    # We bypass the Polygon /prev check to ensure we get live updates
+    if is_live:
+        price = get_cached_price(symbol)
+        if price:
+            return price
+
+    # 2. Check Polygon cache for off-hours data
     if symbol in POLYGON_PRICE_CACHE:
         cached = POLYGON_PRICE_CACHE[symbol]
         if cached["price"] is not None and (now - cached["timestamp"] < POLYGON_PRICE_CACHE_TTL):
             return cached["price"]
     
-    # Fetch from Polygon (with locking to prevent stampede)
+    # 3. Fetch from Polygon (with locking to prevent stampede)
     with POLYGON_PRICE_LOCK:
         # Double-check cache inside lock
         if symbol in POLYGON_PRICE_CACHE:
@@ -391,7 +415,6 @@ def get_polygon_price(symbol):
                     price = data["results"][0].get("c")  # "c" = close price
                     if price and price > 0:
                         POLYGON_PRICE_CACHE[symbol] = {"price": price, "timestamp": now}
-                        # print(f"📈 Polygon price {symbol}: ${price:.2f}")
                         return price
             
             print(f"⚠️ Polygon Price Error ({symbol}): Status {resp.status_code}")
@@ -399,12 +422,7 @@ def get_polygon_price(symbol):
         except Exception as e:
             print(f"Polygon price error ({symbol}): {e}")
     
-    # Return stale cache if available
-    if symbol in POLYGON_PRICE_CACHE and POLYGON_PRICE_CACHE[symbol].get("price"):
-        return POLYGON_PRICE_CACHE[symbol]["price"]
-    
     # FINAL FALLBACK: Use yfinance (get_cached_price)
-    print(f"⚠️ Polygon price failed for {symbol}, trying yfinance fallback...")
     fallback_price = get_cached_price(symbol)
     if fallback_price:
         POLYGON_PRICE_CACHE[symbol] = {"price": fallback_price, "timestamp": now}
@@ -1930,28 +1948,198 @@ def refresh_single_whale(symbol):
         print("Whale scan requires POLYGON_API_KEY - skipping")
         return
 
-# --- POLYGON WEBSOCKET WORKER ---
-def handle_polygon_ws_msg(msgs):
-    """Callback for Polygon WebSocket messages (Trades)"""
+# --- MASSIVE WEBSOCKET STARTER ---
+WS_STARTED = False
+WS_LOCK = threading.Lock()
+
+def start_massive_websocket():
+    """Start the Massive WebSocket client in a separate thread"""
+    global WS_STARTED
+    if not MASSIVE_API_KEY:
+        print("⚠️ No MASSIVE_API_KEY for WebSocket")
+        return
+    
+    with WS_LOCK:
+        if WS_STARTED:
+            print("⚠️ Massive WS Client already started, skipping.")
+            return
+        WS_STARTED = True
+        
+    def run_ws():
+        # Try root endpoint as per user snippet
+        url = f"wss://api.massive.com/options/T?apiKey={MASSIVE_API_KEY}&ticker=*"
+        
+        def on_message(ws, message):
+            try:
+                data = json.loads(message)
+                # Handle batch or single message
+                if isinstance(data, list):
+                    handle_massive_ws_msg(data)
+                else:
+                    handle_massive_ws_msg([data])
+            except Exception as e:
+                print(f"❌ Massive WS Parse Error: {e} | Msg: {message[:100]}...")
+
+        def on_error(ws, error):
+            print(f"❌ Massive WS Error: {error}")
+
+        def on_close(ws, close_status_code, close_msg):
+            global WS_STARTED
+            print(f"🔌 Massive WS Closed: {close_status_code} - {close_msg}")
+            with WS_LOCK:
+                WS_STARTED = False
+            # Reconnect after delay
+            time.sleep(10)
+            start_massive_websocket()
+
+        def on_open(ws):
+            print("🚀 Massive WS Connection Opened")
+
+        print(f"📡 Connecting to Massive WS for all option trades...")
+        
+        # Disable SSL verification for compatibility with local environments
+        ws = websocket.WebSocketApp(url,
+                                    on_open=on_open,
+                                    on_message=on_message,
+                                    on_error=on_error,
+                                    on_close=on_close)
+        
+        import ssl
+        ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
+        
+    t = threading.Thread(target=run_ws, daemon=True)
+    t.start()
+
+def handle_massive_ws_msg(msgs):
+    """Callback for Massive WebSocket messages (Trades)"""
     global SWEEP_CACHE
     tz_eastern = pytz.timezone('US/Eastern')
     
     for msg in msgs:
         try:
-            # DEBUG: Print first few attributes to understand structure
-            # print(f"DEBUG: Processing msg: {msg}")
-
-            # We expect Trade objects
-            if not hasattr(msg, 'price') or not hasattr(msg, 'size'):
-                # print(f"Ignored non-trade msg: {msg}")
-                continue
+            # Massive Format (per docs):
+            # ev: T, sym: Ticker, x: Exchange, p: Price, s: Size, c: Conditions, t: Timestamp (Unix MS)
+            if msg.get("ev") != "T": continue
             
-            print(f"DEBUG: Trade Rx: {msg.symbol} P:{msg.price} S:{msg.size}")
+            symbol = msg.get("sym", "")
+            price = float(msg.get("p", 0))
+            size = int(msg.get("s", 0))
+            ts_ms = int(msg.get("t", 0))
+            conditions = msg.get("c", [])
+            exchange = msg.get("x", 0)
 
+            if not symbol or price <= 0 or size <= 0: continue
+
+            premium = price * size * 100
             
-            # Parse Basic Data
-            price = float(msg.price)
-            size = int(msg.size)
+            # Filter Noise (min $50k)
+            if premium < 50000: continue
+            
+            # Parse Ticker Option Symbol: O:NVDA230616C00400000 
+            full_symbol = symbol.replace("O:", "")
+            
+            # Extract Underlying
+            first_digit_idx = -1
+            for i, char in enumerate(full_symbol):
+                if char.isdigit():
+                    first_digit_idx = i
+                    break
+            
+            if first_digit_idx == -1: continue
+            ticker_name = full_symbol[:first_digit_idx]
+            
+            # Expiry YYMMDD (6 chars) + Type (1 char) + Strike (8 chars)
+            rest = full_symbol[first_digit_idx:]
+            if len(rest) < 15: continue
+                
+            expiry_str = rest[:6]
+            expiry_date = f"20{expiry_str[:2]}-{expiry_str[2:4]}-{expiry_str[4:6]}"
+            type_char = rest[6]
+            option_type = "CALL" if type_char == 'C' else "PUT"
+            strike = float(rest[7:]) / 1000
+            
+            # Timestamp (Massive is MS, convert to Sec)
+            ts_sec = ts_ms / 1000.0
+            trade_dt = datetime.fromtimestamp(ts_sec, tz_eastern)
+            time_str = trade_dt.strftime('%H:%M:%S')
+
+            # Detect Conditions (Sweeps) - Massive ID mapping (233, 30 usually sweep)
+            is_sweep = conditions and (233 in conditions or 30 in conditions)
+            is_block = size >= 500
+            
+            # Simplified ASK/BID side logic
+            side = "BUY" if is_sweep else "SELL" # Simplified heuristic
+            bid, ask = price, price # WebSocket doesn't yield quotes here
+            
+            tags = []
+            if is_sweep: tags.append("SWEEP")
+            if is_block: tags.append("BLOCK")
+            if premium >= 1000000: tags.append("WHALE")
+
+            data = {
+                "ticker": ticker_name, 
+                "symbol": symbol,
+                "strike": strike,
+                "type": option_type,
+                "expiry": expiry_date,
+                "premium": f"${premium:,.0f}",
+                "size": size,
+                "price": price,
+                "timestamp": ts_sec,
+                "timeStr": time_str,
+                "side": side,
+                "bid": bid,
+                "ask": ask,
+                "spot": 0,
+                "details": f"{' '.join(tags)}", 
+                "tags": tags,
+                "is_sweep": is_sweep,
+                "is_block": is_block,
+                "exchange": exchange
+            }
+            
+            with SWEEP_LOCK:
+                SWEEP_CACHE.appendleft(data)
+                # Keep cache tidy
+                while len(SWEEP_CACHE) > 200:
+                    SWEEP_CACHE.pop()
+                    
+            # print(f"🌊 Massive Rx: {ticker_name} {strike}{type_char} {premium:,.0f} | {time_str}")
+
+        except Exception as e:
+            print(f"❌ Massive Row Parse Error: {e} | Msg: {msg}")
+        
+# --- POLYGON WEBSOCKET WORKER ---
+def handle_polygon_ws_msg(msgs):
+    """Callback for Polygon WebSocket messages (Trades)"""
+    print(f"DEBUG: WS Raw Rx: {type(msgs)} | Content: {msgs}")
+    global SWEEP_CACHE
+    tz_eastern = pytz.timezone('US/Eastern')
+    
+    for msg in msgs:
+        try:
+            # Handle both dict and object formats (Standard for polygon-api-client)
+            if isinstance(msg, dict):
+                m_type = msg.get("ev")
+                if m_type != "T": continue # Only trades
+                symbol = msg.get("sym")
+                price = float(msg.get("p", 0))
+                size = int(msg.get("s", 0))
+                ts_ns = int(msg.get("t", 0))
+                conditions = msg.get("c", [])
+                exchange = msg.get("x", 0)
+            else:
+                if not hasattr(msg, 'price') or not hasattr(msg, 'size'):
+                    continue
+                symbol = msg.symbol
+                price = float(msg.price)
+                size = int(msg.size)
+                ts_ns = int(msg.sip_timestamp)
+                conditions = getattr(msg, 'conditions', [])
+                exchange = getattr(msg, 'exchange', 0)
+
+            print(f"DEBUG: Trade Rx: {symbol} P:{price} S:{size}")
+            
             premium = price * size * 100
             
             # Filter Noise (min $50k for now)
@@ -1959,55 +2147,36 @@ def handle_polygon_ws_msg(msgs):
                 continue
                 
             # Parse Ticker Option Symbol: O:NVDA230616C00400000 -> NVDA...
-            # We want to extract underlying and contract details
-            # Standard Polygon Format: O:{TICKER}{YY}{MM}{DD}{C/P}{STRIKE}
-            # e.g. O:NVDA230616C00400000
-            full_symbol = msg.symbol.replace("O:", "")
+            full_symbol = symbol.replace("O:", "")
             
-            # Extract Underlying (heuristic: letters at start)
-            # Find the first digit
+            # Extract Underlying
             first_digit_idx = -1
             for i, char in enumerate(full_symbol):
                 if char.isdigit():
                     first_digit_idx = i
                     break
             
-            if first_digit_idx == -1: 
-                continue # Malformed
+            if first_digit_idx == -1: continue
                 
-            ticker = full_symbol[:first_digit_idx]
+            ticker_name = full_symbol[:first_digit_idx]
             
-            # Parse Expiry, Type, Strike (Simplified)
+            # Parse Expiry, Type, Strike
             rest = full_symbol[first_digit_idx:]
-            # Expiry YYMMDD (6 chars) + Type (1 char) + Strike (8 chars)
-            if len(rest) < 15:
-                continue
+            if len(rest) < 15: continue
                 
             expiry_str = rest[:6]
-            # Convert YYMMDD to YYYY-MM-DD
             expiry_date = f"20{expiry_str[:2]}-{expiry_str[2:4]}-{expiry_str[4:6]}"
-            
-            type_char = rest[6] # C or P
+            type_char = rest[6]
             option_type = "CALL" if type_char == 'C' else "PUT"
-            
-            strike_str = rest[7:]
-            strike = float(strike_str) / 1000
+            strike = float(rest[7:]) / 1000
             
             # Timestamp
-            ts_ns = int(msg.sip_timestamp)
             ts_sec = ts_ns / 1e9
             trade_dt = datetime.fromtimestamp(ts_sec, tz_eastern)
             time_str = trade_dt.strftime('%H:%M:%S')
             
             # Detect Conditions (Sweeps)
-            conditions = getattr(msg, 'conditions', [])
-            is_sweep = False
-            # 233 = ISO (Intermarket Sweep Order)
-            # 30 = Intermarket Sweep (depending on exchange specs, Polygon normalizes some)
-            if conditions and (233 in conditions or 30 in conditions):
-                is_sweep = True
-            
-            # If large size, mark block
+            is_sweep = conditions and (233 in conditions or 30 in conditions)
             is_block = size >= 500
             
             # Filter: STRICT minimum $50k per trade
@@ -2052,8 +2221,8 @@ def handle_polygon_ws_msg(msgs):
 
             # Construct Data Object
             data = {
-                "ticker": ticker, 
-                "symbol": msg.symbol,
+                "ticker": ticker_name, 
+                "symbol": symbol,
                 "strike": strike,
                 "type": option_type,
                 "expiry": expiry_date,
@@ -2065,11 +2234,12 @@ def handle_polygon_ws_msg(msgs):
                 "side": side,
                 "bid": bid,
                 "ask": ask,
-                "spot": 0, # Could look up
+                "spot": 0,
                 "details": f"{' '.join(tags)}", 
                 "tags": tags,
                 "is_sweep": is_sweep,
-                "is_block": is_block
+                "is_block": is_block,
+                "exchange": exchange
             }
             
             with SWEEP_LOCK:
@@ -2079,25 +2249,40 @@ def handle_polygon_ws_msg(msgs):
             print(f"WS Parse Error: {e} | Msg: {msg}") 
             pass
 
+# --- POLYGON WEBSOCKET STARTER ---
 def start_polygon_websocket():
     """Start the Polygon WebSocket client in a separate thread"""
+    global WS_STARTED
     if not POLYGON_API_KEY:
         return
+    
+    with WS_LOCK:
+        if WS_STARTED:
+            print("⚠️ WS Client already started, skipping.")
+            return
+        WS_STARTED = True
         
     def run_ws():
-        # Subscribe to all tickers in WATCHLIST
-        subs = [f"T.O:{t}*" for t in WATCHLIST]
+        # Subscribe to all trades for symbols in WHALE_WATCHLIST
+        # Polygon pattern: T.O.<SYMBOL>.*
+        subs = [f"T.O.{t}.*" for t in WHALE_WATCHLIST]
         masked_key = f"{POLYGON_API_KEY[:4]}...{POLYGON_API_KEY[-4:]}" if POLYGON_API_KEY else "None"
         print(f"📡 Connecting to Polygon WS (Trades) for {len(subs)} tickers using API Key: {masked_key}")
         
-        client = WebSocketClient(
-            api_key=POLYGON_API_KEY,
-            feed=Feed.Delayed, # Used User's Key capabilities (Delayed usually default for free/starter)
-            market=Market.Options,
-            subscriptions=subs,
-            verbose=False # Set True for debug
-        )
-        client.run(handle_polygon_ws_msg)
+        try:
+            client = WebSocketClient(
+                api_key=POLYGON_API_KEY,
+                feed=Feed.Delayed, # Default to delayed to ensure compatibility
+                market=Market.Options,
+                subscriptions=subs,
+                verbose=True # Enable for debug
+            )
+            print("🚀 WS Client initialized, starting run...")
+            client.run(handle_polygon_ws_msg)
+        except Exception as ws_err:
+            print(f"❌ WS Client Crashed/Failed: {ws_err}")
+            time.sleep(10)
+            return run_ws()
         
     t = threading.Thread(target=run_ws, daemon=True)
     t.start()
@@ -2114,7 +2299,7 @@ def fetch_daily_watchlist_activity():
         print("⚠️ No API Key for historical fetch")
         return
 
-    print(f"📊 Fetching daily activity for WATCHLIST ({len(WATCHLIST)} tickers)...")
+    print(f"📊 Fetching daily activity for WHALE_WATCHLIST ({len(WHALE_WATCHLIST)} tickers)...")
     
     # 50k Premium Filter
     MIN_PREMIUM = 50000
@@ -2187,7 +2372,7 @@ def fetch_daily_watchlist_activity():
 
     # Execute efficiently
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        results = executor.map(process_ticker, WATCHLIST)
+        results = list(executor.map(process_ticker, WHALE_WATCHLIST))
         
     all_trades = []
     for res in results:
@@ -3990,20 +4175,41 @@ def api_price():
     """
     Lightweight endpoint to get just the current price.
     Used for frequent UI updates (e.g. Gamma Wall ATM indicator) without heavy data fetching.
+    
+    PRIORITY Logic:
+    1. During Market Hours: Prefer yfinance/Cache (Real-time).
+    2. After Hours/Weekends: Prefer Polygon (Official Previous Close).
     """
     symbol = request.args.get('symbol', 'SPY').upper()
+    is_live = is_currently_market_hours()
     
-    # Try Polygon first (Gamma Wall source)
-    price = get_polygon_price(symbol)
-    source = "polygon"
-    
-    # Fallback to YFinance/Cache
-    if not price:
+    # 1. During market hours, yfinance/Cache is the primary source for real-time movement
+    if is_live:
         price = get_cached_price(symbol)
-        source = "yfinance"
+        source = "yfinance (live)"
         
+        # Fallback to Polygon if yfinance fails
+        if not price:
+            price = get_polygon_price(symbol)
+            source = "polygon (fallback)"
+    else:
+        # 2. After hours, we prefer the official Polygon Previous Close
+        price = get_polygon_price(symbol)
+        source = "polygon (prev)"
+        
+        # Fallback to Cache/yfinance
+        if not price:
+            price = get_cached_price(symbol)
+            source = "yfinance (fallback)"
+            
     if price:
-        return jsonify({"symbol": symbol, "price": price, "source": source, "timestamp": time.time()})
+        return jsonify({
+            "symbol": symbol, 
+            "price": price, 
+            "source": source, 
+            "is_live": is_live,
+            "timestamp": time.time()
+        })
     else:
         return jsonify({"error": "Price unavailable"}), 404
 
@@ -4745,6 +4951,9 @@ def get_fish_history(optionsTicker):
 if __name__ == "__main__":
     # Start background worker
     start_background_worker()
+    
+    # Start Massive WebSocket for live trades
+    start_massive_websocket()
     
     # Pre-load historical sweeps for demo
     load_historical_sweeps()
