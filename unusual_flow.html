@@ -2206,7 +2206,9 @@
                 changeEl.style.color = changeColor;
             });
 
-            scrambleText(document.getElementById('display-vol'), (day.volume || 0).toLocaleString());
+            scrambleText(document.getElementById('display-vol'), (day.volume || 0).toLocaleString(), 800, () => {
+                document.getElementById('display-vol').innerHTML = (day.volume || 0).toLocaleString() + '<span style="font-size: 10px; color: #666; margin-left: 4px; text-transform: uppercase;">contracts</span>';
+            });
 
             // Calculate and display notional value (Volume × Price × 100 shares per contract)
             const volume = day.volume || 0;
@@ -2424,8 +2426,8 @@
                             display: false
                         },
                         tooltip: {
-                            mode: 'index',
-                            intersect: false,
+                            mode: 'nearest',
+                            intersect: true,
                             backgroundColor: 'rgba(0,0,0,0.95)',
                             titleColor: '#fff',
                             titleFont: { family: "'VT323', monospace", size: 14 },
@@ -2434,7 +2436,31 @@
                             borderColor: '#0063B2',
                             borderWidth: 1,
                             padding: 10,
+                            filter: function (tooltipItem) {
+                                // Only show tooltip if the volume (or raw value) is greater than 50
+                                return tooltipItem.raw > 50;
+                            },
                             callbacks: {
+                                title: function (context) {
+                                    const idx = context[0].dataIndex;
+                                    const historyItem = window.chartHistoryData?.[idx];
+                                    if (!historyItem) return '';
+
+                                    // Parse date/timestamp
+                                    let date;
+                                    if (historyItem.timestamp) {
+                                        date = new Date(historyItem.timestamp);
+                                    } else if (historyItem.date) {
+                                        date = new Date(historyItem.date.includes('T') ? historyItem.date : historyItem.date + 'T12:00:00');
+                                    }
+
+                                    if (date && !isNaN(date.getTime())) {
+                                        const dateStr = date.toLocaleString('en-US', { month: 'short', day: 'numeric' });
+                                        const timeStr = date.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                                        return `${dateStr} ${timeStr}`; // e.g., "Jan 24 10:30 AM"
+                                    }
+                                    return historyItem.date || '';
+                                },
                                 label: function (context) {
                                     const idx = context.dataIndex;
                                     const historyItem = window.chartHistoryData?.[idx];
@@ -2456,7 +2482,8 @@
 
                                         const tooltipLines = [
                                             `Premium: $${context.raw?.toLocaleString()}`,
-                                            `${volLabel}: ${historyItem.volume?.toLocaleString() || '-'}`
+                                            `${volLabel}: ${historyItem.volume?.toLocaleString() || '-'} contracts`,
+                                            `Avg Fill: $${(historyItem.vwap || historyItem.price || 0).toFixed(2)}`
                                         ];
 
                                         if (isToday) {
@@ -2613,8 +2640,9 @@
             document.getElementById('tf-6d').classList.remove('active');
             document.getElementById('tf-20d').classList.remove('active');
 
-            // Show interval selector for 3D views (typically hourly/intraday)
-            document.getElementById('interval-select').style.display = 'inline-block';
+            // Hardcode 5m interval and hide selector
+            document.getElementById('interval-select').value = '5m';
+            document.getElementById('interval-select').style.display = 'none';
 
             if (lastContractId) fetchVolumeHistory(lastContractId, lastContractType, lastOI);
         });

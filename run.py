@@ -759,6 +759,24 @@ def fetch_polygon_historical_aggs(contract_symbol, timespan="minute", multiplier
         if resp.status_code == 200:
             data = resp.json()
             results = data.get("results", [])
+            
+            # FALLBACK: If 1D view is empty (e.g. Pre-Market Monday), fetch previous trading day
+            if not results and days == 1:
+                # Calculate previous trading day
+                fallback_dt = datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=1)
+                while fallback_dt.weekday() >= 5: # Skip weekends
+                    fallback_dt -= timedelta(days=1)
+                
+                fallback_date = fallback_dt.strftime("%Y-%m-%d")
+                print(f"⚠️ 1D Empty ({start_date}). Fallback to previous day: {fallback_date}")
+                
+                # Retry fetch with same params but new date range
+                url_fallback = f"https://api.polygon.io/v2/aggs/ticker/{contract_symbol}/range/{multiplier}/{timespan}/{fallback_date}/{fallback_date}"
+                resp_fallback = requests.get(url_fallback, params=params, timeout=10)
+                
+                if resp_fallback.status_code == 200:
+                    results = resp_fallback.json().get("results", [])
+
             return results
         else:
             print(f"Polygon Aggs Error ({contract_symbol}): {resp.status_code}")
@@ -1095,6 +1113,10 @@ def get_vol_oi_history(contract_symbol):
                 bar_datetime = datetime.fromtimestamp(bar['t']/1000)
                 if bar_datetime.weekday() >= 5: continue
                 
+                # PRE-MARKET FILTER: Ignore 'Today' bars before 4 AM (Fixes midnight glitches)
+                if bar_datetime.date() == datetime.now().date() and bar_datetime.hour < 4:
+                    continue
+
                 history_data.append({
                     "date": bar_datetime.strftime("%Y-%m-%d"),
                     "timestamp": bar['t'],  # Add timestamp for intraday charts
@@ -1124,8 +1146,8 @@ def get_vol_oi_history(contract_symbol):
                 current_volume = day_data.get("volume", 0) or 0
                 
                 # Only update/append history with daily snapshot if NOT in intraday mode
-                # Intraday mode (display_days=1) uses 5-min buckets, so adding a daily total breaks the chart scale/format.
-                if display_days > 1:
+                # Intraday mode uses 5-min buckets, so adding a daily total breaks the chart scale/format.
+                if interval == '1d':
                     # Update today's entry if exists, or add it (skip weekends)
                     today_str = datetime.now().strftime("%Y-%m-%d")
                     today_weekday = datetime.now().weekday()
