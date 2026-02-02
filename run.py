@@ -3022,15 +3022,20 @@ def refresh_polymarket_logic():
         # 3. active=true & closed=false: Strict liveness check
         url = "https://gamma-api.polymarket.com/events?limit=200&active=true&closed=false&order=volume24hr&ascending=false"
         
-        headers = {'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json'}
+        # Use more realistic headers to avoid blocking
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json',
+            'Origin': 'https://polymarket.com',
+            'Referer': 'https://polymarket.com/'
+        }
         
         # Optional: Use API Key if provided (helps with rate limits)
         api_key = os.environ.get("POLYMARKET_API_KEY")
         if api_key:
             headers['Authorization'] = f"Bearer {api_key}"
 
-            
-        resp = requests.get(url, headers=headers, verify=False, timeout=5)
+        resp = requests.get(url, headers=headers, timeout=10)
         
         if resp.status_code == 200:
             events = resp.json()
@@ -3045,7 +3050,7 @@ def refresh_polymarket_logic():
             ]
             for slug in important_slugs:
                 try:
-                    slug_resp = requests.get(f'https://gamma-api.polymarket.com/events?slug={slug}', headers=headers, verify=False, timeout=3)
+                    slug_resp = requests.get(f'https://gamma-api.polymarket.com/events?slug={slug}', headers=headers, timeout=5)
                     if slug_resp.status_code == 200:
                         slug_events = slug_resp.json()
                         for se in slug_events:
@@ -3331,7 +3336,7 @@ def refresh_polymarket_logic():
                     "liquidity": c['liquidity'],
                     "outcome_1_label": c['outcome_1_label'],
                     "outcome_1_prob": c['outcome_1_prob'],
-                    "outcome_2_label": c['outcome_2_prob'],
+                    "outcome_2_label": c['outcome_2_label'],
                     "outcome_2_prob": c['outcome_2_prob'],
                     "slug": c['slug'],
                     "delta": c['delta']
