@@ -346,7 +346,10 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.innerHTML = `
     <td>${opt.ticker}</td>
                 <td>${opt.side}</td>
-                <td class="${volumeClass}">${opt.volume}</td>
+                <td class="${volumeClass}" style="line-height: 1.1;">
+                    ${opt.volume}
+                    <div style="font-size: 8px; color: #666; letter-spacing: 0.5px;">CONTRACTS</div>
+                </td>
                 <td>${opt.price}</td>
 `;
             optionsBody.appendChild(tr);
