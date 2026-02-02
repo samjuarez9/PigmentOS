@@ -855,7 +855,7 @@
                 const size = trade.size || trade.s;
                 const cost = trade.notional_value || (price * size * 100);
 
-                if (cost < 100000) return; // Filter for significant trades
+                if (cost < 50000) return; // Filter for significant trades
 
                 const tr = document.createElement('tr');
 
@@ -1028,7 +1028,7 @@
             });
 
             if (tbody.children.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">NO TRADES OVER $100k FOUND</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">NO TRADES OVER $50k FOUND</td></tr>';
             }
         }
 

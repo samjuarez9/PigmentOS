@@ -1561,7 +1561,7 @@ def scan_whales_polygon():
                     min_vol = 500
                 # Tier 3: Mid Cap / Others (STX, PLTR, SOFI, etc.)
                 else:
-                    min_whale_val = 100_000    # $100k
+                    min_whale_val = 50_000    # $50k
                     min_vol = 100
 
                 # 1. PURE WHALE FILTER (Big Money)
@@ -1704,7 +1704,7 @@ def scan_single_whale_polygon(symbol):
             min_vol = 500
         # Tier 3: Mid Cap / Others
         else:
-            min_whale_val = 100_000
+            min_whale_val = 50_000
             min_vol = 100
         
         for contract in polygon_data.get("results", []):
@@ -4504,7 +4504,7 @@ def api_library_options():
         
         # Process trades: calculate premium, filter by size, etc.
         MIN_PREMIUM = 50000  # $50k minimum per trade for significant flow
-        MIN_SIZE = 100  # Minimum contracts per trade
+        MIN_SIZE = 10    # Minimum contracts per trade (relaxed to catch high-premium trades)
         
         # Group trades by contract to apply Tick Test
         trades_by_contract = {}
