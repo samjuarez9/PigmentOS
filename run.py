@@ -1983,8 +1983,8 @@ def handle_polygon_ws_msg(msgs):
             # If large size, mark block
             is_block = size >= 500
             
-            # Filter: STRICT minimum $100k per trade
-            if premium < 100000:
+            # Filter: STRICT minimum $50k per trade
+            if premium < 50000:
                 continue
             
             # Tagging
@@ -2089,8 +2089,8 @@ def fetch_daily_watchlist_activity():
 
     print(f"📊 Fetching daily activity for WATCHLIST ({len(WATCHLIST)} tickers)...")
     
-    # 100k Premium Filter
-    MIN_PREMIUM = 100000
+    # 50k Premium Filter
+    MIN_PREMIUM = 50000
     
     found_count = 0
     
