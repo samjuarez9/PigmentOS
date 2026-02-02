@@ -4647,6 +4647,10 @@ def api_library_options():
 
 
 
+@app.route('/demo/sweeps')
+def demo_sweeps_page():
+    return send_from_directory('.', 'demo_sweeps.html')
+
 @app.route('/api/demo/stream')
 def demo_stream():
     """Stream ONLY real-time sweep cache for the demo page."""
