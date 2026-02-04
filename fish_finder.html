@@ -206,8 +206,7 @@
             overflow: hidden;
         }
 
-        .type-toggle-btn::after,
-        .go-btn::after {
+        .type-toggle-btn::after {
             content: "";
             position: absolute;
             top: 0;
@@ -248,11 +247,12 @@
         }
 
         .go-btn {
-            background: linear-gradient(135deg, #a349ff, #6350e6);
+            background: #5c49e2;
             color: #fff;
             border: none;
             padding: 0 12px;
-            font-family: var(--font-press-start);
+            font-family: var(--font-mono);
+            font-weight: bold;
             font-size: 10px;
             /* Smaller button text */
             cursor: pointer;
@@ -262,15 +262,17 @@
             /* Match inputs */
             display: flex;
             align-items: center;
+            justify-content: center;
             position: relative;
             overflow: hidden;
-            box-shadow: 0 0 10px rgba(163, 73, 255, 0.3);
+            box-shadow: none;
+            letter-spacing: 0.5px;
         }
 
         .go-btn:hover:not(:disabled) {
-            background: linear-gradient(135deg, #bc79ff, #7a68ff);
+            background: #6d5ce6;
             transform: translateY(-1px);
-            box-shadow: 0 0 15px rgba(163, 73, 255, 0.5);
+            box-shadow: 0 0 10px rgba(92, 73, 226, 0.4);
         }
 
         .go-btn:disabled {

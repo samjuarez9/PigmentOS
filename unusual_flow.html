@@ -267,11 +267,12 @@
         }
 
         .go-btn {
-            background: var(--accent-purple);
+            background: #5c49e2;
             color: #fff;
             border: none;
             padding: 0 20px;
-            font-family: var(--font-pixel);
+            font-family: var(--font-mono);
+            font-weight: bold;
             font-size: 10px;
             cursor: pointer;
             border-radius: 4px;
@@ -280,26 +281,19 @@
             align-self: flex-end;
             position: relative;
             overflow: hidden;
+            letter-spacing: 0.5px;
         }
 
+        /* Scanlines removed to match clean Dark Pool style */
         .go-btn::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: repeating-linear-gradient(0deg,
-                    transparent,
-                    transparent 1px,
-                    rgba(0, 0, 0, 0.15) 1px,
-                    rgba(0, 0, 0, 0.15) 2px);
-            pointer-events: none;
+            display: none;
         }
 
         .go-btn:hover {
-            background: #d54dff;
+            background: #6d5ce6;
+            /* Slightly lighter purple */
             transform: translateY(-1px);
+            box-shadow: 0 0 10px rgba(92, 73, 226, 0.4);
         }
 
         .go-btn:disabled {
