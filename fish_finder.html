@@ -19,6 +19,37 @@
             --font-pixel: 'Press Start 2P', cursive;
         }
 
+        /* Custom CSS Tooltip */
+        .side-cell {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .side-cell::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 30, 30, 0.95);
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 10px;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s;
+            z-index: 1000;
+            border: 1px solid #444;
+            pointer-events: none;
+        }
+
+        .side-cell:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+
         body {
             background-color: var(--bg-color);
             color: var(--text-color);
@@ -482,6 +513,39 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
+        /* Side Tags (BUY/SELL) */
+        .tag-buy {
+            background: linear-gradient(180deg, #00cc66 0%, #009944 100%);
+            color: #fff;
+            font-size: 9px;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .tag-sell {
+            background: linear-gradient(180deg, #ff4466 0%, #cc2244 100%);
+            color: #fff;
+            font-size: 9px;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .tag-neutral {
+            background: #444;
+            color: #999;
+            font-size: 9px;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+
         .tag-0dte {
             background: #333;
             color: #fff;
@@ -757,6 +821,7 @@
                     <th>SIZE</th>
                     <th>EXPIRY</th>
                     <th>PREMIUM</th>
+                    <th>SIDE</th>
                     <th>EXCHANGE</th>
                     <th>TAGS</th>
                 </tr>
@@ -1139,6 +1204,35 @@
                 tagsHtml += `<div>${sentimentHtml}</div>`;
                 tagsHtml += `</div>`;
 
+                // Side Display (from quotes enrichment)
+                // Side Display (from quotes enrichment)
+                const tradeSide = trade.side || 'NEUTRAL';
+                const bidVal = trade.bid ? `$${trade.bid.toFixed(2)}` : '—';
+                const askVal = trade.ask ? `$${trade.ask.toFixed(2)}` : '—';
+
+                // Newer Spot Price logic
+                const spotPrice = trade.underlying_price ? `$${trade.underlying_price.toFixed(2)}` : '';
+                const spotHtml = spotPrice ? `<div style="margin-top: 2px; border-top: 1px solid #333; padding-top: 2px;">SPOT: <span style="color: #e0e0e0;">${spotPrice}</span></div>` : '';
+
+                let sideTag = '';
+                if (tradeSide === 'BUY') {
+                    sideTag = `<span class="tag-buy">BUY</span>`;
+                } else if (tradeSide === 'SELL') {
+                    sideTag = `<span class="tag-sell">SELL</span>`;
+                } else {
+                    sideTag = `<span class="tag-neutral">—</span>`;
+                }
+
+                const sideHtml = `
+                    <div>${sideTag}</div>
+                    <div style="font-size: 9px; color: #888; margin-top: 3px; font-weight: bold;">
+                        @ $${price.toFixed(2)}
+                    </div>
+                `;
+
+                // Bid/Ask tooltip (kept for accessibility)
+                const bidAskTitle = (trade.bid && trade.ask) ? `Bid: $${trade.bid.toFixed(2)} | Ask: $${trade.ask.toFixed(2)}` : '';
+
                 tr.innerHTML = `
                     <td class="code" data-label="CONTRACT">
                         <div style="display: flex; align-items: baseline;">
@@ -1161,6 +1255,7 @@
                     </td>
                     <td class="code" style="font-size: 11px; color: #ccc;" data-label="EXPIRY">${rowExpiry}</td>
                     <td class="premium ${rowType === 'CALL' || rowType === 'call' || rowType === 'C' ? 'premium-call' : (rowType === 'PUT' || rowType === 'put' || rowType === 'P' ? 'premium-put' : '')}" title="Price: $${price.toFixed(2)}" data-label="PREMIUM">${costStr}</td>
+                    <td class="code side-cell" data-tooltip="${bidAskTitle}" data-label="SIDE">${sideHtml}</td>
                     <td class="code" data-label="EXCHANGE">${exchangeCell}</td>
                     <td class="code" style="text-align: right;" data-label="TAGS">${tagsHtml}</td>
                 `;
@@ -1169,7 +1264,7 @@
             });
 
             if (tbody.children.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">NO TRADES OVER $50k FOUND</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px;">NO TRADES OVER $50k FOUND</td></tr>';
             }
         }
 

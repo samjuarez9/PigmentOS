@@ -18,6 +18,37 @@
             --widget-bg: #111;
         }
 
+        /* Custom CSS Tooltip */
+        .side-cell {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .side-cell::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 30, 30, 0.95);
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 10px;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s;
+            z-index: 1000;
+            border: 1px solid #444;
+            pointer-events: none;
+        }
+
+        .side-cell:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+
         * {
             box-sizing: border-box;
         }
@@ -1693,98 +1724,128 @@
                 <div class="panel-title">SELECT TICKER <span style="font-size: 14px;">🎣</span></div>
                 <div class="drill-down-row">
                     <!-- 1. Ticker + Scan Button -->
-                    <div class="select-group">
-                        <span class="select-label">Ticker</span>
-                        <div style="display: flex; gap: 8px;">
-                            <select id="fish-ticker-select" class="styled-select" style="width: 120px;">
-                                <option value="" selected disabled>SELECT</option>
-                                <option value="AAPL">AAPL</option>
-                                <option value="AMD">AMD</option>
-                                <option value="AMZN">AMZN</option>
-                                <option value="GOOGL">GOOGL</option>
-                                <option value="INTC">INTC</option>
-                                <option value="IREN">IREN</option>
-                                <option value="LITE">LITE</option>
-                                <option value="META">META</option>
-                                <option value="MSFT">MSFT</option>
-                                <option value="MU">MU</option>
-                                <option value="NVDA">NVDA</option>
-                                <option value="ORCL">ORCL</option>
-                                <option value="PLTR">PLTR</option>
-                                <option value="SNDK">SNDK</option>
-                                <option value="STX">STX</option>
-                                <option value="TSLA">TSLA</option>
-                                <option value="TSM">TSM</option>
-                            </select>
-                            <button id="scan-ticker-btn" class="go-btn" disabled>SCAN</button>
-                        </div>
-                        <div id="fish-spot-price" class="spot-price" style="margin-top: 4px;"></div>
-                    </div>
-
-                    <!-- Divider -->
-                    <div id="secondary-filter-fish-divider"
-                        style="display: none; width: 1px; height: 30px; background: #333; margin: 0 10px;"></div>
-
-                    <!-- 2. Filters (Compact) -->
-                    <div class="select-group secondary-filter-fish" style="display: none;">
-                        <span class="select-label">Expiry</span>
-                        <select id="fish-expiry-select" class="styled-select" style="min-width: 80px;" disabled>
-                            <option value="ALL" selected>ALL</option>
+                    <!-- NEW: Flexible Ticker Input + Pre-Scan Filters -->
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <select id="fishTicker"
+                            style="background: #222; border: 1px solid #444; color: #fff; padding: 5px; border-radius: 4px; width: 120px; font-weight: bold; height: 29px;">
+                            <option value="" disabled selected>SELECT TICKER</option>
+                            <option value="AAPL">AAPL</option>
+                            <option value="AMD">AMD</option>
+                            <option value="AMZN">AMZN</option>
+                            <option value="GOOGL">GOOGL</option>
+                            <option value="INTC">INTC</option>
+                            <option value="IREN">IREN</option>
+                            <option value="LITE">LITE</option>
+                            <option value="META">META</option>
+                            <option value="MSFT">MSFT</option>
+                            <option value="MU">MU</option>
+                            <option value="NVDA">NVDA</option>
+                            <option value="ORCL">ORCL</option>
+                            <option value="PLTR">PLTR</option>
+                            <option value="SNDK">SNDK</option>
+                            <option value="STX">STX</option>
+                            <option value="TSLA">TSLA</option>
+                            <option value="TSM">TSM</option>
                         </select>
-                    </div>
 
-                    <div class="select-group secondary-filter-fish" style="display: none;">
-                        <span class="select-label">Week</span>
-                        <select id="fish-week-select" class="styled-select" style="min-width: 80px;" disabled>
-                            <option value="ALL" selected>ALL</option>
+                        <!-- PRE-SCAN FILTERS -->
+                        <select id="fishExpiryFilter"
+                            style="background: #222; border: 1px solid #444; color: #aaa; padding: 5px; border-radius: 4px; font-size: 11px; height: 29px;">
+                            <option value="all">ALL EXPIRIES</option>
+                            <option value="near">NEAR TERM (0-7D)</option>
+                            <option value="mid">MID TERM (7-45D)</option>
+                            <option value="far">FAR TERM (45D+)</option>
                         </select>
-                    </div>
 
-                    <div class="select-group secondary-filter-fish" style="display: none;">
-                        <span class="select-label">Type</span>
-                        <div class="type-toggle-wrapper"
-                            style="display: flex; border: 1px solid #333; border-radius: 4px; overflow: hidden; height: 34px;">
-                            <button id="fish-type-call" class="type-toggle-btn call"
-                                style="border: none; padding: 0 10px; font-family: var(--font-mono); font-size: 10px; cursor: pointer; height: 100%; border-right: 1px solid #333;"
-                                disabled>CALL</button>
-                            <button id="fish-type-put" class="type-toggle-btn put"
-                                style="border: none; padding: 0 10px; font-family: var(--font-mono); font-size: 10px; cursor: pointer; height: 100%; border-right: 1px solid #333;"
-                                disabled>PUT</button>
-                            <button id="fish-type-any" class="type-toggle-btn active"
-                                style="border: none; padding: 0 10px; font-family: var(--font-mono); font-size: 10px; cursor: pointer; height: 100%;"
-                                disabled>ANY</button>
-                        </div>
-                        <input type="hidden" id="fish-type-select-val" value="ANY">
+                        <select id="fishMoneyFilter"
+                            style="background: #222; border: 1px solid #444; color: #aaa; padding: 5px; border-radius: 4px; font-size: 11px; height: 29px;">
+                            <option value="all">ALL STRIKES</option>
+
+                            <option value="atm">ATM (+/- 5%)</option>
+                            <option value="otm">OTM (Action)</option>
+                            <option value="itm">ITM (Deep)</option>
+                        </select>
+
+                        <select id="fishTypeFilter"
+                            style="background: #222; border: 1px solid #444; color: #aaa; padding: 5px; border-radius: 4px; font-size: 11px; height: 29px;">
+                            <option value="all">ALL TYPES</option>
+                            <option value="call">CALLS ONLY</option>
+                            <option value="put">PUTS ONLY</option>
+                        </select>
+
+                        <button id="scanFishBtn"
+                            style="background: #0085ff; border: none; color: #fff; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; font-size: 11px; height: 29px;">
+                            SCAN
+                        </button>
                     </div>
+                    <div id="fish-spot-price" class="spot-price" style="margin-top: 4px;"></div>
                 </div>
-                <div id="fish-status"
-                    style="font-size: 10px; color: #888; text-transform: uppercase; margin-top: 10px;">Ready</div>
-            </div>
 
-            <!-- Results -->
-            <div class="table-container-fish">
-                <table id="fish-trades-table" class="fish-finder-table">
-                    <thead>
-                        <tr>
-                            <th>CONTRACT</th>
-                            <th>TIME (EST)</th>
-                            <th>SIZE</th>
-                            <th>EXPIRY</th>
-                            <th>PREMIUM</th>
-                            <th>EXCHANGE</th>
-                            <th style="text-align: right;">TAGS</th>
-                        </tr>
-                    </thead>
-                    <tbody id="fish-trades-body">
-                        <tr>
-                            <td colspan="7"
-                                style="text-align:center; padding: 40px; color: #444; font-family: var(--font-pixel); font-size: 10px;">
-                                SELECT A TICKER AND HIT SCAN TO VIEW TRADES ($50k+).</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <!-- Divider -->
+                <div id="secondary-filter-fish-divider"
+                    style="display: none; width: 1px; height: 30px; background: #333; margin: 0 10px;"></div>
+
+                <!-- 2. Filters (Compact) -->
+                <div class="select-group secondary-filter-fish" style="display: none;">
+                    <span class="select-label">Expiry</span>
+                    <select id="fish-expiry-select" class="styled-select" style="min-width: 80px;" disabled>
+                        <option value="ALL" selected>ALL</option>
+                    </select>
+                </div>
+
+                <div class="select-group secondary-filter-fish" style="display: none;">
+                    <span class="select-label">Week</span>
+                    <select id="fish-week-select" class="styled-select" style="min-width: 80px;" disabled>
+                        <option value="ALL" selected>ALL</option>
+                    </select>
+                </div>
+
+                <div class="select-group secondary-filter-fish" style="display: none;">
+                    <span class="select-label">Type</span>
+                    <div class="type-toggle-wrapper"
+                        style="display: flex; border: 1px solid #333; border-radius: 4px; overflow: hidden; height: 34px;">
+                        <button id="fish-type-call" class="type-toggle-btn call"
+                            style="border: none; padding: 0 10px; font-family: var(--font-mono); font-size: 10px; cursor: pointer; height: 100%; border-right: 1px solid #333;"
+                            disabled>CALL</button>
+                        <button id="fish-type-put" class="type-toggle-btn put"
+                            style="border: none; padding: 0 10px; font-family: var(--font-mono); font-size: 10px; cursor: pointer; height: 100%; border-right: 1px solid #333;"
+                            disabled>PUT</button>
+                        <button id="fish-type-any" class="type-toggle-btn active"
+                            style="border: none; padding: 0 10px; font-family: var(--font-mono); font-size: 10px; cursor: pointer; height: 100%;"
+                            disabled>ANY</button>
+                    </div>
+                    <input type="hidden" id="fish-type-select-val" value="ANY">
+                </div>
             </div>
+            <div id="fish-status" style="font-size: 10px; color: #888; text-transform: uppercase; margin-top: 10px;">
+                Ready</div>
         </div>
+
+        <!-- Results -->
+        <div class="table-container-fish">
+            <table id="fish-trades-table" class="fish-finder-table">
+                <thead>
+                    <tr>
+                        <th>CONTRACT</th>
+                        <th>TIME (EST)</th>
+                        <th>SIZE</th>
+                        <th>EXPIRY</th>
+                        <th>PREMIUM</th>
+                        <th>SIDE</th>
+                        <th>EXCHANGE</th>
+                        <th style="text-align: right;">TAGS</th>
+                    </tr>
+                </thead>
+                <tbody id="fish-trades-body">
+                    <tr>
+                        <td colspan="8"
+                            style="text-align:center; padding: 40px; color: #444; font-family: var(--font-pixel); font-size: 10px;">
+                            SELECT A TICKER AND HIT SCAN TO VIEW TRADES ($50k+).</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
     </div>
 
     <script>
@@ -3015,13 +3076,60 @@
         // ==============================================
         // FISH FINDER LOGIC (PORTED)
         // ==============================================
-        const fishTickerSelect = document.getElementById('fish-ticker-select');
-        const fishExpirySelect = document.getElementById('fish-expiry-select');
-        const fishWeekSelect = document.getElementById('fish-week-select');
-        const fishTypeSelectVal = document.getElementById('fish-type-select-val');
-        const scanTickerBtn = document.getElementById('scan-ticker-btn');
+
+        const fishTickerSelect = document.getElementById('fish-ticker-select'); // Keeps old ref just in case
+        const fishTickerInput = document.getElementById('fishTicker'); // New Input
+        const scanFishBtn = document.getElementById('scanFishBtn'); // New Button
+
+        const fishExpiryFilter = document.getElementById('fishExpiryFilter');
+        const fishMoneyFilter = document.getElementById('fishMoneyFilter');
+        const fishTypeFilter = document.getElementById('fishTypeFilter'); // New Filter
+
+        // ... (existing refs) ...
         const fishStatusEl = document.getElementById('fish-status');
         const fishTbody = document.getElementById('fish-trades-body');
+
+        // --- NEW SCAN LOGIC ---
+        if (scanFishBtn) {
+            scanFishBtn.addEventListener('click', async () => {
+                const ticker = fishTickerInput ? fishTickerInput.value : '';
+                if (!ticker) return;
+
+                // Get Filter Values
+                const exp = fishExpiryFilter ? fishExpiryFilter.value : 'all';
+                const mon = fishMoneyFilter ? fishMoneyFilter.value : 'all';
+                const type = fishTypeFilter ? fishTypeFilter.value : 'all';
+
+                fishStatusEl.textContent = `🐷 SCANNING ${ticker}... THIS MAY TAKE A MINUTE`;
+                fishTbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 40px;"><div class="loading-spinner-small" style="margin: 0 auto;"></div><div style="margin-top: 10px; font-size: 11px; color: #666;">🐷 Fetching trades... this may take a minute</div></td></tr>';
+
+
+                try {
+                    // Pass filters to backend
+                    const res = await fetch(`${API_BASE_URL}/api/library/options?symbol=${ticker}&expiry=${exp}&moneyness=${mon}&type=${type}`);
+                    const json = await res.json();
+                    if (json.error) throw new Error(json.error);
+
+                    allScanData = json.data || []; // Correct key is 'data'
+                    // Update Spot
+                    if (json.current_price) document.getElementById('fish-spot-price').textContent = `SPOT: $${json.current_price.toFixed(2)}`;
+
+                    // Render
+                    renderFishTable(allScanData, ticker);
+
+                    // Re-enable type buttons
+
+
+                    // Update Status
+                    fishStatusEl.innerHTML = `<span style="color:#00cc66">SCAN COMPLETE</span> (${allScanData.length} records)`;
+
+                } catch (err) {
+                    console.error(err);
+                    fishStatusEl.innerText = "Error: " + err.message;
+                    fishTbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color: #ff4444;">Scan Failed</td></tr>';
+                }
+            });
+        }
 
         // Filter Buttons (Fish Finder)
         const fishTypeCallBtn = document.getElementById('fish-type-call');
@@ -3030,38 +3138,41 @@
 
         let allScanData = [];
 
-        fishTickerSelect.addEventListener('change', async (e) => {
-            const ticker = e.target.value;
-            if (!ticker) return;
+        if (fishTickerSelect) {
+            fishTickerSelect.addEventListener('change', async (e) => {
+                const ticker = e.target.value;
+                if (!ticker) return;
 
-            fishStatusEl.innerText = "Ready to Scan";
-            scanTickerBtn.disabled = false;
+                fishStatusEl.innerText = "Ready to Scan";
+                scanTickerBtn.disabled = false;
 
-            allScanData = [];
-            fishExpirySelect.innerHTML = '<option value="ALL" selected>ALL EXPIRIES</option>';
-            fishExpirySelect.disabled = true;
-            resetFishTypeButtons();
 
-            document.querySelectorAll('.secondary-filter-fish').forEach(el => el.style.display = 'none');
-            const divider = document.getElementById('secondary-filter-fish-divider');
-            if (divider) divider.style.display = 'none';
+                allScanData = [];
+                fishExpirySelect.innerHTML = '<option value="ALL" selected>ALL EXPIRIES</option>';
+                fishExpirySelect.disabled = true;
 
-            try {
-                const res = await fetch(`${API_BASE_URL}/api/flow/contracts?ticker=${ticker}`);
-                const data = await res.json();
-                if (data.spot_price) {
-                    window.currentSpotPrice = data.spot_price;
-                    document.getElementById('fish-spot-price').textContent = `SPOT: $${data.spot_price.toFixed(2)}`;
-                }
-            } catch (err) { console.error(err); }
-        });
+
+                document.querySelectorAll('.secondary-filter-fish').forEach(el => el.style.display = 'none');
+                const divider = document.getElementById('secondary-filter-fish-divider');
+                if (divider) divider.style.display = 'none';
+
+                try {
+                    const res = await fetch(`${API_BASE_URL}/api/flow/contracts?ticker=${ticker}`);
+                    const data = await res.json();
+                    if (data.spot_price) {
+                        window.currentSpotPrice = data.spot_price;
+                        document.getElementById('fish-spot-price').textContent = `SPOT: $${data.spot_price.toFixed(2)}`;
+                    }
+                } catch (err) { console.error(err); }
+            });
+        }
 
         scanTickerBtn.addEventListener('click', async () => {
             const ticker = fishTickerSelect.value;
             if (!ticker) return;
 
-            fishStatusEl.textContent = `SCANNING ALL FLOW FOR ${ticker}...`;
-            fishTbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px;"><div class="loading-spinner-small" style="margin: 0 auto;"></div></td></tr>';
+            fishStatusEl.textContent = `🐷 SCANNING ALL FLOW FOR ${ticker}... THIS MAY TAKE A MINUTE`;
+            fishTbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 40px;"><div class="loading-spinner-small" style="margin: 0 auto;"></div><div style="margin-top: 10px; font-size: 11px; color: #666;">🐷 Fetching trades... this may take a minute</div></td></tr>';
 
             fishExpirySelect.disabled = true;
             disableFishTypeButtons();
@@ -3093,7 +3204,7 @@
             } catch (err) {
                 console.error("Scan Error:", err);
                 fishStatusEl.textContent = `SCAN FAILED: ${err.message}`;
-                fishTbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: #ff5555; padding: 20px;">ERROR: ${err.message}</td></tr>`;
+                fishTbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: #ff5555; padding: 20px;">ERROR: ${err.message}</td></tr>`;
             }
         });
 
@@ -3114,54 +3225,6 @@
         fishExpirySelect.addEventListener('change', applyFishFilters);
         fishWeekSelect.addEventListener('change', applyFishFilters);
 
-        function resetFishTypeButtons() {
-            fishTypeSelectVal.value = 'ANY';
-            [fishTypeCallBtn, fishTypePutBtn, fishTypeAnyBtn].forEach(btn => btn.classList.remove('active'));
-            fishTypeAnyBtn.classList.add('active');
-            disableFishTypeButtons();
-        }
-
-        function disableFishTypeButtons() { [fishTypeCallBtn, fishTypePutBtn, fishTypeAnyBtn].forEach(btn => btn.disabled = true); }
-        function enableFishTypeButtons() { [fishTypeCallBtn, fishTypePutBtn, fishTypeAnyBtn].forEach(btn => btn.disabled = false); }
-
-        fishTypeCallBtn.addEventListener('click', () => { fishTypeSelectVal.value = 'CALL'; updateFishTypeVisuals(fishTypeCallBtn); applyFishFilters(); });
-        fishTypePutBtn.addEventListener('click', () => { fishTypeSelectVal.value = 'PUT'; updateFishTypeVisuals(fishTypePutBtn); applyFishFilters(); });
-        fishTypeAnyBtn.addEventListener('click', () => { fishTypeSelectVal.value = 'ANY'; updateFishTypeVisuals(fishTypeAnyBtn); applyFishFilters(); });
-
-        function updateFishTypeVisuals(activeBtn) {
-            [fishTypeCallBtn, fishTypePutBtn, fishTypeAnyBtn].forEach(btn => btn.classList.remove('active'));
-            activeBtn.classList.add('active');
-        }
-
-        function applyFishFilters() {
-            const exp = fishExpirySelect.value;
-            const typeF = fishTypeSelectVal.value;
-            const weekF = fishWeekSelect.value;
-
-            let filtered = allScanData;
-            if (exp !== 'ALL') filtered = filtered.filter(t => t.expiry === exp);
-            if (typeF !== 'ANY') {
-                filtered = filtered.filter(t => {
-                    const tT = (t.type || '').toUpperCase();
-                    if (typeF === 'CALL') return tT === 'CALL' || tT === 'C';
-                    if (typeF === 'PUT') return tT === 'PUT' || tT === 'P';
-                    return true;
-                });
-            }
-            if (weekF !== 'ALL') {
-                filtered = filtered.filter(t => {
-                    const ts = t.sip_timestamp || t.timestamp;
-                    if (!ts) return false;
-                    const d = new Date(t.sip_timestamp ? ts / 1000000 : ts * 1000);
-                    const day = d.getDay() || 7;
-                    if (day !== 1) d.setDate(d.getDate() - (day - 1));
-                    const monStr = (d.getMonth() + 1) + '/' + d.getDate();
-                    return monStr === weekF;
-                });
-            }
-            renderFishTable(filtered, fishTickerSelect.value);
-            fishStatusEl.textContent = `FILTERED: ${filtered.length} TRADES`;
-        }
 
         function renderFishTable(trades, ticker) {
             fishTbody.innerHTML = '';
@@ -3169,11 +3232,10 @@
                 const price = trade.price || trade.p;
                 const size = trade.size || trade.s;
                 const cost = trade.notional_value || (price * size * 100);
-                if (cost < 50000) return;
 
                 const tsMs = trade.sip_timestamp ? (Number(trade.sip_timestamp) / 1000000) : (Number(trade.timestamp) * 1000);
                 const d = new Date(tsMs);
-                const dateStr = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+                const dateStr = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${String(d.getFullYear()).slice(-2)}`;
                 const timeStr = d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
                 let costStr = cost >= 1000000 ? `$${(cost / 1000000).toFixed(2)}M` : `$${(cost / 1000).toFixed(1)}k`;
@@ -3203,27 +3265,70 @@
                 }
 
                 const conds = (trade.conditions || trade.condition || trade.c || []);
-                const isSweep = Array.isArray(conds) ? conds.some(c => c === 233 || c === 'I' || c === 'Sweep' || c === 'F') : (conds === 233 || conds === 'I');
+                // Codes: 14, 219, 228, 230 are ISO/Sweeps. 'F' is legacy char.
+                const isSweep = Array.isArray(conds) ? conds.some(c => [14, 219, 228, 230, 'F', 'SWEEP', 'I'].includes(c)) : [14, 219, 228, 230, 'F', 'SWEEP', 'I'].includes(conds);
+                const isAuto = Array.isArray(conds) ? conds.includes(209) : conds === 209;
+                const isMulti = Array.isArray(conds) ? conds.includes(233) : conds === 233;
+
+                // Side Display with bid/ask (Moved up for logic)
+                const tradeSide = trade.side || 'NEUTRAL';
+
+                // Smart Sentiment Logic
+                let sentimentHtml = '';
+                if (tradeSide === 'BUY') {
+                    // Bought Call = Bullish, Bought Put = Bearish
+                    sentimentHtml = isCall ? '<span class="tag-bullish">BULLISH</span>' : '<span class="tag-bearish">BEARISH</span>';
+                } else if (tradeSide === 'SELL') {
+                    // Sold Call = Bearish, Sold Put = Bullish
+                    sentimentHtml = isCall ? '<span class="tag-bearish">BEARISH</span>' : '<span class="tag-bullish">BULLISH</span>';
+                } else {
+                    // Neutral Side
+                    sentimentHtml = '<span class="tag-neutral" style="background: #444; color: #aaa; padding: 2px 5px; border-radius: 4px; font-size: 9px; font-weight: bold;">NEUTRAL</span>';
+                }
+
                 if (isSweep) tags += '<span class="badge-sweep">SWEEP <span style="color: #ffff00;">⚡</span></span>';
-                tags += isCall ? '<span class="tag-bullish">BULLISH</span>' : '<span class="tag-bearish">BEARISH</span>';
+                if (isMulti) tags += '<span class="badge-multi" style="background: #9d00ff; color: #fff; padding: 2px 4px; border-radius: 4px; font-size: 8px; margin-right: 3px; font-weight: bold;">MULTI</span>';
+                if (isAuto) tags += '<span class="badge-auto" style="background: #0085ff; color: #fff; padding: 2px 4px; border-radius: 4px; font-size: 8px; margin-right: 3px; font-weight: bold;">AUTO</span>';
+
+                tags += sentimentHtml;
+                const bidVal = trade.bid ? `$${trade.bid.toFixed(2)}` : '—';
+                const askVal = trade.ask ? `$${trade.ask.toFixed(2)}` : '—';
+                let sideHtml = '';
+                if (tradeSide === 'BUY') {
+                    sideHtml = `<div><span style="background: linear-gradient(180deg, #00cc66 0%, #009944 100%); color: #fff; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold;">BUY</span></div>
+                                <div style="font-size: 9px; color: #888; margin-top: 3px; font-weight: bold;">@ $${price.toFixed(2)}</div>`;
+                } else if (tradeSide === 'SELL') {
+                    sideHtml = `<div><span style="background: linear-gradient(180deg, #ff4466 0%, #cc2244 100%); color: #fff; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold;">SELL</span></div>
+                                <div style="font-size: 9px; color: #888; margin-top: 3px; font-weight: bold;">@ $${price.toFixed(2)}</div>`;
+                } else {
+                    sideHtml = `<div><span style="background: #333; color: #888; font-size: 9px; padding: 2px 8px; border-radius: 4px;">—</span></div>
+                                <div style="font-size: 9px; color: #888; margin-top: 3px; font-weight: bold;">@ $${price.toFixed(2)}</div>`;
+                }
 
                 const tr = document.createElement('tr');
                 if (tags.includes('ITM')) tr.classList.add('itm-row');
                 tr.innerHTML = `
                     <td class="code"><b>${trade.ticker || ticker}</b> <span class="${isCall ? 'type-c' : 'type-p'}">$${trade.strike}${isCall ? 'C' : 'P'}</span></td>
-                    <td class="code">${dateStr} <small style="color:#555">${timeStr}</small></td>
+                    <td class="code" style="line-height: 1.2;">
+                        <div>${dateStr}</div>
+                        <div style="font-size: 9px; color: #666;">${timeStr}</div>
+                    </td>
                     <td class="code" style="line-height: 1.1;">
                         ${size}
                         <div style="font-size: 8px; color: #666; letter-spacing: 0.5px;">CONTRACTS</div>
                     </td>
                     <td class="code">${rowExp}</td>
-                    <td class="${isCall ? 'premium-call' : 'premium-put'}"><b>${costStr}</b></td>
+                    <td class="${isCall ? 'premium-call' : 'premium-put'}">
+                        <b>${costStr}</b>
+                        <div style="font-size: 9px; opacity: 0.8;">@ $${price.toFixed(2)}</div>
+                    </td>
+                    <td class="code side-cell" data-tooltip="${trade.bid && trade.ask ? `Bid: $${trade.bid.toFixed(2)} | Ask: $${trade.ask.toFixed(2)}` : ''}">${sideHtml}</td>
                     <td class="code">${isDP ? '<span class="tag-dark-pool">DARK POOL</span>' : '🇺🇸'}</td>
                     <td style="text-align: right;">${tags}</td>
                 `;
                 fishTbody.appendChild(tr);
             });
-            if (!fishTbody.children.length) fishTbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px; color: #444;">NO TRADES OVER $50k FOUND</td></tr>';
+            if (!fishTbody.children.length) fishTbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 40px; color: #444;">NO TRADES FOUND</td></tr>';
         }
 
         function populateFishWeeks(trades) {

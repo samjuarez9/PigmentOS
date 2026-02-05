@@ -2070,9 +2070,38 @@ def handle_massive_ws_msg(msgs):
             is_sweep = conditions and (233 in conditions or 30 in conditions)
             is_block = size >= 500
             
-            # Simplified ASK/BID side logic
-            side = "BUY" if is_sweep else "SELL" # Simplified heuristic
-            bid, ask = price, price # WebSocket doesn't yield quotes here
+            # BID/ASK side logic using Massive Quotes API
+            bid, ask = 0, 0
+            side = "NEUTRAL"
+            
+            try:
+                # Fetch latest quote from Massive API for accurate side detection
+                quote_url = f"https://api.massive.com/v3/quotes/{symbol}"
+                quote_resp = requests.get(quote_url, params={"apiKey": MASSIVE_API_KEY, "limit": 1}, timeout=2)
+                
+                if quote_resp.ok:
+                    quote_data = quote_resp.json()
+                    quotes = quote_data.get("results", [])
+                    if quotes:
+                        latest = quotes[-1]
+                        # Massive API uses: bid_price, ask_price
+                        bid = float(latest.get("bid_price", 0) or 0)
+                        ask = float(latest.get("ask_price", 0) or 0)
+                        
+                        # Determine side based on where trade price falls vs bid/ask
+                        if bid > 0 and ask > 0:
+                            mid = (bid + ask) / 2
+                            if price >= ask:
+                                side = "BUY"  # Bought at/above ask (aggressive buyer)
+                            elif price <= bid:
+                                side = "SELL"  # Sold at/below bid (aggressive seller)
+                            elif price > mid:
+                                side = "BUY"  # Above mid = leaning buyer
+                            else:
+                                side = "SELL"  # Below mid = leaning seller
+            except:
+                # Fallback to sweep-based heuristic if quote fetch fails
+                side = "BUY" if is_sweep else "SELL"
             
             tags = []
             if is_sweep: tags.append("SWEEP")
@@ -4651,19 +4680,24 @@ if not hasattr(start_background_worker, '_started') and not os.environ.get('GUNI
 @app.route('/api/library/options')
 def api_library_options():
     """
-    Fetch full option chain snapshots for a specific ticker (0-30 DTE) from Alpaca.
-    Used for the "Upcoming Options Library" visualization (Trade List).
+    Fetch option trades for a specific ticker using MASSIVE API.
+    Used for the Fish Finder visualization.
+    
+    Flow:
+    1. Get option chain snapshot from Massive
+    2. Fetch trades for each contract
+    3. Get quotes for bid/ask side detection
     """
     symbol = request.args.get('symbol')
     if not symbol:
         return jsonify({"error": "Symbol required"}), 400
         
-    if not ALPACA_API_KEY or not ALPACA_SECRET_KEY:
-        return jsonify({"error": "Alpaca API key missing"}), 500
+    if not MASSIVE_API_KEY:
+        return jsonify({"error": "MASSIVE_API_KEY not configured"}), 500
 
-    # Cache Key (Symbol + Date + Hour to keep it relatively fresh but cached)
+    # Cache Key
     current_time = time.time()
-    cache_key = f"library_alpaca_{symbol}_v4"
+    cache_key = f"library_massive_{symbol}_v1"
     
     global LIBRARY_CACHE
     if 'LIBRARY_CACHE' not in globals():
@@ -4671,41 +4705,109 @@ def api_library_options():
         
     if cache_key in LIBRARY_CACHE:
         cached = LIBRARY_CACHE[cache_key]
-        if current_time - cached['timestamp'] < 300: # 5 min cache for rate limit safety
+        if current_time - cached['timestamp'] < 300:  # 5 min cache
             return jsonify(cached['data'])
 
     try:
-        # Use Trade-by-Trade API instead of Snapshots for accurate intel
-        headers = {
-            "APCA-API-KEY-ID": ALPACA_API_KEY,
-            "APCA-API-SECRET-KEY": ALPACA_SECRET_KEY,
-            "Accept": "application/json"
-        }
-        
         tz_eastern = pytz.timezone('US/Eastern')
         now_et = datetime.now(tz_eastern)
         
-        # Get current stock price for moneyness calculation
+        # 1. Get current stock price from Massive
         current_price = 0
         try:
-            stock_url = f"https://data.alpaca.markets/v2/stocks/{symbol}/trades/latest"
-            stock_resp = requests.get(stock_url, headers=headers, timeout=5)
-            if stock_resp.status_code == 200:
-                stock_data = stock_resp.json()
-                current_price = float(stock_data.get('trade', {}).get('p', 0) or 0)
+            price_url = f"https://api.massive.com/v2/last/trade/{symbol}"
+            price_resp = requests.get(price_url, params={"apiKey": MASSIVE_API_KEY}, timeout=5)
+            if price_resp.ok:
+                price_data = price_resp.json()
+                current_price = float(price_data.get("results", {}).get("price", 0) or 
+                                     price_data.get("results", {}).get("p", 0) or 0)
         except:
             pass
+            
+        # Fallback to Polygon/YFinance if Massive price fails (common 403 error)
+        if not current_price:
+            current_price = get_polygon_price(symbol) or 0
         
-        # First, get snapshots to find all active option contracts for this symbol
-        snapshot_url = f"{ALPACA_DATA_URL}/snapshots/{symbol}"
-        snapshot_resp = requests.get(snapshot_url, headers=headers, params={"limit": 500}, timeout=15)
+        # 2. Get option chain snapshot from Massive (Split Calls/Puts to ensure coverage)
+        chain_url = f"https://api.massive.com/v3/snapshot/options/{symbol}"
         
-        if snapshot_resp.status_code != 200:
-            return jsonify({"error": f"Alpaca Snapshot Error: {snapshot_resp.status_code}"}), 500
+        # User Filters (Pre-Scan)
+        expiry_filter = request.args.get('expiry', 'all') 
+        money_filter = request.args.get('moneyness', 'all')
+        type_filter = request.args.get('type', 'all') # call, put, all
         
-        snapshots = snapshot_resp.json().get("snapshots", {})
+        # Base Params
+        params = {"apiKey": MASSIVE_API_KEY, "limit": 250}
         
-        # Helper to parse OCC
+        # GLOBAL MIN QTY (Noise Reduction)
+        params["size.gte"] = 50
+        
+        # 1. EXPIRY FILTER
+        if expiry_filter != 'all':
+            today = datetime.now().date()
+            if expiry_filter == 'near': # 0-7 Days
+                params["expiration_date.lte"] = (today + timedelta(days=7)).strftime("%Y-%m-%d")
+            elif expiry_filter == 'mid': # 7-45 Days
+                params["expiration_date.gte"] = (today + timedelta(days=7)).strftime("%Y-%m-%d")
+                params["expiration_date.lte"] = (today + timedelta(days=45)).strftime("%Y-%m-%d")
+            elif expiry_filter == 'far': # 45+ Days
+                params["expiration_date.gte"] = (today + timedelta(days=45)).strftime("%Y-%m-%d")
+
+        # 2. MONEYNESS FILTER (Smart Strike)
+        if current_price and current_price > 0:
+            if money_filter == 'atm': # +/- 5%
+                params["strike_price.gte"] = int(current_price * 0.95)
+                params["strike_price.lte"] = int(current_price * 1.05)
+            elif money_filter == 'otm': # Calls > Price, Puts < Price (Handled in type fetch)
+                 pass 
+            elif money_filter == 'itm':
+                 pass
+            else:
+                 # DEFAULT: +/- 35%
+                 strike_min = int(current_price * 0.65)
+                 strike_max = int(current_price * 1.35)
+                 params["strike_price.gte"] = strike_min
+                 params["strike_price.lte"] = strike_max
+                 if current_price < 20: 
+                    params.pop("strike_price.gte", None)
+                    params.pop("strike_price.lte", None)
+
+        # Helper to fetch by type
+        def fetch_chain_type(ctype):
+            try:
+                p = params.copy()
+                p["contract_type"] = ctype
+                
+                # Apply Type-Specific Moneyness
+                if money_filter == 'otm' and current_price:
+                    if ctype == 'call': p["strike_price.gte"] = current_price
+                    if ctype == 'put':  p["strike_price.lte"] = current_price
+                elif money_filter == 'itm' and current_price:
+                    if ctype == 'call': p["strike_price.lte"] = current_price
+                    if ctype == 'put':  p["strike_price.gte"] = current_price
+                    
+                r = requests.get(chain_url, params=p, timeout=15)
+                if r.ok: return r.json().get("results", [])
+            except: pass
+            return []
+
+        import concurrent.futures
+        # Execute Fetch based on Type Filter
+        results = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+             futures = []
+             if type_filter in ['all', 'call']:
+                 futures.append(executor.submit(fetch_chain_type, "call"))
+             if type_filter in ['all', 'put']:
+                 futures.append(executor.submit(fetch_chain_type, "put"))
+             
+             for f in concurrent.futures.as_completed(futures):
+                 results.extend(f.result() or [])
+        
+        if not results:
+            return jsonify({"error": f"No options found for {symbol}"}), 404
+        
+        # Parse OCC symbol helper
         def parse_occ(sym):
             try:
                 clean = sym.replace("O:", "")
@@ -4720,194 +4822,302 @@ def api_library_options():
                 day = int(date_str[4:6])
                 expiry = f"{year}-{month:02d}-{day:02d}"
                 return {"expiry": expiry, "type": "CALL" if put_call == "C" else "PUT", "strike": strike}
-            except: return None
+            except: 
+                return None
         
-        # Filter contracts: 0-30 DTE only
+        # 3. Filter contracts by DTE (0-30 days)
         valid_contracts = []
-        for option_symbol in snapshots.keys():
-            parsed = parse_occ(option_symbol)
-            if not parsed: continue
+        for item in results:
+            # Handle both nested and flat response structures
+            ticker = item.get("details", {}).get("ticker") or item.get("ticker")
+            if not ticker:
+                continue
+                
+            parsed = parse_occ(ticker)
+            if not parsed:
+                continue
             
             try:
                 expiry_date = datetime.strptime(parsed['expiry'], "%Y-%m-%d").date()
                 days_to_expiry = (expiry_date - now_et.date()).days
-                if 0 <= days_to_expiry <= 30:
-                    valid_contracts.append(option_symbol)
+                # Removed 30-day limit to see all expiries (LEAPS etc)
+                if days_to_expiry >= 0:
+                    valid_contracts.append({
+                        "ticker": ticker,
+                        "parsed": parsed,
+                        "greeks": item.get("greeks", {}),
+                        "last_quote": item.get("last_quote", {})
+                    })
             except:
                 continue
         
-        # Fetch trades for valid contracts (in batches to avoid URL length limits) AND PARALLELIZE
-        all_trades = []
-        batch_size = 20  # Alpaca allows multiple symbols per request
+        print(f"🐟 Massive: Found {len(valid_contracts)} contracts for {symbol} (0-30 DTE)")
         
-        # 30-day lookback for stateless history
-        start_date = (now_et - timedelta(days=30)).strftime("%Y-%m-%dT00:00:00Z")
+        # 4. Fetch trades for contracts (batch in parallel)
+        MIN_PREMIUM = 0  # Removed filter
+        MIN_SIZE = 50     # Global Min Qty for Noise Reduction
         
-        batches = []
-        for i in range(0, len(valid_contracts), batch_size):
-            batches.append(valid_contracts[i:i+batch_size])
-
-        def fetch_batch_trades(batch_symbols):
-            """Helper to fetch a single batch of trades"""
-            if not batch_symbols: return []
+        start_date = (now_et - timedelta(days=30)).strftime("%Y-%m-%d")
+        
+        def fetch_contract_trades(contract_info):
+            """Fetch trades for a single contract from Massive"""
+            ticker = contract_info["ticker"]
+            parsed = contract_info["parsed"]
+            greeks = contract_info["greeks"]
+            last_quote = contract_info["last_quote"]
             
-            symbols_param = ",".join(batch_symbols)
-            trades_url = "https://data.alpaca.markets/v1beta1/options/trades"
-            params = {
-                "symbols": symbols_param,
-                "start": start_date,
-                "limit": 1000
-            }
-            
-            local_trades = []
+            trades_list = []
             try:
-                # Short timeout per batch
-                trades_resp = requests.get(trades_url, headers=headers, params=params, timeout=10)
-                if trades_resp.status_code == 200:
-                    trades_data = trades_resp.json().get("trades", {})
-                    for option_symbol, trades in trades_data.items():
-                        for trade in trades:
-                            local_trades.append({
-                                "symbol": option_symbol,
-                                "price": float(trade.get("p", 0)),
-                                "size": int(trade.get("s", 0)),
-                                "timestamp": trade.get("t", ""),
-                                "condition": trade.get("c", ""),
-                                "exchange": trade.get("x", "")
-                            })
-            except Exception as e:
-                print(f"Trade fetch error for batch: {e}")
-            
-            return local_trades
-
-        # Run batches in parallel
-        # Max workers = 5 to be safe with Alpaca rate limits (200 requests/min is standard, we are doing heavy queries)
-        # 5 workers * 20 symbols = 100 symbols concurrently
-        import concurrent.futures
-        
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            future_to_batch = {executor.submit(fetch_batch_trades, batch): batch for batch in batches}
-            
-            for future in concurrent.futures.as_completed(future_to_batch):
+                # Ensure O: prefix for Massive
+                massive_ticker = ticker if ticker.startswith("O:") else f"O:{ticker}"
+                
+                trades_url = f"https://api.massive.com/v3/trades/{massive_ticker}"
+                trades_resp = requests.get(trades_url, params={
+                    "apiKey": MASSIVE_API_KEY,
+                    "timestamp.gte": start_date,
+                    "limit": 1000,
+                    "order": "desc"
+                }, timeout=10)
+                
+                if not trades_resp.ok:
+                    return []
+                
+                trades_data = trades_resp.json()
+                raw_trades = trades_data.get("results", [])
+                
+                if not raw_trades:
+                    return []
+                
+                # Get historical quotes for the same time range as trades
+                # This allows matching each trade to the quote at that time
+                quotes_list = []
                 try:
-                    batch_trades = future.result()
-                    all_trades.extend(batch_trades)
-                except Exception as exc:
-                    print(f"Batch execution exception: {exc}")
-
-        # Process trades: calculate premium, filter by size, etc.
-        MIN_PREMIUM = 50000  # $50k minimum per trade for significant flow
-        MIN_SIZE = 10    # Minimum contracts per trade (relaxed to catch high-premium trades)
-        
-        # Group trades by contract to apply Tick Test
-        trades_by_contract = {}
-        for trade in all_trades:
-            option_symbol = trade["symbol"]
-            if option_symbol not in trades_by_contract:
-                trades_by_contract[option_symbol] = []
-            trades_by_contract[option_symbol].append(trade)
-            
-        processed_trades = []
-        
-        for option_symbol, contract_trades in trades_by_contract.items():
-            # Sort trades for this contract by timestamp (ascending) for Tick Test
-            contract_trades.sort(key=lambda x: x.get("t", ""))
-            
-            last_price = None
-            last_side = "BUY" # Default starting side
-            
-            parsed = parse_occ(option_symbol)
-            if not parsed:
-                continue
-                
-            snapshot = snapshots.get(option_symbol, {})
-            quote = snapshot.get("latestQuote", {})
-            bid = float(quote.get("bp", 0) or 0)
-            ask = float(quote.get("ap", 0) or 0)
-            
-            # Get Delta from Greeks (Alpaca provides this in snapshots)
-            greeks = snapshot.get("greeks", {})
-            contract_delta = float(greeks.get("delta", 0) or 0)
-            
-            for trade in contract_trades:
-                price = float(trade["price"])
-                size = int(trade["size"])
-                premium = price * size * 100
-                
-                if premium < MIN_PREMIUM or size < MIN_SIZE:
-                    last_price = price # Still update price for tick test
-                    continue
-                
-                # Parse timestamp
-                try:
-                    trade_dt = datetime.fromisoformat(trade["timestamp"].replace("Z", "+00:00"))
-                    trade_dt_et = trade_dt.astimezone(tz_eastern)
-                    trade_time_display = trade_dt_et.strftime("%H:%M:%S")
-                    timestamp = trade_dt_et.timestamp()
-                    is_recent = (now_et - trade_dt_et).total_seconds() < 900 # Last 15 minutes
-                except:
-                    trade_time_display = "N/A"
-                    timestamp = 0
-                    is_recent = False
-                
-                # Side is no longer calculated (removed side cache system)
-                side = None
-                
-                # Calculate moneyness
-                moneyness = None
-                if current_price > 0:
-                    strike = parsed['strike']
-                    is_call = parsed['type'] == 'CALL'
-                    pct_diff = abs(strike - current_price) / current_price * 100
+                    quote_url = f"https://api.massive.com/v3/quotes/{massive_ticker}"
+                    quote_resp = requests.get(quote_url, params={
+                        "apiKey": MASSIVE_API_KEY,
+                        "timestamp.gte": start_date,
+                        "limit": 5000,  # Get enough quotes to cover trades
+                        "order": "asc"  # Sorted by time for binary search
+                    }, timeout=10)
                     
-                    if pct_diff <= 1:
-                        moneyness = "ATM"
-                    elif (is_call and strike < current_price) or (not is_call and strike > current_price):
-                        moneyness = "ITM"
+                    if quote_resp.ok:
+                        quote_data = quote_resp.json()
+                        quotes_list = quote_data.get("results", [])
+                except Exception as e:
+                    print(f"🐟 Quote fetch error for {ticker}: {e}")
+                
+                # Sort quotes by timestamp for binary search
+                quotes_sorted = sorted(quotes_list, key=lambda q: q.get("sip_timestamp", 0))
+                quote_timestamps = [q.get("sip_timestamp", 0) for q in quotes_sorted]
+                
+                import bisect
+                
+                def find_nearest_quote(trade_ts_ns):
+                    """Find the quote closest to the trade timestamp using binary search."""
+                    if not quotes_sorted:
+                        return None
+                    
+                    # Find insertion point
+                    idx = bisect.bisect_left(quote_timestamps, trade_ts_ns)
+                    
+                    # Check neighbors to find closest
+                    candidates = []
+                    if idx > 0:
+                        candidates.append(idx - 1)
+                    if idx < len(quotes_sorted):
+                        candidates.append(idx)
+                    
+                    if not candidates:
+                        return None
+                    
+                    # Return the closest one
+                    closest_idx = min(candidates, key=lambda i: abs(quote_timestamps[i] - trade_ts_ns))
+                    return quotes_sorted[closest_idx]
+                
+                contract_delta = float(greeks.get("delta", 0) or 0)
+                
+                for trade in raw_trades:
+                    price = float(trade.get("price", 0))
+                    size = int(trade.get("size", 0))
+                    premium = price * size * 100
+                    
+                    if premium < MIN_PREMIUM or size < MIN_SIZE:
+                        continue
+                    
+                    # Parse timestamp (nanoseconds to seconds)
+                    sip_ts = trade.get("sip_timestamp", 0)
+                    try:
+                        timestamp = sip_ts / 1_000_000_000  # ns to seconds
+                        trade_dt = datetime.fromtimestamp(timestamp, tz_eastern)
+                        trade_time_display = trade_dt.strftime("%H:%M:%S")
+                    except:
+                        timestamp = 0
+                        trade_time_display = "N/A"
+                    
+                    # Find the quote at the time of this trade
+                    matched_quote = find_nearest_quote(sip_ts)
+                    
+                    bid, ask = 0, 0
+                    if matched_quote:
+                        bid = float(matched_quote.get("bid_price", 0) or 0)
+                        ask = float(matched_quote.get("ask_price", 0) or 0)
                     else:
-                        moneyness = "OTM"
-                
-                trade_data = {
-                    "ticker": symbol,
-                    "strike": parsed['strike'],
-                    "type": parsed['type'],
-                    "expiry": parsed['expiry'],
-                    "premium": f"${premium:,.0f}",
-                    "size": size,
-                    "price": price,
-                    "timestamp": timestamp,
-                    "timeStr": trade_time_display,
-                    "notional_value": premium,
-                    "moneyness": moneyness,
-                    "is_sweep": trade["condition"] == "I",
-                    "is_mega_whale": size >= 500,
-                    "side": side,
-                    "condition": trade["condition"],
-                    "exchange": trade["exchange"],
-                    "delta": contract_delta,  # Delta from Alpaca Greeks
-                    "is_lotto": abs(contract_delta) < 0.20 # Lotto Logic
-                }
+                        # Fallback to last_quote from snapshot if no historical quote found
+                        bid = float(last_quote.get("bid_price", 0) or last_quote.get("bp", 0) or 0)
+                        ask = float(last_quote.get("ask_price", 0) or last_quote.get("ap", 0) or 0)
                     
-                processed_trades.append(trade_data)
+                    # Determine side based on trade price vs bid/ask at that time
+                    side = "NEUTRAL"
+                    if bid > 0 and ask > 0:
+                        mid = (bid + ask) / 2
+                        if price >= ask:
+                            side = "BUY"   # Bought at/above ask (aggressive buyer)
+                        elif price <= bid:
+                            side = "SELL"  # Sold at/below bid (aggressive seller)
+                        elif price > mid:
+                            side = "BUY"   # Above mid = leaning buyer
+                        else:
+                            side = "SELL"  # Below mid = leaning seller
+                    
+                    # Calculate moneyness
+                    moneyness = None
+                    if current_price > 0:
+                        strike = parsed['strike']
+                        is_call = parsed['type'] == 'CALL'
+                        pct_diff = abs(strike - current_price) / current_price * 100
+                        
+                        if pct_diff <= 1:
+                            moneyness = "ATM"
+                        elif (is_call and strike < current_price) or (not is_call and strike > current_price):
+                            moneyness = "ITM"
+                        else:
+                            moneyness = "OTM"
+                    
+                    conditions = trade.get("conditions", [])
+                    # Correct codes for Intermarket Sweep Orders (ISO): 14, 219, 228, 230
+                    is_sweep = any(c in conditions for c in [14, 219, 228, 230])
+                    
+                    trades_list.append({
+                        "ticker": symbol,
+                        "strike": parsed['strike'],
+                        "type": parsed['type'],
+                        "expiry": parsed['expiry'],
+                        "premium": premium,  # Send raw number, frontend formats it
+                        "size": size,
+                        "price": price,
+                        "timestamp": timestamp,
+                        "sip_timestamp": sip_ts,
+                        "timeStr": trade_time_display,
+                        "notional_value": premium,
+                        "moneyness": moneyness,
+                        "is_sweep": is_sweep,
+                        "is_mega_whale": size >= 500,
+                        "side": side,
+                        "bid": bid,
+                        "ask": ask,
+                        "condition": conditions[0] if conditions else "",
+                        "exchange": trade.get("exchange", ""),
+                        "delta": contract_delta,
+                        "is_lotto": abs(contract_delta) < 0.20
+                    })
+                    
+            except Exception as e:
+                print(f"🐟 Trade fetch error for {ticker}: {e}")
+            
+            return trades_list
         
-        # Sort by timestamp descending (most recent first) for display
-        processed_trades.sort(key=lambda x: x['timestamp'], reverse=True)
+        # 5. Run in parallel (limit workers to avoid rate limiting)
+        all_trades = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [executor.submit(fetch_contract_trades, c) for c in valid_contracts]
+            for f in concurrent.futures.as_completed(futures):
+                all_trades.extend(f.result())
         
-        # Filter: Only show trades from current year (2026)
+        # --- NEW: ENRICH WITH HISTORICAL SPOT PRICE ---
+        if all_trades and POLYGON_API_KEY:
+            try:
+                # Fetch 5-minute bars for the underlying symbol for the last 30 days
+                # This matches the trade fetch window but is much faster/lighter than 1-minute
+                print(f"🐟 Fetching historical spot prices for {symbol}...")
+                history = fetch_polygon_historical_aggs(symbol, timespan="minute", multiplier=5, limit=50000, days=30)
+                
+                if history:
+                    # Create a sorted list of (timestamp, price) tuples
+                    # Polygon timestamps are in milliseconds
+                    spot_map = [] 
+                    for bar in history:
+                        ts = bar.get("t") # millis
+                        c = bar.get("c") # close price
+                        if ts and c:
+                            spot_map.append((ts, c))
+                    
+                    spot_map.sort(key=lambda x: x[0])
+                    spot_times = [x[0] for x in spot_map]
+                    
+                    import bisect
+                    
+                    for trade in all_trades:
+                        # Trade timestamp is in seconds or nanoseconds. 
+                        # We need milliseconds to match Polygon.
+                        trade_ts_ms = 0
+                        if trade.get("sip_timestamp"):
+                             trade_ts_ms = trade["sip_timestamp"] / 1_000_000
+                        elif trade.get("timestamp"):
+                             trade_ts_ms = trade["timestamp"] * 1000
+                        
+                        if trade_ts_ms > 0:
+                            # Find closest bar
+                            idx = bisect.bisect_left(spot_times, trade_ts_ms)
+                            
+                            # Check neighbors
+                            best_price = None
+                            min_diff = float('inf')
+                            
+                            candidates = []
+                            if idx < len(spot_map): candidates.append(idx)
+                            if idx > 0: candidates.append(idx - 1)
+                            
+                            for i in candidates:
+                                ts_bar, price_bar = spot_map[i]
+                                diff = abs(ts_bar - trade_ts_ms)
+                                if diff < min_diff:
+                                    min_diff = diff
+                                    best_price = price_bar
+                            
+                            # Only accept if within 5 minutes (300000 ms) to avoid matching gaps
+                            if min_diff < 300000:
+                                trade["underlying_price"] = best_price
+            except Exception as e:
+                print(f"🐟 Spot price enrichment failed: {e}")
+        # ---------------------------------------------
+        # (Duplicate execution logic removed)
+        
+        # Sort by timestamp descending
+        all_trades.sort(key=lambda x: x['timestamp'], reverse=True)
+        
+        # Filter current year only
         current_year = now_et.year
-        processed_trades = [t for t in processed_trades if datetime.fromtimestamp(t['timestamp'], tz_eastern).year == current_year]
+        all_trades = [t for t in all_trades if t['timestamp'] > 0 and 
+                      datetime.fromtimestamp(t['timestamp'], tz_eastern).year == current_year]
         
-        # Cache Result
+        print(f"🐟 Massive: Returning {len(all_trades)} trades for {symbol}")
+        
+        # Cache result
         LIBRARY_CACHE[cache_key] = {
             "timestamp": current_time,
-            "data": {"data": processed_trades, "current_price": current_price}
+            "data": {"data": all_trades, "current_price": current_price}
         }
         
-        return jsonify({"data": processed_trades, "current_price": current_price})
+        return jsonify({"data": all_trades, "current_price": current_price})
 
     except Exception as e:
-        print(f"Library Fetch Error: {e}")
+        print(f"🐟 Library Fetch Error: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+
+
+
 
 
 
@@ -4977,6 +5187,141 @@ def get_fish_history(optionsTicker):
     except Exception as e:
         print(f"🐟 Fish History Error: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+# === MASSIVE QUOTES API PROXY (FISH FINDER) ===
+@app.route('/api/fish/quotes/<path:optionsTicker>')
+def get_fish_quotes(optionsTicker):
+    """
+    Proxy to Massive API for quote history.
+    Used to determine bid/ask side for trades.
+    """
+    if not MASSIVE_API_KEY:
+        return jsonify({"error": "MASSIVE_API_KEY not configured"}), 500
+
+    try:
+        url = f"https://api.massive.com/v3/quotes/{optionsTicker}"
+        
+        params = request.args.to_dict()
+        params['apiKey'] = MASSIVE_API_KEY 
+        
+        resp = requests.get(url, params=params, timeout=10)
+        
+        if resp.ok:
+            return jsonify(resp.json())
+        else:
+            return jsonify({"error": f"Massive API Error: {resp.status_code}"}), resp.status_code
+
+    except Exception as e:
+        print(f"🐟 Fish Quotes Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/fish/trades-enriched/<path:optionsTicker>')
+def get_fish_trades_enriched(optionsTicker):
+    """
+    Fetch trades AND enrich with bid/ask side from quotes.
+    This combines trades + quotes for accurate BUY/SELL detection.
+    """
+    if not MASSIVE_API_KEY:
+        return jsonify({"error": "MASSIVE_API_KEY not configured"}), 500
+
+    try:
+        # 1. Fetch trades
+        trades_url = f"https://api.massive.com/v3/trades/{optionsTicker}"
+        params = request.args.to_dict()
+        params['apiKey'] = MASSIVE_API_KEY
+        
+        trades_resp = requests.get(trades_url, params=params, timeout=10)
+        if not trades_resp.ok:
+            return jsonify({"error": "Failed to fetch trades"}), trades_resp.status_code
+        
+        trades_data = trades_resp.json()
+        trades = trades_data.get("results", [])
+        
+        if not trades:
+            return jsonify(trades_data)
+        
+        # 2. Fetch quotes for the same time range
+        quotes_url = f"https://api.massive.com/v3/quotes/{optionsTicker}"
+        quotes_params = {"apiKey": MASSIVE_API_KEY, "limit": 500}
+        
+        # If trades have timestamps, use them to bound quote query
+        if trades:
+            first_ts = trades[0].get("t", 0)
+            last_ts = trades[-1].get("t", 0)
+            if first_ts and last_ts:
+                quotes_params["timestamp.gte"] = min(first_ts, last_ts) - 60000  # 1 min before
+                quotes_params["timestamp.lte"] = max(first_ts, last_ts) + 60000  # 1 min after
+        
+        quotes_resp = requests.get(quotes_url, params=quotes_params, timeout=10)
+        quotes = quotes_resp.json().get("results", []) if quotes_resp.ok else []
+        
+        # 3. Build quote lookup (by timestamp)
+        # Sort quotes by timestamp for binary search
+        quotes_sorted = sorted(quotes, key=lambda q: q.get("t", 0))
+        
+        def find_nearest_quote(trade_ts):
+            """Find the quote closest to the trade timestamp."""
+            if not quotes_sorted:
+                return None
+            
+            # Simple linear search for closest (could optimize with bisect)
+            closest = None
+            min_diff = float('inf')
+            for q in quotes_sorted:
+                diff = abs(q.get("t", 0) - trade_ts)
+                if diff < min_diff:
+                    min_diff = diff
+                    closest = q
+                # If we've passed the trade time, we can stop
+                if q.get("t", 0) > trade_ts and closest:
+                    break
+            return closest
+        
+        def determine_side(price, bid, ask):
+            """Determine if trade is BUY or SELL based on bid/ask."""
+            if bid <= 0 or ask <= 0:
+                return "NEUTRAL"
+            mid = (bid + ask) / 2
+            if price >= ask:
+                return "BUY"  # Bought at/above ask (aggressive buyer)
+            elif price <= bid:
+                return "SELL"  # Sold at/below bid (aggressive seller)
+            elif price > mid:
+                return "BUY"  # Above mid = leaning buyer
+            else:
+                return "SELL"  # Below mid = leaning seller
+        
+        # 4. Enrich trades with side
+        enriched_trades = []
+        for trade in trades:
+            trade_ts = trade.get("t", 0)
+            trade_price = float(trade.get("p", 0))
+            
+            quote = find_nearest_quote(trade_ts)
+            if quote:
+                # Massive API uses: bid_price, ask_price
+                bid = float(quote.get("bid_price", 0) or 0)
+                ask = float(quote.get("ask_price", 0) or 0)
+                side = determine_side(trade_price, bid, ask)
+                trade["bid"] = bid
+                trade["ask"] = ask
+                trade["side"] = side
+            else:
+                trade["bid"] = 0
+                trade["ask"] = 0
+                trade["side"] = "NEUTRAL"
+            
+            enriched_trades.append(trade)
+        
+        trades_data["results"] = enriched_trades
+        return jsonify(trades_data)
+
+    except Exception as e:
+        print(f"🐟 Fish Enriched Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     # Start background worker

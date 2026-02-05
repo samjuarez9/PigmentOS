@@ -1,406 +1,43 @@
 ✅ Firebase Admin SDK initialized successfully
 📂 Loaded 50 whale trades from cache (Filtered <= 30 DTE)
-📅 Weekend - skipping whale fetch (using cached data)
-   Cached whale trades available: 50
-📅 Weekend - skipping whale fetch (using cached data)
-   Cached whale trades available: 50
-📊 Fetching daily activity for WATCHLIST (18 tickers)...
+🌙 Market closed - minimal startup (using cached data)
+📂 Loaded 50 whale trades from cache (Filtered <= 30 DTE)
+🌙 Market closed - minimal startup (using cached data)
+📡 Connecting to Massive WS for all option trades...
+📊 Fetching daily activity for WHALE_WATCHLIST (16 tickers)...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:06:18 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'c4999e5199ef6cc9f3b73225288d8e01', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
 ✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
 ✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
+✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
 ✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
+✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
+✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
 ✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
-✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
-✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
-✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
-✅ Loaded 16 historical trades for demo.
+📡 Connecting to Massive WS for all option trades...
+✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
+⚠️ Finnhub News: HTTP 401
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:06:28 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '2d0dbc913595ef5abfb1fbe8e481acd4', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+⚠️ Finnhub News: HTTP 401
+Polygon: Post-5PM - using next expiry 2026-02-05 for SPY
+Polygon: Post-5PM - using next expiry 2026-02-05 for SPY
+Polygon: Fetched 128 contracts for SPY (exp: 2026-02-05)
+Gamma: Using Polygon.io for SPY
+Polygon: Fetched 128 contracts for SPY (exp: 2026-02-05)
+Gamma: Using Polygon.io for SPY
+✅ Loaded 47 historical trades for demo.
 🚀 PigmentOS Server running on port 8001
  * Serving Flask app 'run'
  * Debug mode: on
-⚠️ Finnhub News: HTTP 401
 [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on all addresses (0.0.0.0)
  * Running on http://127.0.0.1:8001
  * Running on http://192.168.1.131:8001
 [33mPress CTRL+C to quit[0m
-✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
-Polygon: Weekend - using next trading day 2026-02-02 for SPY
-⚠️ Finnhub News: HTTP 401
-127.0.0.1 - - [01/Feb/2026 17:17:58] "GET /api/demo/stream HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:18:29] "GET /api/fish/trades/O:SPY251219C00500000 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:18:46] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:18:46] "[36mGET /demo3_fish_history.html HTTP/1.1[0m" 304 -
-127.0.0.1 - - [01/Feb/2026 17:19:38] "[36mGET / HTTP/1.1[0m" 304 -
-127.0.0.1 - - [01/Feb/2026 17:19:38] "[36mGET /styles.css?v=3.20 HTTP/1.1[0m" 304 -
-127.0.0.1 - - [01/Feb/2026 17:19:38] "[36mGET /assets/polymarket_logo.png HTTP/1.1[0m" 304 -
-127.0.0.1 - - [01/Feb/2026 17:19:38] "[36mGET /app.js?v=3.30 HTTP/1.1[0m" 304 -
-127.0.0.1 - - [01/Feb/2026 17:19:38] "GET /api/ping HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:19:38] "GET /api/status HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:19:38] "GET /api/whales/stream HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:19:38] "GET /api/polymarket HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:19:39] "GET /api/news HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:19:40] "GET /api/heatmap HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:19:40] "GET /api/gamma?symbol=SPY HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:19:41] "GET /api/cnn-fear-greed HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:19:43] "GET /api/movers HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:19:43] "[36mGET /unusual_flow HTTP/1.1[0m" 304 -
-127.0.0.1 - - [01/Feb/2026 17:21:00] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:21:00] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 17:24:08] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:24:15] "GET /api/fish/trades/O:AMD260206C00240000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:24:30] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 17:26:07] "GET /api/status HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:26:50] "GET /api/flow/contracts?ticker=NVDA HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:27:09] "GET /api/fish/trades/O:NVDA260202C00155000?limit=2 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:31:47] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:31:47] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 17:31:50] "GET /api/flow/contracts?ticker=AMZN HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:31:51] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:31:58] "GET /api/fish/trades/O:AMD260206C00240000?limit=100 HTTP/1.1" 200 -
-Polygon: Weekend - using next trading day 2026-02-02 for SPY
-Polygon: Fetched 134 contracts for SPY (exp: 2026-02-02)
-Gamma: Using Polygon.io for SPY
-Polygon: Fetched 134 contracts for SPY (exp: 2026-02-02)
-Gamma: Using Polygon.io for SPY
-📡 Connecting to Polygon WS (Trades) for 18 tickers using API Key: z5qc...jdlw
-📊 Movers: Fetched 23 tickers via yfinance
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 476 contracts for NVDA (strike: $153-$229, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 620 contracts for AMZN (strike: $191-$287, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
-✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
-✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
-✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
-✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
-✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
-✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
-✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
-⚠️ Finnhub News: HTTP 401
-⚠️ Finnhub News: HTTP 401
-127.0.0.1 - - [01/Feb/2026 17:34:23] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:34:23] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 17:34:27] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:34:36] "GET /api/fish/trades/O:AMD260206C00240000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:35:24] "GET /api/fish/trades/O:NVDA260202C00155000?limit=1 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:37:39] "GET /api/flow/contracts?ticker=AMZN HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:37:49] "GET /api/flow/snapshot/O:AMZN260206C00250000 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:37:49] "GET /api/flow/vol_oi_history/O:AMZN260206C00250000?days=6&interval=1d HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:38:16] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:38:16] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 17:38:20] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:38:27] "GET /api/fish/trades/O:AMD260206C00240000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:39:11] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:39:11] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 17:39:14] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:39:19] "GET /api/fish/trades/O:AMD260206C00240000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:40:37] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:40:37] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 17:40:40] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:40:45] "GET /api/fish/trades/O:AMD260206C00240000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:42:38] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:42:38] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 17:42:41] "GET /api/flow/contracts?ticker=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:42:49] "GET /api/fish/trades/O:GOOGL260206C00340000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:42:51] "GET /api/fish/trades/O:GOOGL260206C00340000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:42:55] "GET /api/fish/trades/O:GOOGL260206C00350000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:43:01] "GET /api/fish/trades/O:GOOGL260206C00310000?limit=100 HTTP/1.1" 200 -
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 620 contracts for AMZN (strike: $191-$287, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 786 contracts for GOOGL (strike: $270-$406, exp: 2026-02-01 to 2026-04-02)
-✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
-✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
-✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
-✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
-✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
-✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
-✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
-✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
-⚠️ Finnhub News: HTTP 401
-⚠️ Finnhub News: HTTP 401
-127.0.0.1 - - [01/Feb/2026 17:48:15] "GET /api/fish/trades/O:GOOGL260206P00310000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:48:23] "GET /api/fish/trades/O:GOOGL260206P00360000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:48:26] "GET /api/fish/trades/O:GOOGL260206C00360000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:48:29] "GET /api/fish/trades/O:GOOGL260206C00355000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:48:31] "GET /api/fish/trades/O:GOOGL260206C00352500?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:49:46] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:49:46] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 17:49:50] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:49:58] "GET /api/fish/trades/O:AMD260206C00250000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:50:01] "GET /api/fish/trades/O:AMD260206P00250000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:50:05] "GET /api/fish/trades/O:AMD260206P00240000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:50:07] "GET /api/fish/trades/O:AMD260206C00240000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:51:44] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:51:44] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 17:51:47] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:51:55] "GET /api/fish/trades/O:AMD260206C00220000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:51:58] "GET /api/fish/trades/O:AMD260206C00222500?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:01] "GET /api/fish/trades/O:AMD260206C00225000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:03] "GET /api/fish/trades/O:AMD260206C00227500?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:05] "GET /api/fish/trades/O:AMD260206C00232500?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:06] "GET /api/fish/trades/O:AMD260206C00237500?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:10] "GET /api/fish/trades/O:AMD260206P00245000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:11] "GET /api/fish/trades/O:AMD260206P00242500?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:13] "GET /api/fish/trades/O:AMD260206P00240000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:17] "GET /api/fish/trades/O:AMD260206P00260000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:25] "GET /api/fish/trades/O:AMD260206C00260000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:31] "GET /api/fish/trades/O:AMD260206C00275000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:34] "GET /api/fish/trades/O:AMD260206C00282500?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:36] "GET /api/fish/trades/O:AMD260206C00275000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:38] "GET /api/fish/trades/O:AMD260206C00270000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:40] "GET /api/fish/trades/O:AMD260206C00262500?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:42] "GET /api/fish/trades/O:AMD260206C00252500?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:44] "GET /api/fish/trades/O:AMD260206C00250000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:46] "GET /api/fish/trades/O:AMD260206C00245000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:47] "GET /api/fish/trades/O:AMD260206C00242500?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:49] "GET /api/fish/trades/O:AMD260206C00237500?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:52] "GET /api/fish/trades/O:AMD260206C00220000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:54] "GET /api/fish/trades/O:AMD260206C00217500?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:52:57] "GET /api/fish/trades/O:AMD260206C00200000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:53:23] "GET /api/fish/trades/O:AMD260306C00240000?limit=100 HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:56:55] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:56:55] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 17:56:59] "GET /api/flow/contracts?ticker=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:57:02] "GET /api/library/options?symbol=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:57:02] "GET /api/library/options?symbol=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:57:06] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 17:58:27] "GET /api/library/options?symbol=AAPL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:59:10] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:59:10] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 17:59:10] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 17:59:18] "GET /api/flow/contracts?ticker=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 17:59:20] "GET /api/library/options?symbol=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:01:35] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:01:35] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:01:39] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:01:43] "GET /api/library/options?symbol=AMD HTTP/1.1" 200 -
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 786 contracts for GOOGL (strike: $270-$406, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 786 contracts for GOOGL (strike: $270-$406, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
-✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
-✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
-✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
-✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
-✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
-✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
-✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
-⚠️ Finnhub News: HTTP 401
-⚠️ Finnhub News: HTTP 401
-127.0.0.1 - - [01/Feb/2026 18:03:40] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:03:40] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:03:44] "GET /api/flow/contracts?ticker=MU HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:03:48] "GET /api/library/options?symbol=MU HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:08:36] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:08:36] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:08:39] "GET /api/flow/contracts?ticker=META HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:08:42] "GET /api/library/options?symbol=META HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:12:24] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:12:24] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:12:27] "GET /api/flow/contracts?ticker=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:12:30] "GET /api/library/options?symbol=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:14:48] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:14:48] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:14:51] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:14:56] "GET /api/library/options?symbol=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:17:19] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:17:19] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:17:24] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:17:24] "GET /api/library/options?symbol=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:18:03] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:18:03] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-Flow Contracts: Found 612 contracts for MU (strike: $332-$498, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 1600 contracts for META (strike: $573-$860, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 786 contracts for GOOGL (strike: $270-$406, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
-✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
-✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
-✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
-✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
-✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
-✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
-✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
-⚠️ Finnhub News: HTTP 401
-⚠️ Finnhub News: HTTP 401
-127.0.0.1 - - [01/Feb/2026 18:18:12] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:18:17] "GET /api/library/options?symbol=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:19:34] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:19:34] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:19:38] "GET /api/flow/contracts?ticker=NVDA HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:19:42] "GET /api/library/options?symbol=NVDA HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:21:55] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:21:55] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:21:59] "GET /api/flow/contracts?ticker=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:22:02] "GET /api/library/options?symbol=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:26:10] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:26:10] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:26:13] "GET /api/library/options?symbol=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:26:13] "GET /api/flow/contracts?ticker=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:32:09] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:32:09] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:32:12] "GET /api/flow/contracts?ticker=META HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:32:15] "GET /api/library/options?symbol=META HTTP/1.1" 200 -
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 476 contracts for NVDA (strike: $153-$229, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 786 contracts for GOOGL (strike: $270-$406, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 786 contracts for GOOGL (strike: $270-$406, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 1600 contracts for META (strike: $573-$860, exp: 2026-02-01 to 2026-04-02)
-✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
-✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
-✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
-✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
-✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
-✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
-✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
-✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
-⚠️ Finnhub News: HTTP 401
-⚠️ Finnhub News: HTTP 401
-127.0.0.1 - - [01/Feb/2026 18:33:19] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:33:19] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:33:23] "GET /api/flow/contracts?ticker=MU HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:33:27] "GET /api/library/options?symbol=MU HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:33:41] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:33:41] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:33:44] "GET /api/flow/contracts?ticker=INTC HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:33:47] "GET /api/library/options?symbol=INTC HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:34:02] "GET /api/library/options?symbol=INTC HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:34:04] "GET /api/library/options?symbol=INTC HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:34:06] "GET /api/library/options?symbol=INTC HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:34:08] "GET /api/library/options?symbol=INTC HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:38:01] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:38:01] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:38:04] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:38:08] "GET /api/library/options?symbol=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:39:24] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:39:24] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:39:27] "GET /api/flow/contracts?ticker=AAPL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:39:28] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:39:29] "GET /api/library/options?symbol=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:44:28] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:44:29] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:44:31] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:44:35] "GET /api/library/options?symbol=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:45:57] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:45:57] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:46:00] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:46:00] "GET /api/library/options?symbol=AMD HTTP/1.1" 200 -
-Flow Contracts: Found 612 contracts for MU (strike: $332-$498, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 312 contracts for INTC (strike: $37-$56, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 650 contracts for AAPL (strike: $208-$311, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
-✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
-✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
-✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
-✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
-✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
-✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
-✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
-⚠️ Finnhub News: HTTP 401
-⚠️ Finnhub News: HTTP 401
-127.0.0.1 - - [01/Feb/2026 18:48:56] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:48:56] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:48:59] "GET /api/flow/contracts?ticker=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:49:02] "GET /api/library/options?symbol=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:50:01] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:50:02] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:50:05] "GET /api/flow/contracts?ticker=META HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:50:08] "GET /api/library/options?symbol=META HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:51:56] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:51:56] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:51:59] "GET /api/flow/contracts?ticker=MU HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:52:02] "GET /api/library/options?symbol=MU HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:52:10] "GET /api/library/options?symbol=MU HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:53:40] "GET /api/flow/contracts?ticker=PLTR HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:53:44] "GET /api/library/options?symbol=PLTR HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:53:53] "GET /api/flow/contracts?ticker=MU HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:53:53] "GET /api/library/options?symbol=MU HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:54:55] "GET /api/library/options?symbol=MU HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:54:59] "GET /api/library/options?symbol=MU HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:55:54] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:55:54] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:56:02] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:58:59] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 18:58:59] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 18:59:07] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:00:21] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:00:21] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 19:00:24] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:01:17] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:01:17] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 19:01:48] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:01:48] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 19:01:52] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:01:55] "GET /api/library/options?symbol=AMD HTTP/1.1" 200 -
-Flow Contracts: Found 786 contracts for GOOGL (strike: $270-$406, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 1600 contracts for META (strike: $573-$860, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 612 contracts for MU (strike: $332-$498, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 326 contracts for PLTR (strike: $117-$176, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 612 contracts for MU (strike: $332-$498, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
-✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
-✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
-✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
-✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
-✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
-✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
-✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
-⚠️ Finnhub News: HTTP 401
-⚠️ Finnhub News: HTTP 401
-127.0.0.1 - - [01/Feb/2026 19:04:07] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:04:07] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 19:04:10] "GET /api/flow/contracts?ticker=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:04:12] "GET /api/library/options?symbol=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:05:00] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:05:00] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 19:05:03] "GET /api/flow/contracts?ticker=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:05:03] "GET /api/library/options?symbol=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:06:19] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:06:19] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 19:06:22] "GET /api/library/options?symbol=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:06:22] "GET /api/flow/contracts?ticker=AMD HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:08:49] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:08:49] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 19:08:53] "GET /api/flow/contracts?ticker=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:08:53] "GET /api/library/options?symbol=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:11:52] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:11:52] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 19:11:55] "GET /api/flow/contracts?ticker=AMZN HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:11:58] "GET /api/library/options?symbol=AMZN HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:12:09] "GET /api/library/options?symbol=AMZN HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:12:31] "GET /api/flow/contracts?ticker=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:12:34] "GET /api/library/options?symbol=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:13:15] "GET /demo3_fish_history.html HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:13:15] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
-127.0.0.1 - - [01/Feb/2026 19:13:17] "GET /api/flow/contracts?ticker=GOOGL HTTP/1.1" 200 -
-127.0.0.1 - - [01/Feb/2026 19:13:18] "GET /api/library/options?symbol=GOOGL HTTP/1.1" 200 -
-Flow Contracts: Found 786 contracts for GOOGL (strike: $270-$406, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 786 contracts for GOOGL (strike: $270-$406, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 346 contracts for AMD (strike: $189-$284, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 786 contracts for GOOGL (strike: $270-$406, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 620 contracts for AMZN (strike: $191-$287, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 786 contracts for GOOGL (strike: $270-$406, exp: 2026-02-01 to 2026-04-02)
-Flow Contracts: Found 786 contracts for GOOGL (strike: $270-$406, exp: 2026-02-01 to 2026-04-02)
-✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
-✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
-✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
-✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
-✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
-✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
-✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
-✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
-⚠️ Finnhub News: HTTP 401
-⚠️ Finnhub News: HTTP 401
+127.0.0.1 - - [04/Feb/2026 23:06:29] "GET /unusual_flow HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:06:29] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+127.0.0.1 - - [04/Feb/2026 23:07:25] "GET /api/library/options?symbol=GOOGL&expiry=all&moneyness=all&type=all HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:07:37] "GET /unusual_flow HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:07:37] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+127.0.0.1 - - [04/Feb/2026 23:07:41] "GET /api/flow/contracts?ticker=SNDK HTTP/1.1" 200 -
