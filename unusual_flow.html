@@ -1854,6 +1854,14 @@
                             <option value="250">250+ CONTRACTS</option>
                         </select>
 
+                        <select id="fishMinPremiumFilter"
+                            style="background: #222; border: 1px solid #444; color: #ffcc00; padding: 5px; border-radius: 4px; font-size: 11px; height: 29px; font-weight: bold;">
+                            <option value="50000" selected>PREM: $50k+ (Global)</option>
+                            <option value="100000">$100k+</option>
+                            <option value="250000">$250k+</option>
+                            <option value="500000">$500k+</option>
+                        </select>
+
                         <button id="scanFishBtn"
                             style="background: #0085ff; border: none; color: #fff; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; font-size: 11px; height: 29px;">
                             SCAN
@@ -3137,6 +3145,7 @@
         const fishMoneyFilter = document.getElementById('fishMoneyFilter');
         const fishTypeFilter = document.getElementById('fishTypeFilter');
         const fishMinSizeFilter = document.getElementById('fishMinSizeFilter');
+        const fishMinPremiumFilter = document.getElementById('fishMinPremiumFilter');
 
         // Secondary filter selects (post-scan)
         const fishExpirySelect = document.getElementById('fish-expiry-select');
@@ -3157,6 +3166,7 @@
                 const mon = fishMoneyFilter ? fishMoneyFilter.value : 'all';
                 const type = fishTypeFilter ? fishTypeFilter.value : 'all';
                 const minSize = fishMinSizeFilter ? fishMinSizeFilter.value : '50';
+                const minPrem = fishMinPremiumFilter ? fishMinPremiumFilter.value : '50000';
 
                 fishStatusEl.textContent = `SCANNING ${ticker}... THIS MAY TAKE A MINUTE`;
                 fishTbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px;"><div class="loading-spinner-small" style="margin: 0 auto;"></div><div style="margin-top: 10px; font-size: 11px; color: #666;">🐷 Fetching trades... this may take a minute</div></td></tr>';
@@ -3164,7 +3174,7 @@
 
                 try {
                     // Pass filters to backend
-                    const res = await fetch(`${API_BASE_URL}/api/library/options?symbol=${ticker}&expiry=${exp}&moneyness=${mon}&type=${type}&minSize=${minSize}`);
+                    const res = await fetch(`${API_BASE_URL}/api/library/options?symbol=${ticker}&expiry=${exp}&moneyness=${mon}&type=${type}&minSize=${minSize}&minPremium=${minPrem}`);
                     const json = await res.json();
                     if (json.error) throw new Error(json.error);
 
@@ -3175,11 +3185,16 @@
                         document.getElementById('fish-spot-price').textContent = `SPOT: $${json.current_price.toFixed(2)}`;
                     }
 
-                    // Render
-                    renderFishTable(allScanData, ticker);
+                    // Populate Expiries for secondary filter (Internal only now)
+                    populateFishExpiries(allScanData);
 
                     // Re-enable type buttons
+                    fishTypeCallBtn.disabled = false;
+                    fishTypePutBtn.disabled = false;
+                    fishTypeAnyBtn.disabled = false;
 
+                    // Render
+                    applyFishFilters(); // Initial render with filters applied
 
                     // Update Status
                     fishStatusEl.innerHTML = `<span style="color:#00cc66">SCAN COMPLETE</span> (${allScanData.length} records)`;
@@ -3190,6 +3205,21 @@
                     fishTbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color: #ff4444;">Scan Failed</td></tr>';
                 }
             });
+        }
+
+        function applyFishFilters() {
+            if (!allScanData) return;
+
+            const expFilter = fishExpirySelect.value;
+            // Week filter logic would go here if implemented, for now ignoring or just passthrough
+
+            let filtered = allScanData.filter(t => {
+                if (expFilter !== 'ALL' && t.expiry !== expFilter) return false;
+                return true;
+            });
+
+            const ticker = fishTickerInput ? fishTickerInput.value : '';
+            renderFishTable(filtered, ticker);
         }
 
         // Filter Buttons (Fish Finder)
@@ -3339,7 +3369,7 @@
                     <td class="${isCall ? 'premium-call' : 'premium-put'}">
                         <b>${costStr}</b>
                     </td>
-                    <td class="code side-cell" data-tooltip="${trade.bid && trade.ask ? `Bid: $${trade.bid.toFixed(2)} | Ask: $${trade.ask.toFixed(2)}` : ''}">${sideHtml}</td>
+                    <td class="code side-cell" data-tooltip="${(trade.bid !== undefined || trade.ask !== undefined) ? `Bid: $${(trade.bid || 0).toFixed(2)} | Ask: $${(trade.ask || 0).toFixed(2)}` : ''}">${sideHtml}</td>
                     <td style="text-align: right;">${tags}</td>
                 `;
                 fishTbody.appendChild(tr);
