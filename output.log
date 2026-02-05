@@ -418,3 +418,5 @@ Flow Contracts: Found 740 contracts for GOOGL (strike: $266-$400, exp: 2026-02-0
 🔌 Massive WS Closed: None - None
 📡 Connecting to Massive WS for all option trades...
 127.0.0.1 - - [04/Feb/2026 23:25:30] "GET /api/library/options?symbol=GOOGL&expiry=near&moneyness=atm&type=all HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:27:46] "GET /unusual_flow HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:27:46] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
