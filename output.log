@@ -41,3 +41,267 @@ Gamma: Using Polygon.io for SPY
 127.0.0.1 - - [04/Feb/2026 23:07:37] "GET /unusual_flow HTTP/1.1" 200 -
 127.0.0.1 - - [04/Feb/2026 23:07:37] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
 127.0.0.1 - - [04/Feb/2026 23:07:41] "GET /api/flow/contracts?ticker=SNDK HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:08:47] "GET /api/library/options?symbol=SNDK&expiry=all&moneyness=all&type=all HTTP/1.1" 200 -
+🐟 Massive: Found 500 contracts for GOOGL (0-30 DTE)
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:06:38 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '04cbe90749175175ded24f66f77c640a', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:06:48 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '815d7da3fc67a46b389d3e3215c20d78', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:06:58 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'e8c9a3825f75ddecc6f7fef3348ca084', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:07:09 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'bf73e017e6dde8e8be750ac5f3667766', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:07:19 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'b73e3528bf9452f378b395b23e2d8e40', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+🐟 Fetching historical spot prices for GOOGL...
+🐟 Massive: Returning 1101 trades for GOOGL
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:07:29 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '8046c1006bf5b091f39170650653a0c9', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:07:39 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '04f5d240c16b35cb69b28d6345409126', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+Flow Contracts: Found 842 contracts for SNDK (strike: $468-$701, exp: 2026-02-04 to 2026-04-05)
+🐟 Massive: Found 500 contracts for SNDK (0-30 DTE)
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:07:49 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'db874876c3772d6fe823e85349fd008d', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:07:59 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '5800733413ec6ebb3f76f859281b5188', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:08:10 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '877168b2b39727f3670d9c680be2332b', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:08:20 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '6ac9daec6d20e0faac6ef61b00be1bce', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:08:30 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'c9a2559cdee4be463107e4b64209dfae', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:08:40 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '742ebd1a941078aaa3a825fe797d5440', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+🐟 Fetching historical spot prices for SNDK...
+🐟 Massive: Returning 689 trades for SNDK
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:08:50 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '630c286237a93b3af9bdb33be0121c26', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:09:00 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '80a02f1ceaa460a6348f3c5c3e8109e8', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:09:10 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'f470b25105b7aef3498053402aa000c1', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:09:20 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'a7333938c92997c1f9953e2daf890bb9', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:09:31 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '49b77a22933ca0feb96e9443006dbdc0', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+127.0.0.1 - - [04/Feb/2026 23:10:38] "[36mGET / HTTP/1.1[0m" 304 -
+127.0.0.1 - - [04/Feb/2026 23:10:38] "[36mGET /app.js?v=3.30 HTTP/1.1[0m" 304 -
+127.0.0.1 - - [04/Feb/2026 23:10:38] "[36mGET /styles.css?v=3.20 HTTP/1.1[0m" 304 -
+127.0.0.1 - - [04/Feb/2026 23:10:38] "[36mGET /assets/polymarket_logo.png HTTP/1.1[0m" 304 -
+127.0.0.1 - - [04/Feb/2026 23:10:38] "GET /api/status HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:10:38] "GET /api/ping HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:10:38] "GET /api/whales/stream HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:10:38] "GET /api/polymarket HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:10:39] "GET /api/movers HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:10:40] "GET /api/news HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:10:41] "GET /api/heatmap HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:10:41] "GET /api/gamma?symbol=SPY HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:10:41] "[36mGET /unusual_flow HTTP/1.1[0m" 304 -
+127.0.0.1 - - [04/Feb/2026 23:10:42] "GET /api/cnn-fear-greed HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:10:45] "GET /api/flow/contracts?ticker=INTC HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:10:46] "GET /api/flow/contracts?ticker=AMZN HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:10:48] "GET /api/flow/contracts?ticker=GOOGL HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:10:58] "GET /api/flow/snapshot/O:GOOGL260206C00330000 HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:10:58] "GET /api/flow/vol_oi_history/O:GOOGL260206C00330000?days=6&interval=1d HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:11:00] "GET /api/flow/vol_oi_history/O:GOOGL260206C00330000?days=3&interval=5m HTTP/1.1" 200 -
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:09:41 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'f47ab854e6baa68e398935b7184d1727', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:09:51 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'a9471d5bfe6333e3baf4daef28fb893d', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:10:01 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '49526c049342b9b20527882168b92454', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:10:11 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '838fa3f960cdaaf258acc0180423bfbd', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:10:21 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '9b959063541a663ed08d99bbae13fc64', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:10:31 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '45bbd4c7e207c1b835308cd94e0c279a', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+🔄 Starting background movers fetch...
+📡 Connecting to Massive WS for all option trades...
+✅ Movers Updated: 23 tickers
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:10:43 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '5dd1b7ac3d0e90d8cc6200c7675accc7', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+Flow Contracts: Found 334 contracts for INTC (strike: $39-$58, exp: 2026-02-04 to 2026-04-05)
+Flow Contracts: Found 520 contracts for AMZN (strike: $186-$280, exp: 2026-02-04 to 2026-04-05)
+Flow Contracts: Found 740 contracts for GOOGL (strike: $266-$400, exp: 2026-02-04 to 2026-04-05)
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:10:54 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '9c8f257af888767ed102df9794765c59', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:11:04 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'ac910f91da8b47d1693c462975f66583', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:11:14 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '10b6fbcb12626118dfe71a39a9f8e9a8', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:11:24 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '2a7ea52f90708e66358f0c1230d085ef', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:11:34 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'a6fad761c10ce251d2c2585fe3f2c14b', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:11:44 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '8a4378e39ef93cff22b60049fd34f7a9', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:11:54 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'ce4d7b9b425c6f5687377316bca55628', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:12:05 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '040f30983df8349b09847fc4bb90ab65', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:12:15 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '27b1bc2c44891931cdcbd402b4676a01', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:12:25 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '2ed74bb16fc2e738fa7cce71667210c6', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:12:35 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'a19ac1105dee3dbe04884cfaa128629f', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:12:45 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'b418b7194901b9fc8bd6faabd58d3ee8', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:12:55 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '7dd0d8031c436251ee67b5d092c5c3a6', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:13:05 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'a450a8bef7773c0d6ce5433c88bfb410', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:13:15 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '8180ecc57b0f5152c76fb5bc6939f668', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:13:26 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '28a4a8b7689da44079d9076cbcaf6218', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:13:36 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'd3c91ee0f25b547491a3d418657acd8c', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:13:46 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'ab29ddc894ad7b5b5920d76c49cc6908', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:13:56 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '8071fbe946e68733a683bff6f2c86b76', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:14:06 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'bc7170ad7da595695aca4184f3525d40', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:14:16 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'e4ed0b09ab967ac82e1a55ebe6c04a5a', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:14:26 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '298ae8d7ccc40fb2873d3962a4834503', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:14:37 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'ff49224c31630c6b2a1977a29a333f18', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:14:47 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'ee53a8ae948eda09930bdfdb84f9d456', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:14:57 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '20b9817232c5b04b49a57422e3b3464d', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:15:07 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '2c04a5a5cbb96da4b9bf2f72c5fb26dd', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:15:17 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '1e6cc572f448742cd4824633972939ac', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:15:27 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '6f537be7c11a7e6a17721b8cb53b627e', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:15:37 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'b61157bc6d275bcfee50c366611e7edd', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:15:48 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '0d38087fe798d36fe7701ae033fbff3c', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:15:58 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '6746210a0602a6c5d2daeb20714c1bca', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:16:12 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '8cfc18e6be0e5014c6bcf92d97292b1c', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:16:22 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'e48540be29647ac0664996c5512aaacd', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:16:32 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '34d830dd28c5e9e84eefd5c64dd99fdd', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:16:42 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '544c74b24240de618140efd46ec9d015', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:16:52 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '3c50789d9a0069164e5ed32db6bd7efb', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:17:02 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '81b9f0450eaff2fad3d500419df3b97b', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:17:12 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '7e579718edcbbdecd63c86164cb1afc3', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:17:23 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '58c426892a712c79f7802270fa485578', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:17:33 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '8fcf6fc76d218a1ec4c0ee144205dc42', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:17:43 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '4219859e5d3182b5ff4e3b673b9a6e4d', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:17:53 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '06664b9a49250252af572d30efe31656', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:18:03 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '225d04293ecedb5e9099e7eca43c9d4a', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:18:13 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '719890143aad48101c02ae2678489ae7', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:18:23 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'a29aa8fdd95e8930e8894e592ab5471f', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:18:34 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'e21a26341d90e527e2dd927e79dad0c8', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:18:44 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '2f9526fc8c55c8cfb5ac43ae45a3c3ec', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:18:54 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '96faa288b023f8099961184e74511683', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Thu, 05 Feb 2026 04:19:04 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': 'b915c377c8f5df5605ff4138854d83bf', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+📡 Connecting to Massive WS for all option trades...
+127.0.0.1 - - [04/Feb/2026 23:19:28] "GET /unusual_flow HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:19:29] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+127.0.0.1 - - [04/Feb/2026 23:19:32] "GET /api/flow/contracts?ticker=GOOGL HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:19:41] "GET /api/flow/snapshot/O:GOOGL260206C00300000 HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:19:42] "GET /api/flow/vol_oi_history/O:GOOGL260206C00300000?days=6&interval=1d HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:19:45] "GET /api/flow/vol_oi_history/O:GOOGL260206C00300000?days=3&interval=5m HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:19:55] "GET /api/flow/snapshot/O:GOOGL260206C00330000 HTTP/1.1" 200 -
+127.0.0.1 - - [04/Feb/2026 23:19:56] "GET /api/flow/vol_oi_history/O:GOOGL260206C00330000?days=3&interval=5m HTTP/1.1" 200 -

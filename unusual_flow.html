@@ -2648,8 +2648,6 @@
                         const textSegments = [
                             { text: 'Avg Fill', color: '#D15CFF' },
                             { text: ' / ', color: '#555' },
-                            { text: 'VWAP', color: '#FFFF00' },
-                            { text: ' / ', color: '#555' },
                             { text: 'Avg Size', color: '#0085FF' }
                         ];
 
@@ -2921,26 +2919,13 @@
                 volumeChart.data.datasets = [
                     {
                         type: 'line',
-                        label: 'VWAP',
-                        data: vwapData,
-                        borderColor: '#FFFF00', // Yellow Dotted
-                        borderWidth: 1,
-                        borderDash: [4, 4], // Dotted
-                        pointRadius: 0,
-                        pointHoverRadius: 4,
-                        yAxisID: 'y1',
-                        order: 0
-                    },
-                    {
-                        type: 'line',
                         label: 'Price',
                         data: priceData,
                         borderColor: '#FF00FF', // Pink Price Line
-                        backgroundColor: 'rgba(255, 0, 255, 0.1)', // Pink Fill
                         borderWidth: 2,
                         pointRadius: 0,
                         tension: 0.1,
-                        fill: true,
+                        fill: false,
                         yAxisID: 'y1',
                         order: 1
                     },
@@ -2975,26 +2960,13 @@
                 volumeChart.data.datasets = [
                     {
                         type: 'line',
-                        label: 'VWAP',
-                        data: vwapData,
-                        borderColor: '#FFFF00', // Yellow Dotted
-                        borderWidth: 1,
-                        borderDash: [4, 4], // Dotted
-                        pointRadius: 0,
-                        pointHoverRadius: 4,
-                        yAxisID: 'y1',
-                        order: 0
-                    },
-                    {
-                        type: 'line',
                         label: 'Avg Fill',
                         data: priceData,
                         borderColor: '#FF00FF', // Pink Price Line
-                        backgroundColor: 'rgba(255, 0, 255, 0.1)', // Pink Fill
                         borderWidth: 2,
                         borderDash: [], // Solid line
                         pointRadius: 0,
-                        fill: true,
+                        fill: false,
                         tension: 0.1,
                         yAxisID: 'y1',
                         order: 1
