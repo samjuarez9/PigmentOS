@@ -3131,6 +3131,10 @@
         const fishMoneyFilter = document.getElementById('fishMoneyFilter');
         const fishTypeFilter = document.getElementById('fishTypeFilter'); // New Filter
 
+        // Secondary filter selects (post-scan)
+        const fishExpirySelect = document.getElementById('fish-expiry-select');
+        const fishWeekSelect = document.getElementById('fish-week-select');
+
         // ... (existing refs) ...
         const fishStatusEl = document.getElementById('fish-status');
         const fishTbody = document.getElementById('fish-trades-body');
@@ -3212,47 +3216,6 @@
                 } catch (err) { console.error(err); }
             });
         }
-
-        scanTickerBtn.addEventListener('click', async () => {
-            const ticker = fishTickerSelect.value;
-            if (!ticker) return;
-
-            fishStatusEl.textContent = `🐷 SCANNING ALL FLOW FOR ${ticker}... THIS MAY TAKE A MINUTE`;
-            fishTbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 40px;"><div class="loading-spinner-small" style="margin: 0 auto;"></div><div style="margin-top: 10px; font-size: 11px; color: #666;">🐷 Fetching trades... this may take a minute</div></td></tr>';
-
-            fishExpirySelect.disabled = true;
-            disableFishTypeButtons();
-
-            try {
-                const res = await fetch(`${API_BASE_URL}/api/library/options?symbol=${ticker}`);
-                const json = await res.json();
-                if (json.error) throw new Error(json.error);
-
-                allScanData = json.data || [];
-                allScanData.sort((a, b) => (b.sip_timestamp || b.timestamp) - (a.sip_timestamp || a.timestamp));
-
-                if (json.current_price) {
-                    window.currentSpotPrice = json.current_price;
-                    document.getElementById('fish-spot-price').textContent = `SPOT: $${json.current_price.toFixed(2)}`;
-                }
-
-                populateFishExpiries(allScanData);
-                populateFishWeeks(allScanData);
-                enableFishTypeButtons();
-
-                document.querySelectorAll('.secondary-filter-fish').forEach(el => el.style.display = 'flex');
-                const divider = document.getElementById('secondary-filter-fish-divider');
-                if (divider) divider.style.display = 'block';
-
-                renderFishTable(allScanData, ticker);
-                fishStatusEl.textContent = `SCAN COMPLETE: FOUND ${allScanData.length} SIGNIFICANT TRADES`;
-
-            } catch (err) {
-                console.error("Scan Error:", err);
-                fishStatusEl.textContent = `SCAN FAILED: ${err.message}`;
-                fishTbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: #ff5555; padding: 20px;">ERROR: ${err.message}</td></tr>`;
-            }
-        });
 
         function populateFishExpiries(trades) {
             const expiries = new Set();
