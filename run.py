@@ -4695,9 +4695,15 @@ def api_library_options():
     if not MASSIVE_API_KEY:
         return jsonify({"error": "MASSIVE_API_KEY not configured"}), 500
 
-    # Cache Key
+    # Get User Filters (Pre-Scan) - Need these for cache key
+    expiry_filter = request.args.get('expiry', 'all') 
+    money_filter = request.args.get('moneyness', 'all')
+    type_filter = request.args.get('type', 'all')
+    min_size_filter = request.args.get('minSize', '50')  # 50, 100, or 250
+    
+    # Cache Key - Include all filter params to ensure filtered results aren't cached together
     current_time = time.time()
-    cache_key = f"library_massive_{symbol}_v1"
+    cache_key = f"library_massive_{symbol}_type{type_filter}_exp{expiry_filter}_mon{money_filter}_size{min_size_filter}_v3"
     
     global LIBRARY_CACHE
     if 'LIBRARY_CACHE' not in globals():
@@ -4731,16 +4737,11 @@ def api_library_options():
         # 2. Get option chain snapshot from Massive (Split Calls/Puts to ensure coverage)
         chain_url = f"https://api.massive.com/v3/snapshot/options/{symbol}"
         
-        # User Filters (Pre-Scan)
-        expiry_filter = request.args.get('expiry', 'all') 
-        money_filter = request.args.get('moneyness', 'all')
-        type_filter = request.args.get('type', 'all') # call, put, all
-        
-        # Base Params
+        # Base Params (filter vars defined above for cache key)
         params = {"apiKey": MASSIVE_API_KEY, "limit": 250}
         
-        # GLOBAL MIN QTY (Noise Reduction)
-        params["size.gte"] = 50
+        # User-selected MIN QTY filter (50, 100, or 250)
+        params["size.gte"] = int(min_size_filter)
         
         # 1. EXPIRY FILTER
         if expiry_filter != 'all':
@@ -4855,7 +4856,7 @@ def api_library_options():
         
         # 4. Fetch trades for contracts (batch in parallel)
         MIN_PREMIUM = 0  # Removed filter
-        MIN_SIZE = 50     # Global Min Qty for Noise Reduction
+        MIN_SIZE = int(min_size_filter)  # User-selected min contracts (50, 100, or 250)
         
         start_date = (now_et - timedelta(days=30)).strftime("%Y-%m-%d")
         

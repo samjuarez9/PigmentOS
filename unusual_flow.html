@@ -1847,6 +1847,13 @@
                             <option value="put">PUTS ONLY</option>
                         </select>
 
+                        <select id="fishMinSizeFilter"
+                            style="background: #222; border: 1px solid #444; color: #aaa; padding: 5px; border-radius: 4px; font-size: 11px; height: 29px;">
+                            <option value="50" selected>50+ CONTRACTS</option>
+                            <option value="100">100+ CONTRACTS</option>
+                            <option value="250">250+ CONTRACTS</option>
+                        </select>
+
                         <button id="scanFishBtn"
                             style="background: #0085ff; border: none; color: #fff; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; font-size: 11px; height: 29px;">
                             SCAN
@@ -1906,13 +1913,12 @@
                         <th>EXPIRY</th>
                         <th>PREMIUM</th>
                         <th>SIDE</th>
-                        <th>EXCHANGE</th>
                         <th style="text-align: right;">TAGS</th>
                     </tr>
                 </thead>
                 <tbody id="fish-trades-body">
                     <tr>
-                        <td colspan="8"
+                        <td colspan="7"
                             style="text-align:center; padding: 40px; color: #444; font-family: var(--font-pixel); font-size: 10px;">
                             SELECT A TICKER AND HIT SCAN TO VIEW TRADES ($50k+).</td>
                     </tr>
@@ -3129,7 +3135,8 @@
 
         const fishExpiryFilter = document.getElementById('fishExpiryFilter');
         const fishMoneyFilter = document.getElementById('fishMoneyFilter');
-        const fishTypeFilter = document.getElementById('fishTypeFilter'); // New Filter
+        const fishTypeFilter = document.getElementById('fishTypeFilter');
+        const fishMinSizeFilter = document.getElementById('fishMinSizeFilter');
 
         // Secondary filter selects (post-scan)
         const fishExpirySelect = document.getElementById('fish-expiry-select');
@@ -3149,14 +3156,15 @@
                 const exp = fishExpiryFilter ? fishExpiryFilter.value : 'all';
                 const mon = fishMoneyFilter ? fishMoneyFilter.value : 'all';
                 const type = fishTypeFilter ? fishTypeFilter.value : 'all';
+                const minSize = fishMinSizeFilter ? fishMinSizeFilter.value : '50';
 
-                fishStatusEl.textContent = `🐷 SCANNING ${ticker}... THIS MAY TAKE A MINUTE`;
-                fishTbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 40px;"><div class="loading-spinner-small" style="margin: 0 auto;"></div><div style="margin-top: 10px; font-size: 11px; color: #666;">🐷 Fetching trades... this may take a minute</div></td></tr>';
+                fishStatusEl.textContent = `SCANNING ${ticker}... THIS MAY TAKE A MINUTE`;
+                fishTbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px;"><div class="loading-spinner-small" style="margin: 0 auto;"></div><div style="margin-top: 10px; font-size: 11px; color: #666;">🐷 Fetching trades... this may take a minute</div></td></tr>';
 
 
                 try {
                     // Pass filters to backend
-                    const res = await fetch(`${API_BASE_URL}/api/library/options?symbol=${ticker}&expiry=${exp}&moneyness=${mon}&type=${type}`);
+                    const res = await fetch(`${API_BASE_URL}/api/library/options?symbol=${ticker}&expiry=${exp}&moneyness=${mon}&type=${type}&minSize=${minSize}`);
                     const json = await res.json();
                     if (json.error) throw new Error(json.error);
 
@@ -3176,7 +3184,7 @@
                 } catch (err) {
                     console.error(err);
                     fishStatusEl.innerText = "Error: " + err.message;
-                    fishTbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color: #ff4444;">Scan Failed</td></tr>';
+                    fishTbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color: #ff4444;">Scan Failed</td></tr>';
                 }
             });
         }
@@ -3248,8 +3256,6 @@
                 const timeStr = d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
                 let costStr = cost >= 1000000 ? `$${(cost / 1000000).toFixed(2)}M` : `$${(cost / 1000).toFixed(1)}k`;
-                const exch = trade.exchange || trade.x;
-                const isDP = (exch == 0 || exch === 'OTC' || exch === 'TRF' || exch === 'D' || exch === '4' || exch === 'J' || exch === 'U');
 
                 const rType = trade.type || '';
                 const isCall = rType === 'CALL' || rType === 'call' || rType === 'C';
@@ -3331,12 +3337,11 @@
                         <b>${costStr}</b>
                     </td>
                     <td class="code side-cell" data-tooltip="${trade.bid && trade.ask ? `Bid: $${trade.bid.toFixed(2)} | Ask: $${trade.ask.toFixed(2)}` : ''}">${sideHtml}</td>
-                    <td class="code">${isDP ? '<span class="tag-dark-pool">DARK POOL</span>' : '🇺🇸'}</td>
                     <td style="text-align: right;">${tags}</td>
                 `;
                 fishTbody.appendChild(tr);
             });
-            if (!fishTbody.children.length) fishTbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 40px; color: #444;">NO TRADES FOUND</td></tr>';
+            if (!fishTbody.children.length) fishTbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px; color: #444;">NO TRADES FOUND</td></tr>';
         }
 
         function populateFishWeeks(trades) {
