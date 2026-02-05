@@ -4857,6 +4857,7 @@ def api_library_options():
         # 4. Fetch trades for contracts (batch in parallel)
         MIN_PREMIUM = 0  # Removed filter
         MIN_SIZE = int(min_size_filter)  # User-selected min contracts (50, 100, or 250)
+        print(f"🐟 MIN_SIZE filter set to: {MIN_SIZE} (from min_size_filter={min_size_filter})")
         
         start_date = (now_et - timedelta(days=30)).strftime("%Y-%m-%d")
         

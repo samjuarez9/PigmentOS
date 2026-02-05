@@ -3169,8 +3169,11 @@
                     if (json.error) throw new Error(json.error);
 
                     allScanData = json.data || []; // Correct key is 'data'
-                    // Update Spot
-                    if (json.current_price) document.getElementById('fish-spot-price').textContent = `SPOT: $${json.current_price.toFixed(2)}`;
+                    // Update Spot price for display AND for ITM/OTM/ATM tag calculation
+                    if (json.current_price) {
+                        window.currentSpotPrice = json.current_price;
+                        document.getElementById('fish-spot-price').textContent = `SPOT: $${json.current_price.toFixed(2)}`;
+                    }
 
                     // Render
                     renderFishTable(allScanData, ticker);
