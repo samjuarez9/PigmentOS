@@ -1103,6 +1103,80 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .selection-panel {
+                padding: 12px;
+                overflow: hidden;
+            }
+
+            .drill-down-row {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .select-group {
+                min-width: 100%;
+                width: 100%;
+            }
+
+            /* Fish Finder inline flex container */
+            #view-fish .drill-down-row>div[style*="display: flex"] {
+                flex-wrap: wrap !important;
+                gap: 8px !important;
+            }
+
+            /* Fish Finder filters - make them stack */
+            #fishTicker,
+            #fishExpiryFilter,
+            #fishMoneyFilter,
+            #fishTypeFilter,
+            #scanFishBtn {
+                width: 100% !important;
+                min-width: unset !important;
+            }
+
+            .styled-select {
+                font-size: 11px;
+                padding: 6px;
+            }
+
+            .strike-nav-wrapper {
+                width: 100%;
+            }
+
+            .type-toggle-wrapper {
+                width: 100%;
+            }
+
+            .go-btn {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .panel-title {
+                font-size: 10px;
+            }
+
+            .select-label {
+                font-size: 9px;
+            }
+
+            .styled-select {
+                font-size: 10px;
+                padding: 5px;
+            }
+
+            .title {
+                font-size: 12px;
+            }
+        }
     </style>
     <link
         href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;700&family=VT323&family=Space+Mono:wght@400;700&display=swap"
