@@ -3330,7 +3330,7 @@
                     // Sold Call = Bearish, Sold Put = Bullish
                     sentimentHtml = isCall ? '<span class="tag-bearish">BEARISH</span>' : '<span class="tag-bullish">BULLISH</span>';
                 } else {
-                    // Neutral Side
+                    // MID or NEUTRAL - can't determine intent
                     sentimentHtml = '<span class="tag-neutral" style="background: #444; color: #aaa; padding: 2px 5px; border-radius: 4px; font-size: 9px; font-weight: bold;">NEUTRAL</span>';
                 }
 
@@ -3348,8 +3348,11 @@
                 } else if (tradeSide === 'SELL') {
                     sideHtml = `<div><span style="background: linear-gradient(180deg, #ff4466 0%, #cc2244 100%); color: #fff; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold;">SELL</span></div>
                                 <div style="font-size: 9px; color: #888; margin-top: 3px; font-weight: bold;">@ $${price.toFixed(2)}</div>`;
+                } else if (tradeSide === 'MID') {
+                    sideHtml = `<div><span style="background: #444; color: #888; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold;">MID</span></div>
+                                <div style="font-size: 9px; color: #888; margin-top: 3px; font-weight: bold;">@ $${price.toFixed(2)}</div>`;
                 } else {
-                    sideHtml = `<div><span style="background: #333; color: #888; font-size: 9px; padding: 2px 8px; border-radius: 4px;">—</span></div>
+                    sideHtml = `<div><span style="background: #333; color: #666; font-size: 9px; padding: 2px 8px; border-radius: 4px;">—</span></div>
                                 <div style="font-size: 9px; color: #888; margin-top: 3px; font-weight: bold;">@ $${price.toFixed(2)}</div>`;
                 }
 

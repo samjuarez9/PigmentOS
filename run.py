@@ -2089,19 +2089,30 @@ def handle_massive_ws_msg(msgs):
                         ask = float(latest.get("ask_price", 0) or 0)
                         
                         # Determine side based on where trade price falls vs bid/ask
+                        # Industry-standard logic matching Unusual Whales / Cheddar Flow
                         if bid > 0 and ask > 0:
-                            mid = (bid + ask) / 2
-                            if price >= ask:
-                                side = "BUY"  # Bought at/above ask (aggressive buyer)
-                            elif price <= bid:
-                                side = "SELL"  # Sold at/below bid (aggressive seller)
-                            elif price > mid:
-                                side = "BUY"  # Above mid = leaning buyer
+                            spread = ask - bid
+                            TOLERANCE = 0.02  # 2 cent tolerance for edge cases
+                            
+                            if price >= ask - TOLERANCE:
+                                side = "BUY"  # At/above ask = aggressive buyer
+                            elif price <= bid + TOLERANCE:
+                                side = "SELL"  # At/below bid = aggressive seller
                             else:
-                                side = "SELL"  # Below mid = leaning seller
+                                # Calculate position in spread (0% = bid, 100% = ask)
+                                if spread > 0:
+                                    position_pct = (price - bid) / spread * 100
+                                    if position_pct >= 75:
+                                        side = "BUY"  # Upper quarter = leaning buyer
+                                    elif position_pct <= 25:
+                                        side = "SELL"  # Lower quarter = leaning seller
+                                    else:
+                                        side = "MID"  # Middle 50% = ambiguous
+                                else:
+                                    side = "MID"
             except:
-                # Fallback to sweep-based heuristic if quote fetch fails
-                side = "BUY" if is_sweep else "SELL"
+                # Fallback: can't determine side without quote
+                side = "MID"
             
             tags = []
             if is_sweep: tags.append("SWEEP")
@@ -2238,18 +2249,27 @@ def handle_polygon_ws_msg(msgs):
                     bid = float(quote.get("bP", 0) or 0)
                     ask = float(quote.get("aP", 0) or 0)
                     
+                    # Industry-standard MID logic
                     if bid > 0 and ask > 0:
-                        mid = (bid + ask) / 2
-                        if price >= ask:
+                        spread = ask - bid
+                        TOLERANCE = 0.02
+                        
+                        if price >= ask - TOLERANCE:
                             side = "BUY"
-                        elif price <= bid:
+                        elif price <= bid + TOLERANCE:
                             side = "SELL"
-                        elif price > mid:
-                            side = "BUY"
+                        elif spread > 0:
+                            position_pct = (price - bid) / spread * 100
+                            if position_pct >= 75:
+                                side = "BUY"
+                            elif position_pct <= 25:
+                                side = "SELL"
+                            else:
+                                side = "MID"
                         else:
-                            side = "SELL"
+                            side = "MID"
             except:
-                pass
+                side = "MID"
 
             # Construct Data Object
             data = {
