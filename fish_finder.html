@@ -978,7 +978,7 @@
                 document.querySelectorAll('.secondary-filter').forEach(el => el.style.display = '');
 
                 renderTable(allScanData, ticker);
-                statusEl.textContent = `SCAN COMPLETE: FOUND ${rawTrades.length} SIGNIFICANT TRADES`;
+                statusEl.innerHTML = `<span style="color:#00cc66">SCAN COMPLETE</span> (${rawTrades.length} whales 🐋)`;
 
             } catch (err) {
                 console.error("Scan Error:", err);
