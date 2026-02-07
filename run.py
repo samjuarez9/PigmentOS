@@ -162,7 +162,7 @@ def preview_page():
 WATCHLIST = [
     "NVDA", "TSLA", "AAPL", "MSFT", "AMZN", "META", "GOOGL", "GOOG",
     "AMD", "AVGO", "ARM", "SMCI", "MU", "INTC",
-    "PLTR", "SOFI", "RKLB", "ORCL"
+    "PLTR", "SOFI", "RKLB", "ORCL", "WDC"
 ]
 
 MEGA_WHALE_THRESHOLD = 8_000_000  # $8M
@@ -367,45 +367,58 @@ POLYGON_PRICE_CACHE_TTL = 180  # 3 minute TTL (safe with locking)
 POLYGON_PRICE_LOCK = threading.Lock()  # Prevent cache stampede
 
 def get_polygon_price(symbol):
-    """Get price for Gamma Wall and Unusual Whales.
+    """Get price for Gamma Wall, Unusual Whales, and Fish Finder.
     
-    PRIORITY Logic:
-    1. During Market Hours: Prefer yfinance/Cache (Real-time).
-    2. After Hours/Weekends: Prefer Polygon (Official Previous Close).
-    
-    This ensures GEX and Moneyness use the most 'responsive' price available.
+    PRIORITY Logic (Avoid yfinance rate limits):
+    1. Massive Options snapshot underlying_asset (Options Advanced plan included)
+    2. Fallback to yfinance (cached 15 min)
+    3. Final fallback to Polygon /prev (returns YESTERDAY's close)
     """
     global POLYGON_PRICE_CACHE
     
-    if not POLYGON_API_KEY:
-        return get_cached_price(symbol)
-    
     now = time.time()
-    is_live = is_currently_market_hours()
     
-    # 1. During market hours, yfinance/Cache is the primary source for real-time movement
-    # We bypass the Polygon /prev check to ensure we get live updates
-    if is_live:
-        price = get_cached_price(symbol)
-        if price:
-            return price
-
-    # 2. Check Polygon cache for off-hours data
+    # Check cache first (any source)
     if symbol in POLYGON_PRICE_CACHE:
         cached = POLYGON_PRICE_CACHE[symbol]
         if cached["price"] is not None and (now - cached["timestamp"] < POLYGON_PRICE_CACHE_TTL):
             return cached["price"]
     
-    # 3. Fetch from Polygon (with locking to prevent stampede)
-    with POLYGON_PRICE_LOCK:
-        # Double-check cache inside lock
-        if symbol in POLYGON_PRICE_CACHE:
-            cached = POLYGON_PRICE_CACHE[symbol]
-            if cached["price"] is not None and (now - cached["timestamp"] < POLYGON_PRICE_CACHE_TTL):
-                return cached["price"]
-
+    # 1. PRIMARY: Use Massive Options snapshot (underlying_asset.price)
+    # This is INCLUDED in the Options Advanced plan - no extra cost!
+    if MASSIVE_API_KEY:
+        with POLYGON_PRICE_LOCK:
+            # Double-check cache inside lock
+            if symbol in POLYGON_PRICE_CACHE:
+                cached = POLYGON_PRICE_CACHE[symbol]
+                if cached["price"] is not None and (now - cached["timestamp"] < POLYGON_PRICE_CACHE_TTL):
+                    return cached["price"]
+            
+            try:
+                # Fetch just 1 contract to get underlying_asset price
+                url = f"https://api.massive.com/v3/snapshot/options/{symbol}"
+                resp = requests.get(url, params={"apiKey": MASSIVE_API_KEY, "limit": 1}, timeout=5)
+                
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get("status") == "OK" and data.get("results"):
+                        underlying = data["results"][0].get("underlying_asset", {})
+                        price = underlying.get("price")
+                        if price and price > 0:
+                            POLYGON_PRICE_CACHE[symbol] = {"price": price, "timestamp": now}
+                            return price
+            except Exception as e:
+                print(f"Massive underlying price error ({symbol}): {e}")
+    
+    # 2. FALLBACK: yfinance (cached for 15 min to avoid rate limits)
+    price = get_cached_price(symbol)
+    if price:
+        POLYGON_PRICE_CACHE[symbol] = {"price": price, "timestamp": now}
+        return price
+    
+    # 3. FINAL FALLBACK: Polygon /prev (returns YESTERDAY's close)
+    if POLYGON_API_KEY:
         try:
-            # Try Previous Close first (Reliable)
             url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev?adjusted=true&apiKey={POLYGON_API_KEY}"
             resp = requests.get(url, timeout=5)
             
@@ -414,19 +427,11 @@ def get_polygon_price(symbol):
                 if data.get("resultsCount", 0) > 0 and data.get("results"):
                     price = data["results"][0].get("c")  # "c" = close price
                     if price and price > 0:
+                        print(f"⚠️ Using Polygon /prev for {symbol} (yesterday's close: ${price})")
                         POLYGON_PRICE_CACHE[symbol] = {"price": price, "timestamp": now}
                         return price
-            
-            print(f"⚠️ Polygon Price Error ({symbol}): Status {resp.status_code}")
-
         except Exception as e:
             print(f"Polygon price error ({symbol}): {e}")
-    
-    # FINAL FALLBACK: Use yfinance (get_cached_price)
-    fallback_price = get_cached_price(symbol)
-    if fallback_price:
-        POLYGON_PRICE_CACHE[symbol] = {"price": fallback_price, "timestamp": now}
-        return fallback_price
     
     return None
 
@@ -5056,15 +5061,24 @@ def api_library_options():
                     # Determine side based on trade price vs bid/ask at that time
                     side = "NO_QUOTE" if not quote_matched else "NEUTRAL"
                     if bid > 0 and ask > 0:
-                        mid = (bid + ask) / 2
-                        if price >= ask:
-                            side = "BUY"   # Bought at/above ask (aggressive buyer)
-                        elif price <= bid:
-                            side = "SELL"  # Sold at/below bid (aggressive seller)
-                        elif price > mid:
-                            side = "BUY"   # Above mid = leaning buyer
+                        # Industry-standard MID logic (ported from live stream)
+                        spread = ask - bid
+                        TOLERANCE = 0.02
+                        
+                        if price >= ask - TOLERANCE:
+                            side = "BUY"   # Aggressive buyer
+                        elif price <= bid + TOLERANCE:
+                            side = "SELL"  # Aggressive seller
+                        elif spread > 0:
+                            position_pct = (price - bid) / spread * 100
+                            if position_pct >= 75:
+                                side = "BUY"   # Upper quarter = leaning buyer
+                            elif position_pct <= 25:
+                                side = "SELL"  # Lower quarter = leaning seller
+                            else:
+                                side = "MID"   # Middle 50% = ambiguous
                         else:
-                            side = "SELL"  # Below mid = leaning seller
+                            side = "MID"
                     
                     # Calculate moneyness
                     moneyness = None

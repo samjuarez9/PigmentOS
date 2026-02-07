@@ -10,7 +10,7 @@
             --bg-color: #000000;
             --text-color: #e0e0e0;
             --accent-cyan: #00ffff;
-            --accent-purple: #bd00ff;
+            --accent-purple: #5c49e2;
             --alert-red: #ff3333;
             --font-pixel: 'Press Start 2P', cursive;
             --font-mono: 'JetBrains Mono', monospace;
@@ -47,6 +47,53 @@
         .side-cell:hover::after {
             opacity: 1;
             visibility: visible;
+        }
+
+        /* Aggressive Trade Flashing */
+        .flash-buy {
+            animation: buy-glow-pulse 1.5s infinite;
+            border: 1px solid #00ff66 !important;
+            box-shadow: 0 0 10px rgba(0, 255, 102, 0.4);
+        }
+
+        .flash-sell {
+            animation: sell-glow-pulse 1.5s infinite;
+            border: 1px solid #ff4466 !important;
+            box-shadow: 0 0 10px rgba(255, 68, 102, 0.4);
+        }
+
+        @keyframes buy-glow-pulse {
+            0% {
+                box-shadow: 0 0 5px rgba(0, 255, 102, 0.2);
+                background: rgba(0, 204, 102, 0.8);
+            }
+
+            50% {
+                box-shadow: 0 0 12px rgba(0, 255, 102, 0.5);
+                background: rgba(0, 230, 102, 0.95);
+            }
+
+            100% {
+                box-shadow: 0 0 5px rgba(0, 255, 102, 0.2);
+                background: rgba(0, 204, 102, 0.8);
+            }
+        }
+
+        @keyframes sell-glow-pulse {
+            0% {
+                box-shadow: 0 0 5px rgba(255, 68, 102, 0.2);
+                background: rgba(255, 68, 102, 0.8);
+            }
+
+            50% {
+                box-shadow: 0 0 12px rgba(255, 68, 102, 0.5);
+                background: rgba(255, 90, 120, 0.95);
+            }
+
+            100% {
+                box-shadow: 0 0 5px rgba(255, 68, 102, 0.2);
+                background: rgba(255, 68, 102, 0.8);
+            }
         }
 
         * {
@@ -1630,6 +1677,7 @@
                             <option value="STX">STX</option>
                             <option value="TSLA">TSLA</option>
                             <option value="TSM">TSM</option>
+                            <option value="WDC">WDC</option>
                         </select>
                         <div id="spot-price" class="spot-price"></div>
                     </div>
@@ -1820,6 +1868,7 @@
                             <option value="STX">STX</option>
                             <option value="TSLA">TSLA</option>
                             <option value="TSM">TSM</option>
+                            <option value="WDC">WDC</option>
                         </select>
 
                         <!-- PRE-SCAN FILTERS -->
@@ -1916,7 +1965,7 @@
                 <thead>
                     <tr>
                         <th>CONTRACT</th>
-                        <th>TIME (EST)</th>
+                        <th>TIME</th>
                         <th>SIZE</th>
                         <th>EXPIRY</th>
                         <th>PREMIUM</th>
@@ -3341,18 +3390,23 @@
                 tags += sentimentHtml;
                 const bidVal = trade.bid ? `$${trade.bid.toFixed(2)}` : '—';
                 const askVal = trade.ask ? `$${trade.ask.toFixed(2)}` : '—';
+
+                // Aggressive Trade Detection
+                const isAggressiveBuy = tradeSide === 'BUY' && trade.ask && price >= (trade.ask - 0.01);
+                const isAggressiveSell = tradeSide === 'SELL' && trade.bid && price <= (trade.bid + 0.01);
+
                 let sideHtml = '';
                 if (tradeSide === 'BUY') {
-                    sideHtml = `<div><span style="background: linear-gradient(180deg, #00cc66 0%, #009944 100%); color: #fff; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold;">BUY</span></div>
+                    sideHtml = `<div><span class="${isAggressiveBuy ? 'flash-buy' : ''}" style="background: linear-gradient(180deg, #00cc66 0%, #009944 100%); color: #fff; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">BUY</span></div>
                                 <div style="font-size: 9px; color: #888; margin-top: 3px; font-weight: bold;">@ $${price.toFixed(2)}</div>`;
                 } else if (tradeSide === 'SELL') {
-                    sideHtml = `<div><span style="background: linear-gradient(180deg, #ff4466 0%, #cc2244 100%); color: #fff; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold;">SELL</span></div>
+                    sideHtml = `<div><span class="${isAggressiveSell ? 'flash-sell' : ''}" style="background: linear-gradient(180deg, #ff4466 0%, #cc2244 100%); color: #fff; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">SELL</span></div>
                                 <div style="font-size: 9px; color: #888; margin-top: 3px; font-weight: bold;">@ $${price.toFixed(2)}</div>`;
                 } else if (tradeSide === 'MID') {
-                    sideHtml = `<div><span style="background: #444; color: #888; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold;">MID</span></div>
+                    sideHtml = `<div><span style="background: #444; color: #888; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">MID</span></div>
                                 <div style="font-size: 9px; color: #888; margin-top: 3px; font-weight: bold;">@ $${price.toFixed(2)}</div>`;
                 } else {
-                    sideHtml = `<div><span style="background: #333; color: #666; font-size: 9px; padding: 2px 8px; border-radius: 4px;">—</span></div>
+                    sideHtml = `<div><span style="background: #333; color: #666; font-size: 9px; padding: 2px 8px; border-radius: 4px; display: inline-block;">—</span></div>
                                 <div style="font-size: 9px; color: #888; margin-top: 3px; font-weight: bold;">@ $${price.toFixed(2)}</div>`;
                 }
 

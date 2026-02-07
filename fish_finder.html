@@ -50,6 +50,53 @@
             visibility: visible;
         }
 
+        /* Aggressive Trade Flashing */
+        .flash-buy {
+            animation: buy-glow-pulse 1.5s infinite;
+            border: 1px solid #00ff66 !important;
+            box-shadow: 0 0 10px rgba(0, 255, 102, 0.4);
+        }
+
+        .flash-sell {
+            animation: sell-glow-pulse 1.5s infinite;
+            border: 1px solid #ff4466 !important;
+            box-shadow: 0 0 10px rgba(255, 68, 102, 0.4);
+        }
+
+        @keyframes buy-glow-pulse {
+            0% {
+                box-shadow: 0 0 5px rgba(0, 255, 102, 0.2);
+                background: rgba(0, 204, 102, 0.8);
+            }
+
+            50% {
+                box-shadow: 0 0 12px rgba(0, 255, 102, 0.5);
+                background: rgba(0, 230, 102, 0.95);
+            }
+
+            100% {
+                box-shadow: 0 0 5px rgba(0, 255, 102, 0.2);
+                background: rgba(0, 204, 102, 0.8);
+            }
+        }
+
+        @keyframes sell-glow-pulse {
+            0% {
+                box-shadow: 0 0 5px rgba(255, 68, 102, 0.2);
+                background: rgba(255, 68, 102, 0.8);
+            }
+
+            50% {
+                box-shadow: 0 0 12px rgba(255, 68, 102, 0.5);
+                background: rgba(255, 90, 120, 0.95);
+            }
+
+            100% {
+                box-shadow: 0 0 5px rgba(255, 68, 102, 0.2);
+                background: rgba(255, 68, 102, 0.8);
+            }
+        }
+
         body {
             background-color: var(--bg-color);
             color: var(--text-color);
@@ -762,6 +809,7 @@
                         <option value="STX">STX</option>
                         <option value="TSLA">TSLA</option>
                         <option value="TSM">TSM</option>
+                        <option value="WDC">WDC</option>
                     </select>
                     <button id="scan-ticker-btn" class="go-btn" disabled>SCAN</button>
                 </div>
@@ -816,7 +864,7 @@
             <thead>
                 <tr>
                     <th>CONTRACT</th>
-                    <th>TIME (EST)</th>
+                    <th>TIME</th>
                     <!-- PRICE Hidden -->
                     <th>SIZE</th>
                     <th>EXPIRY</th>
@@ -1214,11 +1262,15 @@
                 const spotPrice = trade.underlying_price ? `$${trade.underlying_price.toFixed(2)}` : '';
                 const spotHtml = spotPrice ? `<div style="margin-top: 2px; border-top: 1px solid #333; padding-top: 2px;">SPOT: <span style="color: #e0e0e0;">${spotPrice}</span></div>` : '';
 
+                // Aggressive Trade Detection
+                const isAggressiveBuy = tradeSide === 'BUY' && trade.ask && price >= (trade.ask - 0.01);
+                const isAggressiveSell = tradeSide === 'SELL' && trade.bid && price <= (trade.bid + 0.01);
+
                 let sideTag = '';
                 if (tradeSide === 'BUY') {
-                    sideTag = `<span class="tag-buy">BUY</span>`;
+                    sideTag = `<span class="tag-buy ${isAggressiveBuy ? 'flash-buy' : ''}">BUY</span>`;
                 } else if (tradeSide === 'SELL') {
-                    sideTag = `<span class="tag-sell">SELL</span>`;
+                    sideTag = `<span class="tag-sell ${isAggressiveSell ? 'flash-sell' : ''}">SELL</span>`;
                 } else if (tradeSide === 'MID') {
                     sideTag = `<span class="tag-neutral" style="background: #444; color: #888;">MID</span>`;
                 } else {
@@ -1242,7 +1294,7 @@
                             <span class="${typeClass}" style="font-weight: bold; margin-left: 6px;">${rowStrike}${typeLabel}</span>
                         </div>
                     </td>
-                    <td class="timestamp" title="${fullTimeStr}" data-label="TIME (EST)">
+                    <td class="timestamp" title="${fullTimeStr}" data-label="TIME">
                         <div>${dateStr}</div>
                         <div style="font-size: 9px; color: #888;">${timeStr}</div>
                     </td>
