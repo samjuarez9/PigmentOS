@@ -1670,6 +1670,7 @@
                             <option value="MU">MU</option>
                             <option value="NVDA">NVDA</option>
                             <option value="ORCL">ORCL</option>
+                            <option value="PBR">PBR</option>
                             <option value="PLTR">PLTR</option>
                             <option value="QQQ">QQQ</option>
                             <option value="SNDK">SNDK</option>
@@ -1863,6 +1864,7 @@
                             <option value="MU">MU</option>
                             <option value="NVDA">NVDA</option>
                             <option value="ORCL">ORCL</option>
+                            <option value="PBR">PBR</option>
                             <option value="PLTR">PLTR</option>
                             <option value="SNDK">SNDK</option>
                             <option value="STX">STX</option>
@@ -3349,7 +3351,7 @@
                 if (window.currentSpotPrice && trade.strike) {
                     const s = parseFloat(trade.strike);
                     const diff = Math.abs(s - window.currentSpotPrice) / window.currentSpotPrice;
-                    if (diff < 0.005) tags += '<span class="tag-atm">ATM</span>';
+                    if (diff < 0.01) tags += '<span class="tag-atm">ATM</span>';
                     else if ((isCall && window.currentSpotPrice > s) || (!isCall && window.currentSpotPrice < s)) tags += '<span class="tag-itm">ITM</span>';
                     else tags += '<span class="tag-otm">OTM</span>';
                 }
