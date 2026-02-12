@@ -3327,6 +3327,93 @@
         fishWeekSelect.addEventListener('change', applyFishFilters);
 
 
+        // ========================================
+        // HELPER FUNCTIONS (extracted from renderFishTable)
+        // ========================================
+
+        /**
+         * Unified moneyness calculation — matches backend calculate_moneyness().
+         * ATM = strike within 1% of spot (INCLUSIVE: <= 0.01).
+         */
+        function calculateMoneyness(strike, spotPrice, isCall) {
+            if (!spotPrice || spotPrice <= 0 || !strike) return null;
+            const s = parseFloat(strike);
+            const pctDiff = Math.abs(s - spotPrice) / spotPrice;
+            if (pctDiff <= 0.01) return 'ATM';
+            if ((isCall && spotPrice > s) || (!isCall && spotPrice < s)) return 'ITM';
+            return 'OTM';
+        }
+
+        /**
+         * Returns moneyness + DTE tag HTML string.
+         */
+        function getMoneynessTags(trade, spotPrice, isCall) {
+            let tags = '';
+            const moneyness = calculateMoneyness(trade.strike, spotPrice, isCall);
+            if (moneyness === 'ATM') tags += '<span class="tag-atm">ATM</span>';
+            else if (moneyness === 'ITM') tags += '<span class="tag-itm">ITM</span>';
+            else if (moneyness === 'OTM') tags += '<span class="tag-otm">OTM</span>';
+
+            if (trade.expiry) {
+                const expD = new Date(trade.expiry);
+                const diffD = Math.ceil((expD - new Date().setHours(0, 0, 0, 0)) / 86400000);
+                if (diffD <= 0) tags += '<span class="tag-0dte">0DTE</span>';
+                else if (diffD > 180) tags += '<span class="tag-leap">LEAP</span>';
+            }
+            return tags;
+        }
+
+        /**
+         * Returns condition badge HTML (SWEEP/MULTI/AUTO).
+         */
+        function getConditionTags(trade) {
+            const conds = (trade.conditions || trade.condition || trade.c || []);
+            const SWEEP_CODES = [14, 219, 228, 230, 'F', 'SWEEP', 'I'];
+            const isSweep = Array.isArray(conds) ? conds.some(c => SWEEP_CODES.includes(c)) : SWEEP_CODES.includes(conds);
+            const isAuto = Array.isArray(conds) ? conds.includes(209) : conds === 209;
+            const isMulti = Array.isArray(conds) ? conds.includes(233) : conds === 233;
+
+            let tags = '';
+            if (isSweep) tags += '<span class="badge-sweep">SWEEP <span style="color: #ffff00;">⚡</span></span>';
+            if (isMulti) tags += '<span class="badge-multi" style="background: #9d00ff; color: #fff; padding: 2px 4px; border-radius: 4px; font-size: 8px; margin-right: 3px; font-weight: bold;">MULTI</span>';
+            if (isAuto) tags += '<span class="badge-auto" style="background: #0085ff; color: #fff; padding: 2px 4px; border-radius: 4px; font-size: 8px; margin-right: 3px; font-weight: bold;">AUTO</span>';
+            return tags;
+        }
+
+        /**
+         * Returns sentiment HTML based on side + option type.
+         */
+        function getSentimentHtml(side, isCall) {
+            if (side === 'BUY') return isCall ? '<span class="tag-bullish">BULLISH</span>' : '<span class="tag-bearish">BEARISH</span>';
+            if (side === 'SELL') return isCall ? '<span class="tag-bearish">BEARISH</span>' : '<span class="tag-bullish">BULLISH</span>';
+            return '<span class="tag-neutral" style="background: #444; color: #aaa; padding: 2px 5px; border-radius: 4px; font-size: 9px; font-weight: bold;">NEUTRAL</span>';
+        }
+
+        /**
+         * Returns side cell inner HTML with aggressive flash detection.
+         */
+        function getSideHtml(side, price, bid, ask) {
+            const priceStr = price.toFixed(2);
+            const priceLine = `<div style="font-size: 9px; color: #888; margin-top: 3px; font-weight: bold;">@ $${priceStr}</div>`;
+
+            if (side === 'BUY') {
+                const isAggressive = ask && price >= (ask - 0.01);
+                return `<div><span class="${isAggressive ? 'flash-buy' : ''}" style="background: linear-gradient(180deg, #00cc66 0%, #009944 100%); color: #fff; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">BUY</span></div>${priceLine}`;
+            }
+            if (side === 'SELL') {
+                const isAggressive = bid && price <= (bid + 0.01);
+                return `<div><span class="${isAggressive ? 'flash-sell' : ''}" style="background: linear-gradient(180deg, #ff4466 0%, #cc2244 100%); color: #fff; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">SELL</span></div>${priceLine}`;
+            }
+            if (side === 'MID') {
+                return `<div><span style="background: #444; color: #888; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">MID</span></div>${priceLine}`;
+            }
+            return `<div><span style="background: #333; color: #666; font-size: 9px; padding: 2px 8px; border-radius: 4px; display: inline-block;">—</span></div>${priceLine}`;
+        }
+
+        // ========================================
+        // MAIN RENDER (uses helpers above)
+        // ========================================
+
         function renderFishTable(trades, ticker) {
             fishTbody.innerHTML = '';
             trades.forEach(trade => {
@@ -3339,78 +3426,22 @@
                 const dateStr = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${String(d.getFullYear()).slice(-2)}`;
                 const timeStr = d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-                let costStr = cost >= 1000000 ? `$${(cost / 1000000).toFixed(2)}M` : `$${(cost / 1000).toFixed(1)}k`;
-
+                const costStr = cost >= 1000000 ? `$${(cost / 1000000).toFixed(2)}M` : `$${(cost / 1000).toFixed(1)}k`;
                 const rType = trade.type || '';
                 const isCall = rType === 'CALL' || rType === 'call' || rType === 'C';
+                const tradeSide = trade.side || 'NEUTRAL';
 
                 let rowExp = trade.expiry || '';
                 if (rowExp.includes('-')) rowExp = rowExp.slice(5).replace('-', '/');
 
-                let tags = '';
-                if (window.currentSpotPrice && trade.strike) {
-                    const s = parseFloat(trade.strike);
-                    const diff = Math.abs(s - window.currentSpotPrice) / window.currentSpotPrice;
-                    if (diff < 0.01) tags += '<span class="tag-atm">ATM</span>';
-                    else if ((isCall && window.currentSpotPrice > s) || (!isCall && window.currentSpotPrice < s)) tags += '<span class="tag-itm">ITM</span>';
-                    else tags += '<span class="tag-otm">OTM</span>';
-                }
+                // Build tags via helpers
+                const tags = getMoneynessTags(trade, window.currentSpotPrice, isCall)
+                           + getConditionTags(trade)
+                           + getSentimentHtml(tradeSide, isCall);
 
-                if (trade.expiry) {
-                    const expD = new Date(trade.expiry);
-                    const diffD = Math.ceil((expD - new Date().setHours(0, 0, 0, 0)) / 86400000);
-                    if (diffD <= 0) tags += '<span class="tag-0dte">0DTE</span>';
-                    else if (diffD > 180) tags += '<span class="tag-leap">LEAP</span>';
-                }
-
-                const conds = (trade.conditions || trade.condition || trade.c || []);
-                // Codes: 14, 219, 228, 230 are ISO/Sweeps. 'F' is legacy char.
-                const isSweep = Array.isArray(conds) ? conds.some(c => [14, 219, 228, 230, 'F', 'SWEEP', 'I'].includes(c)) : [14, 219, 228, 230, 'F', 'SWEEP', 'I'].includes(conds);
-                const isAuto = Array.isArray(conds) ? conds.includes(209) : conds === 209;
-                const isMulti = Array.isArray(conds) ? conds.includes(233) : conds === 233;
-
-                // Side Display with bid/ask (Moved up for logic)
-                const tradeSide = trade.side || 'NEUTRAL';
-
-                // Smart Sentiment Logic
-                let sentimentHtml = '';
-                if (tradeSide === 'BUY') {
-                    // Bought Call = Bullish, Bought Put = Bearish
-                    sentimentHtml = isCall ? '<span class="tag-bullish">BULLISH</span>' : '<span class="tag-bearish">BEARISH</span>';
-                } else if (tradeSide === 'SELL') {
-                    // Sold Call = Bearish, Sold Put = Bullish
-                    sentimentHtml = isCall ? '<span class="tag-bearish">BEARISH</span>' : '<span class="tag-bullish">BULLISH</span>';
-                } else {
-                    // MID or NEUTRAL - can't determine intent
-                    sentimentHtml = '<span class="tag-neutral" style="background: #444; color: #aaa; padding: 2px 5px; border-radius: 4px; font-size: 9px; font-weight: bold;">NEUTRAL</span>';
-                }
-
-                if (isSweep) tags += '<span class="badge-sweep">SWEEP <span style="color: #ffff00;">⚡</span></span>';
-                if (isMulti) tags += '<span class="badge-multi" style="background: #9d00ff; color: #fff; padding: 2px 4px; border-radius: 4px; font-size: 8px; margin-right: 3px; font-weight: bold;">MULTI</span>';
-                if (isAuto) tags += '<span class="badge-auto" style="background: #0085ff; color: #fff; padding: 2px 4px; border-radius: 4px; font-size: 8px; margin-right: 3px; font-weight: bold;">AUTO</span>';
-
-                tags += sentimentHtml;
-                const bidVal = trade.bid ? `$${trade.bid.toFixed(2)}` : '—';
-                const askVal = trade.ask ? `$${trade.ask.toFixed(2)}` : '—';
-
-                // Aggressive Trade Detection
-                const isAggressiveBuy = tradeSide === 'BUY' && trade.ask && price >= (trade.ask - 0.01);
-                const isAggressiveSell = tradeSide === 'SELL' && trade.bid && price <= (trade.bid + 0.01);
-
-                let sideHtml = '';
-                if (tradeSide === 'BUY') {
-                    sideHtml = `<div><span class="${isAggressiveBuy ? 'flash-buy' : ''}" style="background: linear-gradient(180deg, #00cc66 0%, #009944 100%); color: #fff; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">BUY</span></div>
-                                <div style="font-size: 9px; color: #888; margin-top: 3px; font-weight: bold;">@ $${price.toFixed(2)}</div>`;
-                } else if (tradeSide === 'SELL') {
-                    sideHtml = `<div><span class="${isAggressiveSell ? 'flash-sell' : ''}" style="background: linear-gradient(180deg, #ff4466 0%, #cc2244 100%); color: #fff; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">SELL</span></div>
-                                <div style="font-size: 9px; color: #888; margin-top: 3px; font-weight: bold;">@ $${price.toFixed(2)}</div>`;
-                } else if (tradeSide === 'MID') {
-                    sideHtml = `<div><span style="background: #444; color: #888; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">MID</span></div>
-                                <div style="font-size: 9px; color: #888; margin-top: 3px; font-weight: bold;">@ $${price.toFixed(2)}</div>`;
-                } else {
-                    sideHtml = `<div><span style="background: #333; color: #666; font-size: 9px; padding: 2px 8px; border-radius: 4px; display: inline-block;">—</span></div>
-                                <div style="font-size: 9px; color: #888; margin-top: 3px; font-weight: bold;">@ $${price.toFixed(2)}</div>`;
-                }
+                const sideHtml = getSideHtml(tradeSide, price, trade.bid, trade.ask);
+                const tooltip = (trade.bid !== undefined || trade.ask !== undefined)
+                    ? `Bid: $${(trade.bid || 0).toFixed(2)} | Ask: $${(trade.ask || 0).toFixed(2)}` : '';
 
                 const tr = document.createElement('tr');
                 if (tags.includes('ITM')) tr.classList.add('itm-row');
@@ -3428,7 +3459,7 @@
                     <td class="${isCall ? 'premium-call' : 'premium-put'}">
                         <b>${costStr}</b>
                     </td>
-                    <td class="code side-cell" data-tooltip="${(trade.bid !== undefined || trade.ask !== undefined) ? `Bid: $${(trade.bid || 0).toFixed(2)} | Ask: $${(trade.ask || 0).toFixed(2)}` : ''}">${sideHtml}</td>
+                    <td class="code side-cell" data-tooltip="${tooltip}">${sideHtml}</td>
                     <td style="text-align: right;">${tags}</td>
                 `;
                 fishTbody.appendChild(tr);

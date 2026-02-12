@@ -4702,6 +4702,22 @@ if not hasattr(start_background_worker, '_started') and not os.environ.get('GUNI
     start_background_worker._started = True
 
 
+def calculate_moneyness(strike, current_price, contract_type):
+    """Unified moneyness calculation.
+    ATM = strike within 1% of spot price (inclusive).
+    Uses float math — no int() truncation.
+    """
+    if not current_price or current_price <= 0:
+        return None
+    pct_diff = abs(strike - current_price) / current_price * 100
+    if pct_diff <= 1.0:
+        return "ATM"
+    is_call = contract_type.upper() in ("CALL", "C")
+    if (is_call and strike < current_price) or (not is_call and strike > current_price):
+        return "ITM"
+    return "OTM"
+
+
 @app.route('/api/library/options')
 def api_library_options():
     """
@@ -4782,9 +4798,9 @@ def api_library_options():
 
         # 2. MONEYNESS FILTER (Smart Strike)
         if current_price and current_price > 0:
-            if money_filter == 'atm': # +/- 5%
-                params["strike_price.gte"] = int(current_price * 0.95)
-                params["strike_price.lte"] = int(current_price * 1.05)
+            if money_filter == 'atm': # +/- 1% (float precision, no int truncation)
+                params["strike_price.gte"] = round(current_price * 0.99, 2)
+                params["strike_price.lte"] = round(current_price * 1.01, 2)
             elif money_filter == 'otm': # Calls > Price, Puts < Price (Handled in type fetch)
                  pass 
             elif money_filter == 'itm':
@@ -5080,19 +5096,8 @@ def api_library_options():
                         else:
                             side = "MID"
                     
-                    # Calculate moneyness
-                    moneyness = None
-                    if current_price > 0:
-                        strike = parsed['strike']
-                        is_call = parsed['type'] == 'CALL'
-                        pct_diff = abs(strike - current_price) / current_price * 100
-                        
-                        if pct_diff <= 1:
-                            moneyness = "ATM"
-                        elif (is_call and strike < current_price) or (not is_call and strike > current_price):
-                            moneyness = "ITM"
-                        else:
-                            moneyness = "OTM"
+                    # Calculate moneyness (unified function)
+                    moneyness = calculate_moneyness(parsed['strike'], current_price, parsed['type'])
                     
                     conditions = trade.get("conditions", [])
                     # Correct codes for Intermarket Sweep Orders (ISO): 14, 219, 228, 230
