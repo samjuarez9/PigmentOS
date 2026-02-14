@@ -1660,6 +1660,7 @@
                             <option value="AAPL">AAPL</option>
                             <option value="AMD">AMD</option>
                             <option value="AMZN">AMZN</option>
+                            <option value="CAT">CAT</option>
                             <option value="EWZ">EWZ</option>
                             <option value="GOOGL">GOOGL</option>
                             <option value="INTC">INTC</option>
@@ -1856,6 +1857,7 @@
                             <option value="AAPL">AAPL</option>
                             <option value="AMD">AMD</option>
                             <option value="AMZN">AMZN</option>
+                            <option value="CAT">CAT</option>
                             <option value="EWZ">EWZ</option>
                             <option value="GOOGL">GOOGL</option>
                             <option value="INTC">INTC</option>
@@ -3438,8 +3440,8 @@
 
                 // Build tags via helpers
                 const tags = getMoneynessTags(trade, window.currentSpotPrice, isCall)
-                           + getConditionTags(trade)
-                           + getSentimentHtml(tradeSide, isCall);
+                    + getConditionTags(trade)
+                    + getSentimentHtml(tradeSide, isCall);
 
                 const sideHtml = getSideHtml(tradeSide, price, trade.bid, trade.ask);
                 const tooltip = (trade.bid !== undefined || trade.ask !== undefined)

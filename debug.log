@@ -1,0 +1,31 @@
+✅ Firebase Admin SDK initialized successfully
+📂 Loaded 50 whale trades from cache (Filtered <= 30 DTE)
+📈 Market hours - warming price cache...
+📂 Loaded 50 whale trades from cache (Filtered <= 30 DTE)
+📈 Market hours - warming price cache...
+📡 Connecting to Massive WS for all option trades...
+📊 Fetching daily activity for WHALE_WATCHLIST (16 tickers)...
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Fri, 06 Feb 2026 23:17:23 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '24a86077f998c17d207aa90a6990f766', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
+✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
+📡 Connecting to Massive WS for all option trades...
+✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
+✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
+❌ Massive WS Error: Handshake status 404 Not Found -+-+- {'date': 'Fri, 06 Feb 2026 23:17:33 GMT', 'content-type': 'text/plain', 'content-length': '18', 'connection': 'keep-alive', 'x-request-id': '56000c1164e5f87041c94b208472553d', 'strict-transport-security': 'max-age=15724800; includeSubDomains'} -+-+- b'404 page not found'
+🔌 Massive WS Closed: None - None
+⚠️ Finnhub News: HTTP 401
+DEBUG: get_polygon_price called for SPY. Massive Key: YES
+DEBUG: Fetching Massive price for SPY...
+✅ Massive Price for SPY: $689.76
+Polygon: Post-5PM - using next expiry 2026-02-09 for SPY
+✅ Feed Success https://feeds.a.dj.com/rss/RSSMarketsMain.xml: Found 20 entries
+✅ Feed Success https://techcrunch.com/feed/: Found 20 entries
+✅ Feed Success https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664: Found 30 entries
+✅ Feed Success https://www.investing.com/rss/news.rss: Found 10 entries
+✅ Loaded 59 historical trades for demo.
+🚀 PigmentOS Server running on port 8001
+ * Serving Flask app 'run'
+ * Debug mode: on
+Address already in use
+Port 8001 is in use by another program. Either identify and stop that program, or start the server with a different port.
