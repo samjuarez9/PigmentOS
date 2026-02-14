@@ -5436,8 +5436,8 @@ if __name__ == "__main__":
     # Start Massive WebSocket for live trades
     start_massive_websocket()
     
-    # Pre-load historical sweeps for demo
-    load_historical_sweeps()
+    # Pre-load historical sweeps for demo (Run in background to unblock server startup)
+    threading.Thread(target=load_historical_sweeps, daemon=True).start()
     
     port = int(os.environ.get('PORT', 8001))
     print(f"🚀 PigmentOS Server running on port {port}")
