@@ -248,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const WATCHLIST_TICKERS = [
         // Magnificent 7
-        'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA',
+        'AAOI', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA',
 
         // Indices & ETFs
         'SPY', 'QQQ', 'IWM',

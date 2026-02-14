@@ -162,7 +162,7 @@ def preview_page():
 WATCHLIST = [
     "NVDA", "TSLA", "AAPL", "MSFT", "AMZN", "META", "GOOGL", "GOOG",
     "AMD", "AVGO", "ARM", "SMCI", "MU", "INTC",
-    "PLTR", "SOFI", "RKLB", "ORCL", "WDC", "CAT"
+    "PLTR", "SOFI", "RKLB", "ORCL", "WDC", "CAT", "AAOI"
 ]
 
 MEGA_WHALE_THRESHOLD = 8_000_000  # $8M
@@ -204,7 +204,7 @@ def api_status():
 # === CONFIGURATION ===
 WHALE_WATCHLIST = [
     'NVDA', 'TSLA', 'AAPL', 'AMD', 'MSFT', 'AMZN', 
-    'META', 'GOOG', 'GOOGL', 'PLTR', 'MU', 'ORCL', 'TSM', 'WDC', 'STX', 'SNDK', 'CAT'
+    'META', 'GOOG', 'GOOGL', 'PLTR', 'MU', 'ORCL', 'TSM', 'WDC', 'STX', 'SNDK', 'CAT', 'ARM', 'AAOI'
 ]
 
 # MarketData.app API Token (for enhanced options data)
