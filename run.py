@@ -4745,6 +4745,85 @@ def api_library_options():
     
     # Cache Key - Include all filter params to ensure filtered results aren't cached together
     current_time = time.time()
+    
+    # === SPECIAL HANDLING FOR "ALL" (Global Feed from Cache) ===
+    if symbol.upper() == "ALL":
+        try:
+            # 1. Get Base Data from Whales Cache
+            base_data = CACHE.get("whales", {}).get("data", [])
+            
+            # 2. Exclude ETFs (stocks only)
+            ETF_EXCLUDE = ['SPY', 'QQQ', 'IWM', 'DIA', 'EWZ', 'PBR', 'FXI', 'XLF', 'XLE', 'XLK', 'SMH', 'ARKK', 'VXX', 'UVXY', 'TQQQ', 'SQQQ']
+            
+            filtered_data = []
+            for trade in base_data:
+                # Whale cache uses 'baseSymbol' for underlying ticker
+                underlying = trade.get('baseSymbol') or trade.get('ticker', '')
+                
+                # Ticker Filter (No ETFs)
+                if underlying in ETF_EXCLUDE:
+                    continue
+                
+                # Get raw premium (notional_value is the raw number)
+                raw_premium = trade.get('notional_value', 0) or 0
+                raw_size = trade.get('volume', 0) or trade.get('size', 0) or 0
+                    
+                # Apply User Filters
+                
+                # Minimum Premium
+                if raw_premium < int(min_premium_filter):
+                    continue
+                    
+                # Minimum Size
+                if raw_size < int(min_size_filter):
+                    continue
+                    
+                # Map putCall (C/P) to type (CALL/PUT)
+                put_call = trade.get('putCall', '')
+                trade_type = 'CALL' if put_call == 'C' else 'PUT' if put_call == 'P' else trade.get('type', '')
+                    
+                # Type Filter
+                if type_filter != 'all':
+                    if trade_type.lower() != type_filter.lower():
+                        continue
+                        
+                # Moneyness Filter
+                if money_filter != 'all':
+                    if trade.get('moneyness', '').lower() != money_filter.lower():
+                        continue
+
+                # Transform whale cache format → Fish Finder format
+                fish_trade = {
+                    "ticker": underlying,
+                    "strike": trade.get('strikePrice', 0) or trade.get('strike', 0),
+                    "type": trade_type,
+                    "expiry": trade.get('expirationDate', '') or trade.get('expiry', ''),
+                    "premium": raw_premium,
+                    "size": raw_size,
+                    "price": trade.get('lastPrice', 0) or trade.get('price', 0),
+                    "timestamp": trade.get('timestamp', 0),
+                    "timeStr": trade.get('tradeTime', '') or trade.get('timeStr', 'N/A'),
+                    "moneyness": trade.get('moneyness', ''),
+                    "side": trade.get('side', 'NEUTRAL'),
+                    "bid": trade.get('bid', 0),
+                    "ask": trade.get('ask', 0),
+                    "delta": trade.get('delta', 0),
+                    "is_sweep": trade.get('is_sweep', False),
+                    "is_mega_whale": trade.get('is_mega_whale', False),
+                    "is_lotto": abs(float(trade.get('delta', 0) or 0)) < 0.20,
+                    "notional_value": raw_premium,
+                }
+
+                filtered_data.append(fish_trade)
+            
+            return jsonify({"data": filtered_data, "current_price": 0})
+            
+        except Exception as e:
+            print(f"⚠️ Global Fish Scan Error: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({"data": []})
+
     cache_key = f"library_massive_{symbol}_type{type_filter}_exp{expiry_filter}_mon{money_filter}_size{min_size_filter}_prem{min_premium_filter}_v3"
     
     global LIBRARY_CACHE

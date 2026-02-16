@@ -1937,7 +1937,7 @@
                             style="background: #222; border: 1px solid #444; color: #aaa; padding: 5px; border-radius: 4px; font-size: 11px; height: 29px;">
                             <option value="all">ALL STRIKES</option>
 
-                            <option value="atm">ATM (+/- 5%)</option>
+                            <option value="atm">ATM (+/- 1%)</option>
                             <option value="otm">OTM (Action)</option>
                             <option value="itm">ITM (Deep)</option>
                         </select>
@@ -3450,7 +3450,8 @@
             }
             if (side === 'SELL') {
                 const isAggressive = bid && price <= (bid + 0.01);
-                return `<div><span class="${isAggressive ? 'flash-sell' : ''}" style="background: linear-gradient(180deg, #ff4466 0%, #cc2244 100%); color: #fff; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">SELL</span></div>${priceLine}`;
+                const sellLabel = isAggressive ? 'DUMP' : 'SELL';
+                return `<div><span class="${isAggressive ? 'flash-sell' : ''}" style="background: linear-gradient(180deg, #ff4466 0%, #cc2244 100%); color: #fff; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">${sellLabel}</span></div>${priceLine}`;
             }
             if (side === 'MID') {
                 return `<div><span style="background: #444; color: #888; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">MID</span></div>${priceLine}`;
