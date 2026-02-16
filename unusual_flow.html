@@ -1077,12 +1077,13 @@
         }
 
         .tag-otm {
-            background: rgba(189, 0, 255, 0.1);
-            color: #bd00ff;
-            border: 1px solid rgba(189, 0, 255, 0.2);
+            background: #8c52ff;
+            color: #ffffff;
+            border: 1px solid #7000ff;
             font-size: 8px;
             padding: 2px 4px;
             border-radius: 2px;
+            font-weight: bold;
         }
 
         .tag-atm {
@@ -1657,32 +1658,53 @@
                         <span class="select-label">Ticker</span>
                         <select id="ticker-select" class="styled-select">
                             <option value="" selected disabled>SELECT</option>
-                            <option value="AAOI">AAOI</option>
-                            <option value="AAPL">AAPL</option>
-                            <option value="AMD">AMD</option>
-                            <option value="AMZN">AMZN</option>
-                            <option value="ARM">ARM</option>
-                            <option value="CAT">CAT</option>
-                            <option value="EWZ">EWZ</option>
-                            <option value="GOOGL">GOOGL</option>
-                            <option value="INTC">INTC</option>
-                            <option value="IREN">IREN</option>
-                            <option value="IWM">IWM</option>
-                            <option value="LITE">LITE</option>
-                            <option value="META">META</option>
-                            <option value="MSFT">MSFT</option>
-                            <option value="MU">MU</option>
-                            <option value="NVDA">NVDA</option>
-                            <option value="ORCL">ORCL</option>
-                            <option value="PBR">PBR</option>
-                            <option value="PLTR">PLTR</option>
-                            <option value="QQQ">QQQ</option>
-                            <option value="SNDK">SNDK</option>
-                            <option value="SPY">SPY</option>
-                            <option value="STX">STX</option>
-                            <option value="TSLA">TSLA</option>
-                            <option value="TSM">TSM</option>
-                            <option value="WDC">WDC</option>
+
+                            <optgroup label="MAG 7 💎">
+                                <option value="AAPL">AAPL</option>
+                                <option value="AMZN">AMZN</option>
+                                <option value="GOOGL">GOOGL</option>
+                                <option value="META">META</option>
+                                <option value="MSFT">MSFT</option>
+                                <option value="TSLA">TSLA</option>
+                            </optgroup>
+
+                            <optgroup label="SEMICONDUCTORS 💾">
+                                <option value="AMD">AMD</option>
+                                <option value="ARM">ARM</option>
+                                <option value="INTC">INTC</option>
+                                <option value="NVDA">NVDA</option>
+                                <option value="TSM">TSM</option>
+                            </optgroup>
+
+                            <optgroup label="MEMORY & OPTICAL 💽">
+                                <option value="AAOI">AAOI</option>
+                                <option value="LITE">LITE</option>
+                                <option value="MU">MU</option>
+                                <option value="SNDK">SNDK</option>
+                                <option value="STX">STX</option>
+                                <option value="WDC">WDC</option>
+                            </optgroup>
+
+                            <optgroup label="SOFTWARE & CLOUD ☁️">
+                                <option value="ANET">ANET</option>
+                                <option value="ORCL">ORCL</option>
+                                <option value="PLTR">PLTR</option>
+                            </optgroup>
+
+                            <optgroup label="INDUSTRIAL & ENERGY 🏗️">
+                                <option value="BE">BE</option>
+                                <option value="CAT">CAT</option>
+                                <option value="IREN">IREN</option>
+                                <option value="NBIS">NBIS</option>
+                            </optgroup>
+
+                            <optgroup label="ETFS 🌎">
+                                <option value="EWZ">EWZ</option>
+                                <option value="IWM">IWM</option>
+                                <option value="PBR">PBR</option>
+                                <option value="QQQ">QQQ</option>
+                                <option value="SPY">SPY</option>
+                            </optgroup>
                         </select>
                         <div id="spot-price" class="spot-price"></div>
                     </div>
@@ -1856,29 +1878,50 @@
                         <select id="fishTicker"
                             style="background: #222; border: 1px solid #444; color: #fff; padding: 5px; border-radius: 4px; width: 120px; font-weight: bold; height: 29px;">
                             <option value="" disabled selected>SELECT TICKER</option>
-                            <option value="AAOI">AAOI</option>
-                            <option value="AAPL">AAPL</option>
-                            <option value="AMD">AMD</option>
-                            <option value="AMZN">AMZN</option>
-                            <option value="ARM">ARM</option>
-                            <option value="CAT">CAT</option>
-                            <option value="EWZ">EWZ</option>
-                            <option value="GOOGL">GOOGL</option>
-                            <option value="INTC">INTC</option>
-                            <option value="IREN">IREN</option>
-                            <option value="LITE">LITE</option>
-                            <option value="META">META</option>
-                            <option value="MSFT">MSFT</option>
-                            <option value="MU">MU</option>
-                            <option value="NVDA">NVDA</option>
-                            <option value="ORCL">ORCL</option>
-                            <option value="PBR">PBR</option>
-                            <option value="PLTR">PLTR</option>
-                            <option value="SNDK">SNDK</option>
-                            <option value="STX">STX</option>
-                            <option value="TSLA">TSLA</option>
-                            <option value="TSM">TSM</option>
-                            <option value="WDC">WDC</option>
+
+                            <optgroup label="MAG 7 💎">
+                                <option value="AAPL">AAPL</option>
+                                <option value="AMZN">AMZN</option>
+                                <option value="GOOGL">GOOGL</option>
+                                <option value="META">META</option>
+                                <option value="MSFT">MSFT</option>
+                                <option value="TSLA">TSLA</option>
+                            </optgroup>
+
+                            <optgroup label="SEMICONDUCTORS 💾">
+                                <option value="AMD">AMD</option>
+                                <option value="ARM">ARM</option>
+                                <option value="INTC">INTC</option>
+                                <option value="NVDA">NVDA</option>
+                                <option value="TSM">TSM</option>
+                            </optgroup>
+
+                            <optgroup label="MEMORY & OPTICAL 💽">
+                                <option value="AAOI">AAOI</option>
+                                <option value="LITE">LITE</option>
+                                <option value="MU">MU</option>
+                                <option value="SNDK">SNDK</option>
+                                <option value="STX">STX</option>
+                                <option value="WDC">WDC</option>
+                            </optgroup>
+
+                            <optgroup label="SOFTWARE & CLOUD ☁️">
+                                <option value="ANET">ANET</option>
+                                <option value="ORCL">ORCL</option>
+                                <option value="PLTR">PLTR</option>
+                            </optgroup>
+
+                            <optgroup label="INDUSTRIAL & ENERGY 🏗️">
+                                <option value="BE">BE</option>
+                                <option value="CAT">CAT</option>
+                                <option value="IREN">IREN</option>
+                                <option value="NBIS">NBIS</option>
+                            </optgroup>
+
+                            <optgroup label="ETFS 🌎">
+                                <option value="EWZ">EWZ</option>
+                                <option value="PBR">PBR</option>
+                            </optgroup>
                         </select>
 
                         <!-- PRE-SCAN FILTERS -->
@@ -1967,32 +2010,29 @@
             </div>
             <div id="fish-status" style="font-size: 10px; color: #888; text-transform: uppercase; margin-top: 10px;">
                 Ready</div>
+            <div class="table-container-fish">
+                <table id="fish-trades-table" class="fish-finder-table">
+                    <thead>
+                        <tr>
+                            <th>CONTRACT</th>
+                            <th>TIME</th>
+                            <th>SIZE</th>
+                            <th>EXPIRY</th>
+                            <th>PREMIUM</th>
+                            <th>SIDE</th>
+                            <th style="text-align: right;">TAGS</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fish-trades-body">
+                        <tr>
+                            <td colspan="7"
+                                style="text-align:center; padding: 40px; color: #444; font-family: var(--font-pixel); font-size: 10px;">
+                                SELECT A TICKER AND HIT SCAN TO VIEW TRADES ($50k+).</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
-
-        <!-- Results -->
-        <div class="table-container-fish">
-            <table id="fish-trades-table" class="fish-finder-table">
-                <thead>
-                    <tr>
-                        <th>CONTRACT</th>
-                        <th>TIME</th>
-                        <th>SIZE</th>
-                        <th>EXPIRY</th>
-                        <th>PREMIUM</th>
-                        <th>SIDE</th>
-                        <th style="text-align: right;">TAGS</th>
-                    </tr>
-                </thead>
-                <tbody id="fish-trades-body">
-                    <tr>
-                        <td colspan="7"
-                            style="text-align:center; padding: 40px; color: #444; font-family: var(--font-pixel); font-size: 10px;">
-                            SELECT A TICKER AND HIT SCAN TO VIEW TRADES ($50k+).</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
     </div>
 
     <script>
