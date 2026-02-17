@@ -217,8 +217,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 "enable_publishing": false,
                 "hide_top_toolbar": true,
                 "studies": [
-                    "MASimple@tv-basicstudies",    // Simple Moving Average
-                    "RSI@tv-basicstudies"          // RSI (14-period) - Overbought/Oversold
+                    "MACD@tv-basicstudies",       // MACD
+                    "RSI@tv-basicstudies"          // RSI
                 ],
                 "container_id": "chart-container"
             });
