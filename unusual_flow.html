@@ -792,6 +792,34 @@
             font-size: 16px;
         }
 
+        /* Today Toggle Button */
+        .today-toggle {
+            background: transparent;
+            border: 1px solid #333;
+            color: #555;
+            padding: 4px 8px;
+            font-family: var(--font-pixel);
+            font-size: 10px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-right: 5px;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        .today-toggle:hover {
+            border-color: #555;
+            color: #777;
+        }
+
+        .today-toggle.active {
+            border-color: #00ff00;
+            color: #00ff00;
+            background: rgba(0, 255, 0, 0.1);
+            box-shadow: 0 0 5px rgba(0, 255, 0, 0.2);
+            text-shadow: 0 0 3px rgba(0, 255, 0, 0.5);
+        }
+
         /* Premium vs ADV Badge (Orange, styled like sign-out button) */
         .premium-adv-badge {
             display: inline-block;
@@ -1975,6 +2003,8 @@
                             <option value="500000">$500k+</option>
                         </select>
 
+                        <button id="fishTodayBtn" class="today-toggle active"
+                            style="background: transparent; border: 1px solid #00FF00; color: #00FF00; text-shadow: 0 0 4px #00FF00; padding: 0 12px; border-radius: 4px; font-size: 11px; height: 29px; font-family: 'VT323', monospace; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; margin-right: 8px; transition: all 0.2s ease;">TODAY</button>
                         <button id="scanFishBtn"
                             style="background: #0085ff; border: none; color: #fff; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; font-size: 11px; height: 29px;">
                             SCAN
@@ -3250,6 +3280,7 @@
         const fishTickerSelect = document.getElementById('fish-ticker-select'); // Keeps old ref just in case
         const fishTickerInput = document.getElementById('fishTicker'); // New Input
         const scanFishBtn = document.getElementById('scanFishBtn'); // New Button
+        const fishTodayBtn = document.getElementById('fishTodayBtn'); // New Today Toggle
 
         const fishExpiryFilter = document.getElementById('fishExpiryFilter');
         const fishMoneyFilter = document.getElementById('fishMoneyFilter');
@@ -3278,13 +3309,17 @@
                 const minSize = fishMinSizeFilter ? fishMinSizeFilter.value : '50';
                 const minPrem = fishMinPremiumFilter ? fishMinPremiumFilter.value : '50000';
 
+                // Today Only Logic
+                const isToday = fishTodayBtn.classList.contains('active');
+                const todayParam = isToday ? '&today_only=true' : '';
+
                 fishStatusEl.textContent = `SCANNING ${ticker}... THIS MAY TAKE A MINUTE`;
                 fishTbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px;"><div class="loading-spinner-small" style="margin: 0 auto;"></div><div style="margin-top: 10px; font-size: 11px; color: #666;">🐷 Fetching trades... this may take a minute</div></td></tr>';
 
 
                 try {
                     // Pass filters to backend
-                    const res = await fetch(`${API_BASE_URL}/api/library/options?symbol=${ticker}&expiry=${exp}&moneyness=${mon}&type=${type}&minSize=${minSize}&minPremium=${minPrem}`);
+                    const res = await fetch(`${API_BASE_URL}/api/library/options?symbol=${ticker}&expiry=${exp}&moneyness=${mon}&type=${type}&minSize=${minSize}&minPremium=${minPrem}${todayParam}`);
                     const json = await res.json();
                     if (json.error) throw new Error(json.error);
 
@@ -3384,6 +3419,26 @@
 
         fishExpirySelect.addEventListener('change', applyFishFilters);
         fishWeekSelect.addEventListener('change', applyFishFilters);
+
+        // Toggle Today Only
+        if (fishTodayBtn) {
+            fishTodayBtn.addEventListener('click', () => {
+                fishTodayBtn.classList.toggle('active');
+
+                const isActive = fishTodayBtn.classList.contains('active');
+                if (isActive) {
+                    fishTodayBtn.style.color = '#00FF00'; // Green text
+                    fishTodayBtn.style.borderColor = '#00FF00'; // Green border
+                    fishTodayBtn.style.textShadow = '0 0 4px #00FF00';
+                    fishTodayBtn.innerText = 'TODAY';
+                } else {
+                    fishTodayBtn.style.color = '#555'; // Dark text
+                    fishTodayBtn.style.borderColor = '#333'; // Dark border
+                    fishTodayBtn.style.textShadow = 'none';
+                    fishTodayBtn.innerText = 'HISTORY';
+                }
+            });
+        }
 
 
         // ========================================

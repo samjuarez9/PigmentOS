@@ -889,9 +889,9 @@ def get_flow_contracts():
         if not current_price:
             current_price = 100  # Fallback
         
-        # Calculate strike range (±20% of spot)
-        min_strike = current_price * 0.80
-        max_strike = current_price * 1.20
+        # Calculate strike range (±30% of spot)
+        min_strike = current_price * 0.70
+        max_strike = current_price * 1.30
         
         # Calculate expiration range (today to 60 days out)
         today = datetime.now().strftime("%Y-%m-%d")
@@ -4742,6 +4742,7 @@ def api_library_options():
     type_filter = request.args.get('type', 'all')
     min_size_filter = request.args.get('minSize', '50')  # 50, 100, or 250
     min_premium_filter = request.args.get('minPremium', '50000') # Default to 50k Global Rule
+    today_only = request.args.get('today_only') == 'true'
     
     # Cache Key - Include all filter params to ensure filtered results aren't cached together
     current_time = time.time()
@@ -4824,7 +4825,7 @@ def api_library_options():
             traceback.print_exc()
             return jsonify({"data": []})
 
-    cache_key = f"library_massive_{symbol}_type{type_filter}_exp{expiry_filter}_mon{money_filter}_size{min_size_filter}_prem{min_premium_filter}_v3"
+    cache_key = f"library_massive_{symbol}_type{type_filter}_exp{expiry_filter}_mon{money_filter}_size{min_size_filter}_prem{min_premium_filter}_today{today_only}_v3"
     
     global LIBRARY_CACHE
     if 'LIBRARY_CACHE' not in globals():
@@ -4980,7 +4981,13 @@ def api_library_options():
         MIN_SIZE = int(min_size_filter)  # User-selected min contracts (50, 100, or 250)
         print(f"🐟 MIN_SIZE filter set to: {MIN_SIZE} (from min_size_filter={min_size_filter})")
         
-        start_date = (now_et - timedelta(days=30)).strftime("%Y-%m-%d")
+        if today_only:
+             # Today Only: Use current date as start_date
+             start_date = now_et.strftime("%Y-%m-%d")
+             print(f"🐟 TODAY ONLY MODE: Fetching trades since {start_date}")
+        else:
+             # Standard: 30 days history
+             start_date = (now_et - timedelta(days=30)).strftime("%Y-%m-%d")
         
         def fetch_contract_trades(contract_info):
             """Fetch trades for a single contract from Massive"""
