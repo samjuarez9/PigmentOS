@@ -893,9 +893,9 @@ def get_flow_contracts():
         min_strike = current_price * 0.70
         max_strike = current_price * 1.30
         
-        # Calculate expiration range (today to 60 days out)
+        # Calculate expiration range (today to 180 days out)
         today = datetime.now().strftime("%Y-%m-%d")
-        max_expiry = (datetime.now() + timedelta(days=60)).strftime("%Y-%m-%d")
+        max_expiry = (datetime.now() + timedelta(days=180)).strftime("%Y-%m-%d")
         
         # 2. Use Reference API for contract discovery (Options Advanced tier)
         url = "https://api.polygon.io/v3/reference/options/contracts"
@@ -914,9 +914,9 @@ def get_flow_contracts():
         
         all_contracts = []
         
-        # Fetch with pagination (Limit to 3 pages / ~3000 requests to prevent timeouts)
+        # Fetch with pagination (Limit to 5 pages / ~5000 requests to prevent timeouts)
         page_count = 0
-        MAX_PAGES = 3
+        MAX_PAGES = 5
         
         while url and page_count < MAX_PAGES:
             resp = requests.get(url, params=params, timeout=15)
