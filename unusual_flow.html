@@ -1058,8 +1058,26 @@
             border-bottom: 1px solid #222;
         }
 
-        .fish-finder-table tr:hover {
-            background: #1a1a1a;
+        .fish-finder-table tr {
+            transition: background 0.3s, transform 0.3s;
+        }
+
+        .fish-finder-table tr.long-pressing {
+            background: rgba(0, 255, 136, 0.15) !important;
+            transform: scale(0.99);
+            box-shadow: inset 0 0 10px rgba(0, 255, 136, 0.2);
+            cursor: pointer;
+        }
+
+        /* Subtle minimalist text color shift indicating loading behind the pig */
+        .fish-finder-table tr.long-pressing td,
+        .fish-finder-table tr.long-pressing b,
+        .fish-finder-table tr.long-pressing span,
+        .fish-finder-table tr.long-pressing div {
+            color: #00ff88 !important;
+            /* PigmentOS Green */
+            text-shadow: 0 0 4px rgba(0, 255, 136, 0.4) !important;
+            transition: all 0.3s ease;
         }
 
         /* Re-using some Fish Finder specific classes */
@@ -2126,7 +2144,7 @@
 
             // Sync Ticker Selectors
             const contractTicker = document.getElementById('ticker-select');
-            const fishTicker = document.getElementById('fish-ticker-select');
+            const fishTicker = document.getElementById('fishTicker'); // Use the new fishTicker input
 
             if (viewName === 'fish') {
                 if (contractTicker.value && !fishTicker.value) {
@@ -2259,7 +2277,7 @@
             // Aggregate premium, OI, and IV by strike (sum calls + puts)
             const strikePremiums = {};
             const strikeOI = {};
-            const strikeIV = {};  // Track IV per strike { sum, count }
+            const strikeIV = {};  // Track IV per strike { sum: 0, count: 0 }
             let hasPremiumData = false;
 
             relevant.forEach(c => {
@@ -3529,6 +3547,49 @@
         // MAIN RENDER (uses helpers above)
         // ========================================
 
+        async function viewContractInFlow(ticker, expiry, strike, type) {
+            console.log(`Jumping to Flow: ${ticker} ${expiry} ${strike}${type}`);
+
+            // 1. Switch Tabs
+            const flowTabBtn = document.getElementById('tab-contract');
+            if (flowTabBtn) flowTabBtn.click();
+
+            // 2. Set Ticker
+            tickerSelect.value = ticker;
+            tickerSelect.dispatchEvent(new Event('change'));
+
+            // 3. Wait for contracts to load (small polling loop)
+            let retries = 0;
+            const checkContracts = setInterval(() => {
+                if ((availableContracts.length > 0 && !expirySelect.disabled) || retries > 30) {
+                    clearInterval(checkContracts);
+                    if (retries > 30) { alert("Timeout loading contracts."); return; }
+
+                    // 4. Set Expiry
+                    expirySelect.value = expiry;
+                    expirySelect.dispatchEvent(new Event('change'));
+
+                    // 5. Short wait for strikes to populate
+                    setTimeout(() => {
+                        // 6. Set Strike
+                        strikeSelect.value = strike;
+                        strikeSelect.dispatchEvent(new Event('change'));
+
+                        // 7. Set Type & Go
+                        if (type === 'C') {
+                            document.getElementById('type-call').click();
+                        } else {
+                            document.getElementById('type-put').click();
+                        }
+
+                        setTimeout(() => document.getElementById('go-btn').click(), 100);
+
+                    }, 200);
+                }
+                retries++;
+            }, 100);
+        }
+
         function renderFishTable(trades, ticker) {
             fishTbody.innerHTML = '';
             trades.forEach(trade => {
@@ -3546,7 +3607,8 @@
                 const isCall = rType === 'CALL' || rType === 'call' || rType === 'C';
                 const tradeSide = trade.side || 'NEUTRAL';
 
-                let rowExp = trade.expiry || '';
+                const fullExpiry = trade.expiry || '';
+                let rowExp = fullExpiry;
                 if (rowExp.includes('-')) rowExp = rowExp.slice(5).replace('-', '/');
 
                 // Build tags via helpers
@@ -3560,6 +3622,49 @@
 
                 const tr = document.createElement('tr');
                 if (tags.includes('ITM')) tr.classList.add('itm-row');
+
+                // --- LONG PRESS NAVIGATION LOGIC ---
+                let pressTimer;
+                let isDragging = false;
+                const rTicker = trade.ticker || ticker;
+                const rStrike = trade.strike;
+                const rTypeChar = isCall ? 'C' : 'P';
+
+                const startPress = (e) => {
+                    if (e.type === 'mousedown' && e.button !== 0) return; // Only left click
+                    isDragging = false;
+                    tr.classList.add('long-pressing');
+
+                    pressTimer = window.setTimeout(() => {
+                        if (!isDragging) {
+                            tr.classList.remove('long-pressing');
+
+                            // A very subtle UI dimming to hide the tab jump
+                            document.body.style.transition = 'opacity 0.1s';
+                            document.body.style.opacity = '0.7';
+
+                            setTimeout(() => {
+                                document.body.style.opacity = '1';
+                                viewContractInFlow(rTicker, fullExpiry, rStrike, rTypeChar);
+                            }, 50);
+                        }
+                    }, 500); // 500ms long press
+                };
+
+                const cancelPress = () => {
+                    clearTimeout(pressTimer);
+                    tr.classList.remove('long-pressing');
+                };
+
+                tr.addEventListener('mousedown', startPress);
+                tr.addEventListener('touchstart', startPress, { passive: true });
+                tr.addEventListener('mousemove', () => isDragging = true);
+                tr.addEventListener('touchmove', () => isDragging = true, { passive: true });
+                tr.addEventListener('mouseup', cancelPress);
+                tr.addEventListener('mouseleave', cancelPress);
+                tr.addEventListener('touchend', cancelPress);
+                // -----------------------------------
+
                 tr.innerHTML = `
                     <td class="code"><b>${trade.ticker || ticker}</b> <span class="${isCall ? 'type-c' : 'type-p'}">$${trade.strike}${isCall ? 'C' : 'P'}</span></td>
                     <td class="code" style="line-height: 1.2;">

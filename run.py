@@ -5035,102 +5035,12 @@ def api_library_options():
                     return []
                 # --- OPTIMIZATION END ---
 
+                # --- OPTIMIZATION START ---
                 # Get historical quotes bounded by ACTUAL trade timestamps
-                # This ensures we don't exhaust the 5000 limit on early-day quotes
-                quotes_list = []
-                try:
-                    # Find the time range of RELEVANT trades we care about
-                    trade_timestamps = [t.get("sip_timestamp", 0) for t in relevant_trades if t.get("sip_timestamp")]
-                    if trade_timestamps:
-                        min_ts = min(trade_timestamps)
-                        max_ts = max(trade_timestamps)
-                        
-                        # Convert ns to ms for API (add 15 minutes buffer on each side)
-                        # This ensures we capture standing quotes for illiquid options
-                        min_ts_ms = int(min_ts / 1_000_000) - 900000  # 15 mins before first trade
-                        max_ts_ms = int(max_ts / 1_000_000) + 900000  # 15 mins after last trade
-                        
-                        quote_url = f"https://api.massive.com/v3/quotes/{massive_ticker}"
-                        
-                        # Pagination Loop (Max 30 pages * 50000 = 1.5M quotes)
-                        # We use 50000 limit per API docs to minimize requests
-                        current_start = min_ts_ms
-                        for i in range(30): 
-                            quote_resp = requests.get(quote_url, params={
-                                "apiKey": MASSIVE_API_KEY,
-                                "timestamp.gte": current_start,
-                                "timestamp.lte": max_ts_ms,
-                                "limit": 50000, 
-                                "order": "asc"
-                            }, timeout=15)
-                            
-                            if quote_resp.ok:
-                                batch = quote_resp.json().get("results", [])
-                                if not batch:
-                                    break
-                                    
-                                quotes_list.extend(batch)
-                                
-                                if len(batch) < 50000:
-                                    break # Reached end of range
-                                
-                                # Prepare for next page (just in case of crazy heavy volume)
-                                last_q_ts = batch[-1].get("sip_timestamp", 0)
-                                if last_q_ts:
-                                    current_start = int(last_q_ts / 1_000_000) + 1
-                                else:
-                                    break 
-                                    
-                                if current_start > max_ts_ms:
-                                    break
-                            else:
-                                print(f"🐟 Quote fetch failed page {i}: {quote_resp.status_code}")
-                                break
-                                
-                        # print(f"🐟 Fetched {len(quotes_list)} quotes for {ticker}")
-                        
-                except Exception as e:
-                    print(f"🐟 Quote fetch error for {ticker}: {e}")
-                
-                # Sort quotes by timestamp for binary search
-                quotes_sorted = sorted(quotes_list, key=lambda q: q.get("sip_timestamp", 0))
-                quote_timestamps = [q.get("sip_timestamp", 0) for q in quotes_sorted]
-                
-                import bisect
-                
-                # Maximum acceptable time gap between trade and quote (15 minutes in nanoseconds)
-                # Options can be illiquid, so standing quotes can be minutes old.
-                MAX_QUOTE_GAP_NS = 900_000_000_000  # 15 minutes
-                
-                def find_nearest_quote(trade_ts_ns):
-                    """Find the quote closest to the trade timestamp using binary search.
-                    Returns None if the closest quote is more than 5 seconds away."""
-                    if not quotes_sorted:
-                        return None
-                    
-                    # Find insertion point
-                    idx = bisect.bisect_left(quote_timestamps, trade_ts_ns)
-                    
-                    # Check neighbors to find closest
-                    candidates = []
-                    if idx > 0:
-                        candidates.append(idx - 1)
-                    if idx < len(quotes_sorted):
-                        candidates.append(idx)
-                    
-                    if not candidates:
-                        return None
-                    
-                    # Find the closest one
-                    closest_idx = min(candidates, key=lambda i: abs(quote_timestamps[i] - trade_ts_ns))
-                    time_gap = abs(quote_timestamps[closest_idx] - trade_ts_ns)
-                    
-                    # Reject if quote is too stale (more than 5 seconds away)
-                    if time_gap > MAX_QUOTE_GAP_NS:
-                        return None
-                    
-                    return quotes_sorted[closest_idx]
-                
+                # INSTEAD of pulling 1.5 million quotes into RAM, we loop over the trades and pull ONE quote per trade.
+                # This drops memory usage per contract from ~150MB down to <1MB.
+                quote_cache = {} # Cache in case multiple trades hit the exact same nanosecond
+
                 contract_delta = float(greeks.get("delta", 0) or 0)
                 
                 # Iterate RELEVANT trades only
@@ -5148,9 +5058,34 @@ def api_library_options():
                     except:
                         timestamp = 0
                         trade_time_display = "N/A"
+                        
+                    # Fetch ONE quote immediately preceding the trade timestamp
+                    matched_quote = None
+                    if sip_ts:
+                        if sip_ts in quote_cache:
+                            matched_quote = quote_cache[sip_ts]
+                        else:
+                            try:
+                                quote_url = f"https://api.massive.com/v3/quotes/{massive_ticker}"
+                                start_window = sip_ts - 900_000_000_000 # Look back up to 15 mins
+                                quote_resp = requests.get(quote_url, params={
+                                    "apiKey": MASSIVE_API_KEY,
+                                    "timestamp.gte": start_window,
+                                    "timestamp.lte": sip_ts,
+                                    "limit": 1, 
+                                    "order": "desc" # GET THE MOST RECENT QUOTE BEFORE THE TRADE
+                                }, timeout=5)
+                                
+                                if quote_resp.ok:
+                                    qs = quote_resp.json().get("results", [])
+                                    if qs:
+                                        matched_quote = qs[0]
+                                        quote_cache[sip_ts] = matched_quote
+                            except Exception as e:
+                                pass
                     
                     # Find the quote at the time of this trade
-                    matched_quote = find_nearest_quote(sip_ts)
+                    # matched_quote populated above
                     
                     bid, ask = 0, 0
                     quote_matched = False
