@@ -2851,6 +2851,7 @@
                             type: 'timeseries',
                             time: {
                                 tooltipFormat: 'MM/dd/yyyy HH:mm',
+                                minUnit: 'minute',
                                 displayFormats: {
                                     millisecond: 'MMM d HH:mm',
                                     second: 'MMM d HH:mm',
@@ -3312,7 +3313,15 @@
             const container = document.querySelector('.chart-container');
             container.classList.remove('spike-alert');
 
-
+            if (chartDays === 1) {
+                volumeChart.options.scales.x.time.unit = 'hour';
+                volumeChart.options.scales.x.time.displayFormats.hour = 'h:mm a';
+            } else if (chartDays <= 3) {
+                volumeChart.options.scales.x.time.unit = 'hour';
+                volumeChart.options.scales.x.time.displayFormats.hour = 'ccc h:mm a';
+            } else {
+                volumeChart.options.scales.x.time.unit = 'day';
+            }
 
             volumeChart.update();
         }
