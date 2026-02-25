@@ -2,9 +2,19 @@ from gevent import monkey
 monkey.patch_all()
 
 # ENABLE gRPC Gevent Compatibility (Critical for Firebase/Firestore)
-# This prevents deadlocks when using Firestore with Gunicorn+Gevent
 import grpc.experimental.gevent
 grpc.experimental.gevent.init_gevent()
+
+import threading
+# WORKAROUND: Python 3.13 + gevent KeyError in threading._delete
+if hasattr(threading.Thread, '_delete'):
+    _original_delete = threading.Thread._delete
+    def _safe_delete(self):
+        try:
+            _original_delete(self)
+        except KeyError:
+            pass
+    threading.Thread._delete = _safe_delete
 
 import json
 import time
@@ -4580,9 +4590,11 @@ def start_background_worker():
         else:
             # Market hours - warm price cache, whale scan runs via main worker loop
             print("📈 Market hours - warming price cache...")
+            import gevent
             for symbol in WHALE_WATCHLIST[:5]:
                 try:
                     get_cached_price(symbol)
+                    gevent.sleep(1)  # Prevent 429 Too Many Requests
                 except Exception as e:
                     print(f"Startup Price Cache Error ({symbol}): {e}")
         
@@ -4613,6 +4625,13 @@ def start_background_worker():
         
 
     def worker():
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
         # Load Cache INSIDE the worker to prevent blocking main thread import
         load_whale_cache()
         mark_whale_cache_cleared()

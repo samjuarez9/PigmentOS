@@ -23,6 +23,13 @@ def post_fork(server, worker):
     Start background worker AFTER Gunicorn forks (gevent compatible).
     post_worker_init doesn't work with gevent workers - must use post_fork.
     """
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
     try:
         from run import start_background_worker
         start_background_worker()
