@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PigmentOS - Flow</title>
+    <link rel="icon" type="image/png" href="/assets/favicon.png">
     <style>
         :root {
             --bg-color: #000000;
@@ -1276,7 +1277,11 @@
         href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;700&family=VT323&family=Space+Mono:wght@400;700&display=swap"
         rel="stylesheet">
     <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.1/dist/chartjs-chart-financial.js"></script>
     <script
         src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 </head>
@@ -1978,6 +1983,8 @@
                                 <option value="EWZ">EWZ</option>
                                 <option value="IWM">IWM</option>
                                 <option value="PBR">PBR</option>
+                                <option value="QQQ">QQQ</option>
+                                <option value="SPY">SPY</option>
                             </optgroup>
                         </select>
 
@@ -2713,6 +2720,20 @@
         function initChart() {
             const ctx = document.getElementById('volumeChart').getContext('2d');
 
+            // Force global defaults for candlestick colors to override the blue plugin defaults
+            if (window.Chart && Chart.defaults && Chart.defaults.elements && Chart.defaults.elements.candlestick) {
+                Chart.defaults.elements.candlestick.color = {
+                    up: 'rgba(0, 255, 136, 1)',   // Neon Green
+                    down: 'rgba(255, 42, 42, 1)', // Bright Red
+                    unchanged: 'rgba(150, 150, 150, 1)'
+                };
+                Chart.defaults.elements.candlestick.borderColor = {
+                    up: '#00ff88',
+                    down: '#ff2a2a',
+                    unchanged: '#777'
+                };
+            }
+
             volumeChart = new Chart(ctx, {
                 type: 'bar',
                 data: { labels: [], datasets: [] },
@@ -2729,6 +2750,7 @@
                         tooltip: {
                             mode: 'nearest',
                             intersect: true,
+                            displayColors: false,
                             backgroundColor: 'rgba(0,0,0,0.95)',
                             titleColor: '#fff',
                             titleFont: { family: "'VT323', monospace", size: 14 },
@@ -2738,14 +2760,15 @@
                             borderWidth: 1,
                             padding: 10,
                             filter: function (tooltipItem) {
-                                // Only show tooltip if the volume (or raw value) is greater than 50
-                                return tooltipItem.raw > 50;
+                                // Default pass-through, datasets are already filtered directly
+                                return true;
                             },
                             callbacks: {
                                 title: function (context) {
-                                    const idx = context[0].dataIndex;
-                                    const historyItem = window.chartHistoryData?.[idx];
-                                    if (!historyItem) return '';
+                                    if (!context || context.length === 0) return '';
+                                    const timestamp = context[0].raw?.x || context[0].parsed?.x;
+                                    const historyItem = window.chartHistoryData?.find(h => h.timestamp === timestamp);
+                                    if (!historyItem) return context[0].label || '';
 
                                     // Parse date/timestamp
                                     let date;
@@ -2763,47 +2786,52 @@
                                     return historyItem.date || '';
                                 },
                                 label: function (context) {
-                                    const idx = context.dataIndex;
-                                    const historyItem = window.chartHistoryData?.[idx];
+                                    const timestamp = context.raw?.x || context.parsed?.x;
+                                    const historyItem = window.chartHistoryData?.find(h => h.timestamp === timestamp);
                                     const label = context.dataset.label;
 
-                                    if (label === 'Avg Fill') {
-                                        return `Avg Fill: $${context.raw?.toFixed(2) || '-'}`;
+                                    // Use idx specifically if we need to know if it's the 'last' item today
+                                    const isToday = timestamp === window.chartHistoryData[window.chartHistoryData.length - 1]?.timestamp;
+
+                                    if (label === 'Option Price') {
+                                        return `Option Price: $${context.raw?.y?.toFixed(2) || context.raw?.toFixed(2) || '-'}`;
                                     } else if (label === 'VWAP') {
-                                        return `VWAP: $${context.raw?.toFixed(2) || '-'}`;
+                                        return `VWAP: $${context.raw?.y?.toFixed(2) || context.raw?.toFixed(2) || '-'}`;
                                     } else if (label === 'Avg Trade Size') {
+                                        if (!historyItem) return 'Avg Size: Loading...';
                                         return [
                                             `Avg Size: ${historyItem.transactions ? (historyItem.volume / historyItem.transactions).toFixed(0) : 'Loading...'}`,
                                             `Tx Count: ${historyItem.transactions || 'Loading...'}`
                                         ];
-                                    } else if (label === 'Premium') {
-                                        if (!historyItem) return `Premium: $${context.raw?.toLocaleString()}`;
-                                        const isToday = idx === (window.chartHistoryData.length - 1);
-                                        const volLabel = isToday ? "Today's Volume" : "Volume";
 
-                                        const tooltipLines = [
-                                            `Premium: $${context.raw?.toLocaleString()}`,
-                                            `${volLabel}: ${historyItem.volume?.toLocaleString() || '-'} contracts`,
-                                            `Avg Fill: $${(historyItem.vwap || historyItem.price || 0).toFixed(2)}`
-                                        ];
-
-                                        if (isToday) {
-                                            tooltipLines.push(`OI: ${historyItem.oi?.toLocaleString() || '-'}`);
-                                        }
-
-                                        return tooltipLines;
                                     } else if (label === 'Volume') {
                                         // 1D Intraday View
-                                        if (!historyItem) return `Volume: ${context.raw?.toLocaleString()}`;
+                                        if (!historyItem) return `Volume: ${context.raw?.y?.toLocaleString()}`;
 
-                                        const volume = context.raw || 0;
+                                        // `context.raw.y` is used because the candlestick fix sets `y` value instead of a raw number
+                                        const volume = context.raw?.y || context.raw || 0;
                                         const price = historyItem.vwap || historyItem.price || 0;
                                         const premium = volume * price * 100;
 
+                                        const volLabel = isToday ? "Today's Volume" : "Contracts";
+
+                                        const tooltipLines = [
+                                            `${volLabel}: ${volume.toLocaleString()}`,
+                                            `Avg Price: $${price.toFixed(2)}`
+                                        ];
+
+                                        if (isToday && historyItem.oi) {
+                                            tooltipLines.push(`OI: ${historyItem.oi.toLocaleString()}`);
+                                        }
+
+                                        return tooltipLines;
+                                    } else if (label === 'Price') {
+                                        if (!historyItem) return `Price: 0`;
                                         return [
-                                            `Contracts: ${volume.toLocaleString()}`,
-                                            `Premium: $${premium.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
-                                            `Price: $${price.toFixed(2)}`
+                                            `O: $${(historyItem.open || historyItem.price || 0).toFixed(2)}`,
+                                            `H: $${(historyItem.high || historyItem.price || 0).toFixed(2)}`,
+                                            `L: $${(historyItem.low || historyItem.price || 0).toFixed(2)}`,
+                                            `C: $${(historyItem.price || 0).toFixed(2)}`,
                                         ];
                                     }
                                     return '';
@@ -2813,38 +2841,58 @@
                     },
                     layout: {
                         padding: {
-                            right: 30, // Add padding for custom axis title
+                            left: 30, // Add padding for custom axis title
                             bottom: 10,
                             top: 10
                         }
                     },
                     scales: {
                         x: {
+                            type: 'timeseries',
+                            time: {
+                                tooltipFormat: 'MM/dd/yyyy HH:mm',
+                                displayFormats: {
+                                    millisecond: 'MMM d HH:mm',
+                                    second: 'MMM d HH:mm',
+                                    minute: 'h:mm a',
+                                    hour: 'ccc h:mm a',
+                                    day: 'MMM d',
+                                    week: 'MMM d',
+                                    month: 'MMM yyyy',
+                                    quarter: 'MMM yyyy',
+                                    year: 'yyyy'
+                                }
+                            },
                             grid: { display: false, drawBorder: false },
-                            ticks: { color: '#888', font: { family: "'VT323', monospace", size: 10 } }
+                            ticks: {
+                                color: '#888',
+                                font: { family: "'VT323', monospace", size: 10 },
+                                maxTicksLimit: window.innerWidth < 600 ? 5 : 10
+                            }
                         },
                         y: {
                             type: 'linear',
                             display: true,
-                            position: 'left',
+                            position: 'right',
                             beginAtZero: true,
                             grid: { color: '#222', drawBorder: false },
                             ticks: {
                                 color: '#888',
                                 font: { family: "'VT323', monospace" },
                                 callback: function (value) {
-                                    if (value >= 1e6) return '$' + (value / 1e6).toFixed(1) + 'M';
-                                    if (value >= 1e3) return '$' + (value / 1e3).toFixed(1) + 'K';
-                                    return '$' + value;
+                                    if (!Number.isInteger(value)) return '';
+                                    if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
+                                    if (value >= 1e3) return (value / 1e3).toFixed(1) + 'K';
+                                    return value;
                                 }
                             },
-                            title: { display: true, text: 'PREMIUM', color: '#555', font: { size: 10 } }
+                            title: { display: true, text: 'VOLUME', color: '#555', font: { size: 10 } }
                         },
                         y1: {
                             type: 'linear',
                             display: true,
-                            position: 'right',
-                            beginAtZero: false,
+                            position: 'left',
+                            beginAtZero: true,
                             grid: { drawOnChartArea: false, drawBorder: false },
                             ticks: {
                                 color: '#555',
@@ -2855,17 +2903,11 @@
                         },
                         y2: {
                             type: 'linear',
-                            display: true,
+                            display: false,
                             position: 'right',
-                            beginAtZero: true,
-                            grid: { drawOnChartArea: false, drawBorder: false },
-                            ticks: {
-                                color: '#0085FF',
-                                font: { family: "'VT323', monospace", size: 8 },
-                                callback: function (value) { return value.toFixed(0); }
-                            },
-                            title: { display: false }
+                            beginAtZero: true
                         }
+
                     }
                 },
                 plugins: [{
@@ -2875,7 +2917,7 @@
                         const yAxis = scales.y1;
                         if (!yAxis) return;
 
-                        const x = chart.width - 10; // Right margin
+                        const x = 15; // Left margin
                         const y = (yAxis.top + yAxis.bottom) / 2;
 
                         ctx.save();
@@ -2892,7 +2934,7 @@
                         // Colors: Purple / Gray / Red / Gray / Cyan
 
                         const textSegments = [
-                            { text: 'Avg Fill', color: '#D15CFF' },
+                            { text: 'Opt Price', color: '#D15CFF' },
                             { text: ' / ', color: '#555' },
                             { text: 'Avg Size', color: '#0085FF' }
                         ];
@@ -3077,113 +3119,87 @@
             }
 
             // Prepare Chart Data
-            // Prepare Chart Data
-            let labels;
             const intervalVal = document.getElementById('interval-select').value;
             const isIntraday = intervalVal !== '1d' || chartDays === 1;
 
-            if (isIntraday) {
-                // Intraday: Show Time (HH:MM) or Date + Time depending on span
-                // Clean X-Axis Logic: Date at start of new day, Time otherwise
-                labels = history.map((h, index) => {
-                    // Start by checking if we have a valid timestamp (ms) or ISO string
-                    let date;
-                    if (h.timestamp) {
-                        date = new Date(h.timestamp);
-                    } else if (h.date && h.date.includes('T')) {
-                        date = new Date(h.date);
-                    } else {
-                        // Fallback processing
-                        date = new Date(h.date);
-                    }
+            const volData = history.map(h => ({ x: h.timestamp, y: h.volume }));
 
-                    if (!isNaN(date.getTime())) {
-                        const m = date.toLocaleString('en-US', { month: 'short' });
-                        const d = date.getDate();
-                        const hStr = String(date.getHours()).padStart(2, '0');
-                        const minStr = String(date.getMinutes()).padStart(2, '0');
-
-                        // Check if day changed from previous point
-                        let showDate = false;
-                        if (index === 0) {
-                            showDate = true;
-                        } else {
-                            const prevH = history[index - 1];
-                            let prevDate;
-                            if (prevH.timestamp) prevDate = new Date(prevH.timestamp);
-                            else if (prevH.date && prevH.date.includes('T')) prevDate = new Date(prevH.date);
-                            else prevDate = new Date(prevH.date);
-
-                            if (prevDate.getDate() !== d) {
-                                showDate = true;
-                            }
-                        }
-
-                        if (showDate) {
-                            return `${m} ${d}`;
-                        } else {
-                            return `${hStr}:${minStr}`;
-                        }
-                    }
-                    return h.date; // fallback
-                });
-            } else {
-                // Daily: date is "YYYY-MM-DD"
-                labels = history.map(h => {
-                    const date = new Date(h.date + 'T12:00:00');
-                    return `${date.getMonth() + 1}/${date.getDate()}`;
-                });
-            }
-
-            const volData = history.map(h => h.volume);
-            const oiData = history.map(h => h.oi);
             // Calculate Premium: Volume * Price (VWAP or Price) * 100
             const premiumData = history.map(h => {
                 if ((h.volume || 0) <= 100) return null;
                 const price = h.vwap || h.price || 0;
-                return h.volume * price * 100;
-            });
-            const priceData = history.map(h => h.price);
+                return { x: h.timestamp, y: h.volume * price * 100 };
+            }).filter(d => d !== null);
 
-
-
-            const vwapData = history.map(h => h.vwap || null);
+            // OHLC Data for Candlesticks
+            const ohlcData = history.map(h => {
+                if ((h.volume || 0) <= 100) return null;
+                return {
+                    x: h.timestamp,
+                    o: h.open || h.price,
+                    h: h.high || h.price,
+                    l: h.low || h.price,
+                    c: h.price
+                };
+            }).filter(d => d !== null);
 
             // Calculate Avg Trade Size (Volume / Transactions)
             const avgSizeData = history.map(h => {
                 if (!h.transactions || h.transactions === 0) return null;
-                return h.volume / h.transactions;
-            });
+                return { x: h.timestamp, y: h.volume / h.transactions };
+            }).filter(d => d !== null);
 
             // Update Chart
-            volumeChart.data.labels = labels;
+            // We do not set labels array directly when using time scale
+            volumeChart.data.labels = [];
+
+            const simpleVolData = history.map(h => ((h.volume || 0) > 100 ? { x: h.timestamp, y: h.volume } : null)).filter(d => d !== null);
 
             if (chartDays === 1) {
-                // === INTRADAY BAR (Simple Volume) ===
-                const simpleVolData = history.map(h => ((h.volume || 0) > 100 ? h.volume : null));
+                // === INTRADAY CANDLESTICK BAR ===
 
                 volumeChart.data.datasets = [
                     {
-                        type: 'line',
+                        type: 'candlestick',
                         label: 'Price',
-                        data: priceData,
-                        borderColor: '#FF00FF', // Pink Price Line
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        tension: 0.1,
-                        fill: false,
+                        data: ohlcData,
+                        backgroundColors: {
+                            up: '#00ff88',   // Neon Green
+                            down: '#ff2a2a', // Bright Red
+                            unchanged: '#999',
+                        },
+                        borderColors: {
+                            up: '#00ff88',
+                            down: '#ff2a2a',
+                            unchanged: '#777',
+                        },
+                        borderWidth: 1,
                         yAxisID: 'y1',
                         order: 1
                     },
                     {
                         type: 'line',
+                        label: 'Option Price',
+                        data: history.map(h => {
+                            return { x: h.timestamp, y: h.price };
+                        }),
+                        borderColor: '#FF00FF', // Pink Price Line
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        tension: 0.1,
+                        fill: false,
+                        yAxisID: 'y1',
+                        order: 2
+                    },
+                    {
+                        type: 'line',
                         label: 'Avg Trade Size',
                         data: avgSizeData,
-                        borderColor: '#00ffff', // Cyan
+                        borderColor: '#004B93', // Pepsi Blue
                         borderWidth: 1,
                         borderDash: [], // Solid line
                         pointRadius: 0,
-                        yAxisID: 'y2', // Separate axis for Size (hidden)
+                        yAxisID: 'y2', // Invisible second axis so it doesn't skew Option Price
                         order: 2
                     },
                     {
@@ -3202,25 +3218,45 @@
                     }
                 ];
             } else {
-                // === DAILY AGGREGATE CHART (Standard) ===
+                // === DAILY AGGREGATE CHART (Candlesticks) ===
                 volumeChart.data.datasets = [
+                    ...(chartDays < 6 ? [{
+                        type: 'candlestick',
+                        label: 'Price',
+                        data: ohlcData,
+                        backgroundColors: {
+                            up: '#00ff88',   // Neon Green
+                            down: '#ff2a2a', // Bright Red
+                            unchanged: '#999',
+                        },
+                        borderColors: {
+                            up: '#00ff88',
+                            down: '#ff2a2a',
+                            unchanged: '#777',
+                        },
+                        borderWidth: 1,
+                        yAxisID: 'y1',
+                        order: 1
+                    }] : []),
                     {
                         type: 'line',
-                        label: 'Avg Fill',
-                        data: priceData,
+                        label: 'Option Price',
+                        data: history.map(h => {
+                            return { x: h.timestamp, y: h.price };
+                        }),
                         borderColor: '#FF00FF', // Pink Price Line
-                        borderWidth: 2,
+                        borderWidth: 1,
                         borderDash: [], // Solid line
                         pointRadius: 0,
                         fill: false,
                         tension: 0.1,
                         yAxisID: 'y1',
-                        order: 1
+                        order: 2
                     },
                     {
                         type: 'bar',
-                        label: 'Premium',
-                        data: premiumData,
+                        label: 'Volume',
+                        data: volData,
                         backgroundColor: function (context) {
                             const chart = context.chart;
                             const { ctx, chartArea } = chart;
@@ -3235,11 +3271,11 @@
                         type: 'line',
                         label: 'Avg Trade Size',
                         data: avgSizeData,
-                        borderColor: '#0085FF',
+                        borderColor: '#004B93', // Pepsi Blue
                         borderWidth: 1,
                         pointRadius: 0,
                         pointHoverRadius: 5,
-                        yAxisID: 'y2', // New Right Axis
+                        yAxisID: 'y2', // Invisible second axis so it doesn't skew Option Price
                         order: 0
                     }
                 ];
@@ -3248,6 +3284,29 @@
             // Add annotation for average line
             // Removed Vol/OI average line and baseline as they are less relevant for Premium view
             volumeChart.options.plugins.annotation = {};
+
+            // Force evaluate candlestick colors at render time
+            if (window.Chart && Chart.defaults && Chart.defaults.elements && Chart.defaults.elements.candlestick) {
+                Chart.defaults.elements.candlestick.color = {
+                    up: 'rgba(0, 255, 136, 1)',
+                    down: 'rgba(255, 42, 42, 1)',
+                    unchanged: 'rgba(150, 150, 150, 1)'
+                };
+                Chart.defaults.elements.candlestick.borderColor = {
+                    up: '#00ff88',
+                    down: '#ff2a2a',
+                    unchanged: '#777'
+                };
+            }
+
+            // Dynamically scale y1 axis to fit the highest pink line (Option Price) point
+            if (history.length > 0) {
+                const maxPrice = Math.max(...history.map(d => d.price || 0));
+                // Add padding so the Option Price line doesn't hit the absolute ceiling
+                if (maxPrice > 0) {
+                    volumeChart.options.scales.y1.max = maxPrice * 1.1;
+                }
+            }
 
             // Flash alert if any bar > 5x (Removed for now as ratio logic is gone)
             const container = document.querySelector('.chart-container');

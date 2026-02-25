@@ -1125,35 +1125,141 @@ def get_vol_oi_history(contract_symbol):
         else:
              lookback_days = max(18, display_days * 3)
 
-        # Fetch Aggregates using shared helper
-        aggs = fetch_polygon_historical_aggs(
-            formatted_contract, 
-            timespan=timespan, 
-            multiplier=multiplier, 
-            days=lookback_days
-        )
-        
+        # Fetch Aggregates from Massive API (or fallback to Polygon if needed, but let's try Massive direct for options)
         history_data = []
-        if aggs:
-            for bar in aggs:
-                bar_datetime = datetime.fromtimestamp(bar['t']/1000)
-                if bar_datetime.weekday() >= 5: continue
+        if MASSIVE_API_KEY:
+            try:
+                # Massive Options Aggs Endpoint: /v3/historical/options/{ticker}?interval={multiplier}{timespan}&start={start}&limit=5000
+                m_timespan = timespan
+                if m_timespan == 'minute': m_timespan = 'minute'
+                elif m_timespan == 'hour': m_timespan = 'hour'
+                elif m_timespan == 'day': m_timespan = 'day'
                 
-                # PRE-MARKET FILTER: Ignore 'Today' bars before 4 AM (Fixes midnight glitches)
-                if bar_datetime.date() == datetime.now().date() and bar_datetime.hour < 4:
-                    continue
+                # For options, Massive expects the OCC symbol format but without the exact O: prefix sometimes, or with it.
+                # Documentation says it's standard ticker format.
+                clean_sym = formatted_contract.replace("O:", "")
+                
+                start_date_obj = datetime.now() - timedelta(days=lookback_days)
+                # Keep trading days
+                if lookback_days > 5:
+                    start_date_obj = start_date_obj - timedelta(days=(lookback_days // 5) * 2)
+                    
+                start_str = start_date_obj.strftime("%Y-%m-%d")
 
-                history_data.append({
-                    "date": bar_datetime.strftime("%Y-%m-%d"),
-                    "timestamp": bar['t'],  # Add timestamp for intraday charts
-                    "volume": int(bar.get('v', 0)),
-                    "oi": 0,
-                    "vol_oi_ratio": 0,
-                    "price": bar.get('c', 0),
-                    "vwap": bar.get('vw', 0),
-                    "iv": None,
-                    "transactions": int(bar.get('n', 0))
-                })
+                # Note: Massive API docs say `interval` is combined (e.g. "5minute", "1day")
+                interval_str = f"{multiplier}{m_timespan}"
+                
+                massive_url = f"https://api.massive.com/v3/historical/options/{clean_sym}"
+                params = {
+                    "apiKey": MASSIVE_API_KEY,
+                    "interval": interval_str,
+                    "start": start_str,
+                    "limit": 5000,
+                    "sort": "asc"
+                }
+                
+                print(f"DEBUG: Fetching Massive Aggs: {massive_url} | {params}")
+                
+                m_resp = requests.get(massive_url, params=params, timeout=10)
+                if m_resp.status_code == 200:
+                    m_data = m_resp.json()
+                    aggs = m_data.get("results", [])
+                    print(f"DEBUG: Massive Aggs returned {len(aggs)} bars for {clean_sym}")
+                    
+                    for bar in aggs:
+                        # Massive timestamps are usually in milliseconds
+                        ts_ms = bar.get('t', 0)
+                        if ts_ms == 0: continue
+                            
+                        # Handle potential seconds vs milliseconds
+                        if ts_ms < 1e11:
+                            ts_ms *= 1000
+                            
+                        bar_datetime = datetime.fromtimestamp(ts_ms/1000)
+                        if bar_datetime.weekday() >= 5: continue
+                        
+                        # PRE-MARKET FILTER
+                        if bar_datetime.date() == datetime.now().date() and bar_datetime.hour < 4:
+                            continue
+
+                        # Massive keys: o, h, l, c, v, vw, n
+                        history_data.append({
+                            "date": bar_datetime.strftime("%Y-%m-%d"),
+                            "timestamp": ts_ms,
+                            "volume": int(bar.get('volume', bar.get('v', 0))),
+                            "oi": 0,
+                            "vol_oi_ratio": 0,
+                            "price": float(bar.get('close', bar.get('c', 0))),
+                            "vwap": float(bar.get('vwap', bar.get('vw', 0))),
+                            "open": float(bar.get('open', bar.get('o', 0))),
+                            "high": float(bar.get('high', bar.get('h', 0))),
+                            "low": float(bar.get('low', bar.get('l', 0))),
+                            "iv": None,
+                            "transactions": int(bar.get('transactions', bar.get('n', 0)))
+                        })
+                else:
+                    print(f"DEBUG: Massive Aggs Error: {m_resp.status_code} - {m_resp.text}")
+                    # Fallback to polygon if massive fails
+                    aggs = fetch_polygon_historical_aggs(
+                        formatted_contract, 
+                        timespan=timespan, 
+                        multiplier=multiplier, 
+                        days=lookback_days
+                    )
+                    if aggs:
+                        for bar in aggs:
+                            bar_datetime = datetime.fromtimestamp(bar['t']/1000)
+                            if bar_datetime.weekday() >= 5: continue
+                            
+                            if bar_datetime.date() == datetime.now().date() and bar_datetime.hour < 4:
+                                continue
+
+                            history_data.append({
+                                "date": bar_datetime.strftime("%Y-%m-%d"),
+                                "timestamp": bar['t'],  
+                                "volume": int(bar.get('v', 0)),
+                                "oi": 0,
+                                "vol_oi_ratio": 0,
+                                "price": bar.get('c', 0),
+                                "vwap": bar.get('vw', 0),
+                                "open": bar.get('o', 0),
+                                "high": bar.get('h', 0),
+                                "low": bar.get('l', 0),
+                                "iv": None,
+                                "transactions": int(bar.get('n', 0))
+                            })
+            except Exception as e:
+                print(f"DEBUG: Massive Aggs Exception: {e}")
+        else:
+             # Legacy Polygon Fallback
+            aggs = fetch_polygon_historical_aggs(
+                formatted_contract, 
+                timespan=timespan, 
+                multiplier=multiplier, 
+                days=lookback_days
+            )
+            if aggs:
+                for bar in aggs:
+                    bar_datetime = datetime.fromtimestamp(bar['t']/1000)
+                    if bar_datetime.weekday() >= 5: continue
+                    
+                    if bar_datetime.date() == datetime.now().date() and bar_datetime.hour < 4:
+                        continue
+
+                    history_data.append({
+                        "date": bar_datetime.strftime("%Y-%m-%d"),
+                        "timestamp": bar['t'],  
+                        "volume": int(bar.get('v', 0)),
+                        "oi": 0,
+                        "vol_oi_ratio": 0,
+                        "price": bar.get('c', 0),
+                        "vwap": bar.get('vw', 0),
+                        "open": bar.get('o', 0),
+                        "high": bar.get('h', 0),
+                        "low": bar.get('l', 0),
+                        "iv": None,
+                        "transactions": int(bar.get('n', 0))
+                    })
 
         
         # 2. Get current snapshot for today's OI
