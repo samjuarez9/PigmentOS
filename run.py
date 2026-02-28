@@ -214,7 +214,7 @@ def api_status():
 # === CONFIGURATION ===
 WHALE_WATCHLIST = [
     'NVDA', 'TSLA', 'AAPL', 'AMD', 'MSFT', 'AMZN', 
-    'META', 'GOOG', 'GOOGL', 'PLTR', 'MU', 'ORCL', 'TSM', 'WDC', 'STX', 'SNDK', 'CAT', 'ARM', 'AAOI', 'IWM'
+    'META', 'GOOG', 'GOOGL', 'PLTR', 'MU', 'ORCL', 'TSM', 'WDC', 'STX', 'SNDK', 'CAT', 'ARM', 'AAOI', 'IWM', 'XOM', 'CVX', 'LMT'
 ]
 
 # MarketData.app API Token (for enhanced options data)
@@ -5248,6 +5248,10 @@ def api_library_options():
                     conditions = trade.get("conditions", [])
                     # Correct codes for Intermarket Sweep Orders (ISO): 14, 219, 228, 230
                     is_sweep = any(c in conditions for c in [14, 219, 228, 230])
+                    # Code 231 is Single Leg Floor Trade (Pit) - Classic Block Trade
+                    is_block_trade = 231 in conditions
+                    # Codes 201, 203, 205, 207 represent canceled/busted trades
+                    is_canceled = any(c in conditions for c in [201, 203, 205, 207])
                     
                     trades_list.append({
                         "ticker": symbol,
@@ -5263,6 +5267,8 @@ def api_library_options():
                         "notional_value": premium,
                         "moneyness": moneyness,
                         "is_sweep": is_sweep,
+                        "is_block": is_block_trade,
+                        "is_canceled": is_canceled,
                         "is_mega_whale": size >= 500,
                         "side": side,
                         "bid": bid,
